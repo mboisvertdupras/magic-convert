@@ -11,6 +11,7 @@ use \MagicConvert\HTAccessRules;
 use \MagicConvert\Messenger;
 use \MagicConvert\PathHelper;
 use \MagicConvert\Paths;
+use \MagicConvert\PlatformInfo;
 
 // TODO: Move this code to a class
 
@@ -846,6 +847,17 @@ if (!$result['saved-both-config']) {
             'success',
             'Configuration saved. Rewrite rules did not need to be updated. ' . HTAccess::testLinks($config)
         );
+        // On nginx the .htaccess rules don't affect serving; if a rule-affecting setting changed
+        // the global "nginx rules need updating" notice already fired. Still, when nothing changed
+        // here, remind the user honestly that .htaccess is not what serves their images on nginx.
+        if (PlatformInfo::isNginx()) {
+            Messenger::addMessage(
+                'warning',
+                'Reminder: this server is nginx, which does <strong>not read <i>.htaccess</i></strong>. ' .
+                    'Your images are served according to the nginx configuration you installed from the ' .
+                    '<strong>nginx panel</strong> on this page.'
+            );
+        }
     } else {
         Messenger::addMessage(
             'success',

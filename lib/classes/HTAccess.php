@@ -413,6 +413,19 @@ class HTAccess
             );
         }
 
+        // Honest messaging on nginx: the .htaccess files WERE written (Magic Convert always writes
+        // them, e.g. for a possible Apache front-end or future migration), but nginx does not read
+        // them, so they have no effect on serving. Point the user at the nginx panel instead.
+        if (PlatformInfo::isNginx()) {
+            Messenger::addMessage(
+                'warning',
+                'Note: <i>.htaccess</i> rules were written, but <strong>nginx does not read ' .
+                    '<i>.htaccess</i></strong>, so they will not change how your images are served. ' .
+                    'Use the <strong>nginx panel</strong> on this settings page to copy or download ' .
+                    'the native nginx configuration, then reload nginx.'
+            );
+        }
+
         if (count($failedWrites) > 0) {
             $msg = '<p>Failed writing rewrite rules to the following files:</p>';
             foreach ($failedWrites as $rootId) {

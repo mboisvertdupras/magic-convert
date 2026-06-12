@@ -74,6 +74,11 @@ class AdminInit
 
             add_action("admin_post_magicconvert_settings_submit", array('\MagicConvert\OptionsPageHooks', 'submitHandler'));
 
+            // Secure download of a generated nginx artifact (Phase 3.2). Capability + nonce are
+            // re-checked inside the handler; the artifact is chosen by a whitelisted key and
+            // generated on the fly (never read from a web-accessible file).
+            add_action("admin_post_magicconvert_nginx_download", array('\MagicConvert\NginxDownload', 'handle'));
+
 
             // Ajax actions
             add_action('wp_ajax_list_unconverted_files', array('\MagicConvert\BulkConvert', 'processAjaxListUnconvertedFiles'));

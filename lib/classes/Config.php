@@ -1008,7 +1008,13 @@ class Config
             // detection) read this back to compare without regenerating. Wrapped defensively so
             // a failure here can never block a config save.
             try {
-                State::setState('nginx-rules', NginxRules::stateRecordFromPaths($config));
+                // Read the PREVIOUS record BEFORE overwriting it, so we can detect a
+                // rule-affecting fingerprint change and (on nginx) arm the "rules need updating"
+                // notice. The new record is then persisted as the baseline for the next save.
+                $oldNginxRecord = State::getState('nginx-rules', null);
+                $newNginxRecord = NginxRules::stateRecordFromPaths($config);
+                NginxRulesNotice::arm($oldNginxRecord, $newNginxRecord);
+                State::setState('nginx-rules', $newNginxRecord);
             } catch (\Throwable $e) {
                 // non-fatal: nginx state is advisory only
             }
