@@ -72,6 +72,29 @@ class ConvertHelperConcurrencyTest extends TestCase
         $this->assertSame('/cache/logo.jpg.' . getmypid() . '.tmp.webp', $temp);
     }
 
+    // --- tempDestinationFor: AVIF format (Phase 2.1) ------------------------
+
+    public function testTempDestinationForAvifEndsInAvif(): void
+    {
+        $temp = ConvertHelperIndependent::tempDestinationFor('/cache/logo.jpg.avif', 4242, 'avif');
+        $this->assertSame('/cache/logo.jpg.4242.tmp.avif', $temp);
+    }
+
+    public function testTempDestinationForAvifStripsTrailingAvifCaseInsensitively(): void
+    {
+        $temp = ConvertHelperIndependent::tempDestinationFor('/cache/logo.jpg.AVIF', 7, 'avif');
+        $this->assertSame('/cache/logo.jpg.7.tmp.avif', $temp);
+    }
+
+    public function testExplicitWebpFormatMatchesDefaultTempDestination(): void
+    {
+        $dest = '/cache/logo.jpg.webp';
+        $this->assertSame(
+            ConvertHelperIndependent::tempDestinationFor($dest, 99),
+            ConvertHelperIndependent::tempDestinationFor($dest, 99, 'webp')
+        );
+    }
+
     // --- isDestinationFresh --------------------------------------------------
 
     public function testDestinationNewerThanSourceIsFresh(): void

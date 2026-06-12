@@ -3,6 +3,7 @@
 namespace MagicConvert;
 
 use \MagicConvert\ConvertHelperIndependent;
+use \MagicConvert\OutputFormat;
 use \MagicConvert\Paths;
 
 class ConvertLog
@@ -21,7 +22,11 @@ class ConvertLog
         echo json_encode($msg, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
         /*
         $source = sanitize_text_field($_POST['source']);
-        $logFile = ConvertHelperIndependent::getLogFilename($source, Paths::getLogDirAbs());
+        // Phase 2.1 log layout: logs live under /log/conversions/<format-id>/...
+        // The viewer currently only surfaces webp logs (this feature is disabled);
+        // when re-enabled it should accept a format param and look under the right
+        // per-format subdir.
+        $logFile = ConvertHelperIndependent::getLogFilename($source, Paths::getLogDirAbs(), OutputFormat::webp());
         $msg = 'Log file: <i>' . $logFile . '</i><br><br><hr>';
 
         if (!file_exists($logFile)) {

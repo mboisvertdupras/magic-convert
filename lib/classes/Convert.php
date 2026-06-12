@@ -8,6 +8,7 @@ use \MagicConvert\ConvertHelperIndependent;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
 use \MagicConvert\ImageRoots;
+use \MagicConvert\OutputFormat;
 use \MagicConvert\PathHelper;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
@@ -17,11 +18,14 @@ use \MagicConvert\ValidateException;
 class Convert
 {
 
-    public static function getDestination($source, &$config = null)
+    public static function getDestination($source, &$config = null, $format = null)
     {
         if (is_null($config)) {
             $config = Config::loadConfigAndFix();
         }
+        // Phase 2.1: format is explicit here (defaults to webp). Single-format
+        // (webp) convert from the admin/test UI stays webp; multi-format bulk
+        // arrives in step 2.5.
         return ConvertHelperIndependent::getDestination(
             $source,
             $config['destination-folder'],
@@ -29,17 +33,19 @@ class Convert
             Paths::getMagicConvertContentDirAbs(),
             Paths::getUploadDirAbs(),
             (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
-            new ImageRoots(Paths::getImageRootsDef())
+            new ImageRoots(Paths::getImageRootsDef()),
+            OutputFormat::coerce($format)
         );
     }
 
-    public static function updateBiggerThanOriginalMark($source, $destination = null, &$config = null)
+    public static function updateBiggerThanOriginalMark($source, $destination = null, &$config = null, $format = null)
     {
         if (is_null($config)) {
             $config = Config::loadConfigAndFix();
         }
+        $format = OutputFormat::coerce($format);
         if (is_null($destination)) {
-            $destination = self::getDestination($config);
+            $destination = self::getDestination($source, $config, $format);
         }
         BiggerThanSourceDummyFiles::updateStatus(
             $source,
@@ -47,7 +53,8 @@ class Convert
             Paths::getMagicConvertContentDirAbs(),
             new ImageRoots(Paths::getImageRootsDef()),
             $config['destination-folder'],
-            $config['destination-extension']
+            $config['destination-extension'],
+            $format
         );
     }
 
@@ -67,9 +74,14 @@ class Convert
      *                                       bulk path so re-runs are cheap; the
      *                                       explicit "reconvert" UI action passes
      *                                       false to force a fresh encode.
+     *  @param  OutputFormat|string|null $format  Output format (defaults to webp). Bulk/REST/CLI
+     *                                       keep the webp default for now; the encode core
+     *                                       throws a clear "not yet supported" error for non-webp
+     *                                       until the AVIF encoder lands (step 2.3).
      */
-    public static function convertFile($source, $config = null, $convertOptions = null, $converter = null, $skipIfFresh = false)
+    public static function convertFile($source, $config = null, $convertOptions = null, $converter = null, $skipIfFresh = false, $format = null)
     {
+        $format = OutputFormat::coerce($format);
         try {
             // Check source
             // ---------------
@@ -118,7 +130,7 @@ class Convert
             // Check destination
             // -------------------------------
             $checking = 'destination';
-            $destination = self::getDestination($source, $config);
+            $destination = self::getDestination($source, $config, $format);
 
             $destination = SanityCheck::absPath($destination);
 
@@ -151,7 +163,7 @@ class Convert
         // Done with sanitizing, lets get to work!
         // ---------------------------------------
 //return false;
-        $result = ConvertHelperIndependent::convert($source, $destination, $convertOptions, $logDir, $converter);
+        $result = ConvertHelperIndependent::convert($source, $destination, $convertOptions, $logDir, $converter, $format);
 
 //error_log('looki:' . $source . $converter);
         // If we are using stack converter, check if Ewww discovered invalid api key
@@ -166,14 +178,14 @@ class Convert
             }
         //}
 
-        self::updateBiggerThanOriginalMark($source, $destination, $config);
+        self::updateBiggerThanOriginalMark($source, $destination, $config, $format);
 
         if ($result['success'] === true) {
             $result['filesize-original'] = @filesize($source);
             $result['filesize-webp'] = @filesize($destination);
             $result['destination-path'] = $destination;
 
-            $destinationOptions = DestinationOptions::createFromConfig($config);
+            $destinationOptions = DestinationOptions::createFromConfig($config, $format);
 
             $rootOfDestination = Paths::destinationRoot($rootId, $destinationOptions);
 
@@ -185,7 +197,8 @@ class Convert
                 $relPathFromImageRootToSource,
                 $config['destination-folder'],
                 $config['destination-extension'],
-                ($rootId == 'uploads')
+                ($rootId == 'uploads'),
+                $format
             );
 
             $result['destination-url'] = $rootOfDestination['url'] . '/' . $relPathFromImageRootToDest;
@@ -202,11 +215,16 @@ class Convert
      *  Additionally, it is tested if the source exists. If not, false is returned.
      *  The destination does not have to exist.
      *
+     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp). When a
+     *                                              destination of a non-webp format (e.g. .avif)
+     *                                              is passed, supply the matching format so the
+     *                                              reverse extension-stripping is correct.
+     *
      *  @return  string|null  The source path corresponding to a destination path
      *                        - or false on failure (if the source does not exist or $destination is not sane)
      *
      */
-    public static function findSource($destination, &$config = null)
+    public static function findSource($destination, &$config = null, $format = null)
     {
         try {
             // Check that destination path is sane and inside document root
@@ -226,7 +244,8 @@ class Convert
             $config['destination-extension'],
             $config['destination-structure'],
             Paths::getMagicConvertContentDirAbs(),
-            new ImageRoots(Paths::getImageRootsDef())
+            new ImageRoots(Paths::getImageRootsDef()),
+            $format
         );
     }
 

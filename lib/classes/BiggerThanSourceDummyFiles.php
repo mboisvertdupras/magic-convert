@@ -40,7 +40,10 @@ APACHE
         return is_dir($dir);
     }
 
-    public static function pathToDummyFile($source, $basedir, $imageRoots, $destinationFolder, $destinationExt)
+    /**
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     */
+    public static function pathToDummyFile($source, $basedir, $imageRoots, $destinationFolder, $destinationExt, $format = null)
     {
         $sourceResolved = realpath($source);
 
@@ -54,7 +57,7 @@ APACHE
             // So: Resolve both! and test if the resolved source begins with the resolved rootPath.
             if (strpos($sourceResolved, realpath($rootPath)) !== false) {
                 $relPath = substr($sourceResolved, strlen(realpath($rootPath)) + 1);
-                $relPath = ConvertHelperIndependent::appendOrSetExtension($relPath, $destinationFolder, $destinationExt, false);
+                $relPath = ConvertHelperIndependent::appendOrSetExtension($relPath, $destinationFolder, $destinationExt, false, $format);
 
                 return $basedir . '/' . $imageRoot->id . '/' . $relPath;
                 break;
@@ -68,7 +71,7 @@ APACHE
     }
 
     /**
-     * Check if webp is bigger than original.
+     * Check if the converted file is bigger than original.
      *
      * @return boolean|null   True if it is bigger than original, false if not. NULL if it cannot be determined
      */
@@ -92,22 +95,29 @@ APACHE
     /**
      * Update the status for a single image (when rootId is unknown)
      *
-     * Checks if webp is bigger than original. If it is, a dummy file is placed. Otherwise, it is
-     * removed (if exists)
+     * Checks if the converted file is bigger than original. If it is, a dummy file is placed.
+     * Otherwise, it is removed (if exists)
      *
-     * @param  string  $source   Path to the source file that was converted
+     * @param  string                    $source   Path to the source file that was converted
+     * @param  OutputFormat|string|null  $format   Output format (defaults to webp).
      *
-     *
+     * MARKER DESIGN (Phase 2.1): per-format marker base dir named
+     * '<cacheDirName>-bigger-than-source' (webp -> 'webp-images-bigger-than-source',
+     * unchanged; avif -> 'avif-images-bigger-than-source'). Inside it the marker
+     * filename carries the format extension, so webp and avif markers for the same
+     * source never collide. Webp markers are byte-for-byte compatible with existing
+     * ones (no migration needed).
      */
-    public static function updateStatus($source, $destination, $webExpressContentDirAbs, $imageRoots, $destinationFolder, $destinationExt)
+    public static function updateStatus($source, $destination, $webExpressContentDirAbs, $imageRoots, $destinationFolder, $destinationExt, $format = null)
     {
-        $basedir = $webExpressContentDirAbs . '/webp-images-bigger-than-source';
+        $format = OutputFormat::coerce($format);
+        $basedir = $webExpressContentDirAbs . '/' . $format->cacheDirName() . '-bigger-than-source';
         if (!file_exists($basedir)) {
             self::createBiggerThanSourceBaseDir($basedir);
         }
         $bigWebP = BiggerThanSource::bigger($source, $destination);
 
-        $file = self::pathToDummyFile($source, $basedir, $imageRoots, $destinationFolder, $destinationExt);
+        $file = self::pathToDummyFile($source, $basedir, $imageRoots, $destinationFolder, $destinationExt, $format);
         if ($file === false) {
             return;
         }

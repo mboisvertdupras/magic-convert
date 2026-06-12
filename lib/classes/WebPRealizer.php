@@ -174,7 +174,9 @@ class WebPRealizer extends WodConfigLoader
         } else {
             $destination = self::getDestinationNoDocRoot();
         }
-        SanityCheck::pregMatch('#\.webp$#', $destination, 'Does not end with .webp');
+        // webp-realizer realizes WebP files only (on-demand AVIF arrives in step 2.4).
+        $ext = OutputFormat::webp()->extension();
+        SanityCheck::pregMatch('#\.' . $ext . '$#', $destination, 'Does not end with .' . $ext);
 
         return $destination;
     }
@@ -210,6 +212,8 @@ class WebPRealizer extends WodConfigLoader
 
         // Validate source path
         // --------------------------------------------
+        // webp-realizer realizes WebP files only (on-demand AVIF arrives in step 2.4).
+        $outputFormat = OutputFormat::webp();
         $checking = 'source path';
         $source = ConvertHelperIndependent::findSource(
             $destination,
@@ -217,7 +221,8 @@ class WebPRealizer extends WodConfigLoader
             $wodOptions['destination-extension'],
             self::$usingDocRoot ? 'doc-root' : 'image-roots',
             self::$webExpressContentDirAbs,
-            self::getImageRootsDef()
+            self::getImageRootsDef(),
+            $outputFormat
         );
         //self::exitWithError('source:' . $source);
         //echo '<h3>destination:</h3> ' . $destination . '<h3>source:</h3>' . $source; exit;
@@ -247,7 +252,8 @@ class WebPRealizer extends WodConfigLoader
             $destination,
             $serveOptions,
             $logDir,
-            'Conversion triggered with the conversion script (wod/webp-realizer.php)'
+            'Conversion triggered with the conversion script (wod/webp-realizer.php)',
+            $outputFormat
         );
 
         BiggerThanSourceDummyFiles::updateStatus(
@@ -256,7 +262,8 @@ class WebPRealizer extends WodConfigLoader
             self::$webExpressContentDirAbs,
             self::getImageRootsDef(),
             $wodOptions['destination-folder'],
-            $wodOptions['destination-extension']
+            $wodOptions['destination-extension'],
+            $outputFormat
         );
 
         self::fixConfigIfEwwwDiscoveredNonFunctionalApiKeys();

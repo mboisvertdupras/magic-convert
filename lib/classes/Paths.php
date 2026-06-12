@@ -552,17 +552,25 @@ APACHE
 
     // ------------ Cache Dir -------------
 
-    public static function getCacheDirAbs()
+    /**
+     * Absolute path of the per-format cache dir.
+     *
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp -> 'webp-images').
+     */
+    public static function getCacheDirAbs($format = null)
     {
-        return self::getMagicConvertContentDirAbs() . '/webp-images';
+        return self::getMagicConvertContentDirAbs() . '/' . OutputFormat::coerce($format)->cacheDirName();
     }
 
-    public static function getCacheDirRelToDocRoot()
+    public static function getCacheDirRelToDocRoot($format = null)
     {
-        return PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(self::getCacheDirAbs());
+        return PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(self::getCacheDirAbs($format));
     }
 
-    public static function getCacheDirForImageRoot($destinationFolder, $destinationStructure, $imageRootId)
+    /**
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     */
+    public static function getCacheDirForImageRoot($destinationFolder, $destinationStructure, $imageRootId, $format = null)
     {
         if (($destinationFolder == 'mingled') && ($imageRootId == 'uploads')) {
             return self::getUploadDirAbs();
@@ -572,15 +580,15 @@ APACHE
             $relPath = PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(
                 self::getAbsDirById($imageRootId)
             );
-            return self::getCacheDirAbs() . '/doc-root/' . $relPath;
+            return self::getCacheDirAbs($format) . '/doc-root/' . $relPath;
         } else {
-            return self::getCacheDirAbs() . '/' . $imageRootId;
+            return self::getCacheDirAbs($format) . '/' . $imageRootId;
         }
     }
 
-    public static function createCacheDirIfMissing()
+    public static function createCacheDirIfMissing($format = null)
     {
-        return self::createDirIfMissing(self::getCacheDirAbs());
+        return self::createDirIfMissing(self::getCacheDirAbs($format));
     }
 
     // ------------ Log Dir -------------
@@ -592,9 +600,22 @@ APACHE
 
     // ------------ Bigger-than-source  dir -------------
 
-    public static function getBiggerThanSourceDirAbs()
+    /**
+     * Absolute path of the per-format "bigger than source" marker dir.
+     *
+     * MARKER DESIGN (Phase 2.1): markers live in a per-format base dir named
+     * '<cacheDirName>-bigger-than-source'. The webp dir stays
+     * 'webp-images-bigger-than-source' (byte-for-byte compatible with existing
+     * markers — no migration needed); avif gets 'avif-images-bigger-than-source'.
+     * Inside the dir, the marker filename already carries the format extension
+     * (the path is built with appendOrSetExtension), so a source can have an
+     * independent webp marker and avif marker without collision.
+     *
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     */
+    public static function getBiggerThanSourceDirAbs($format = null)
     {
-        return self::getMagicConvertContentDirAbs() . '/webp-images-bigger-than-source';
+        return self::getMagicConvertContentDirAbs() . '/' . OutputFormat::coerce($format)->cacheDirName() . '-bigger-than-source';
     }
 
     // ------------ Plugin Dir (all plugins) -------------
@@ -686,9 +707,15 @@ APACHE
             ];
         } else {
 
+            // Per-format cache dir name (webp -> 'webp-images', avif -> 'avif-images').
+            // The format travels on the DestinationOptions (defaults to webp).
+            $cacheDirName = OutputFormat::coerce(
+                isset($destinationOptions->format) ? $destinationOptions->format : null
+            )->cacheDirName();
+
             // Its within these bases:
-            $destUrl = self::getUrlById('wp-content') . '/magic-convert/webp-images';
-            $destPath = self::getAbsDirById('wp-content') . '/magic-convert/webp-images';
+            $destUrl = self::getUrlById('wp-content') . '/magic-convert/' . $cacheDirName;
+            $destPath = self::getAbsDirById('wp-content') . '/magic-convert/' . $cacheDirName;
 
             if (($destinationOptions->useDocRoot) && self::canUseDocRootForStructuringCacheDir()) {
                 $relPathFromDocRootToSourceImageRoot = PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(
@@ -729,23 +756,26 @@ APACHE
     // TODO: I should complete the move ASAP.
 
     /**
-     * Append ".webp" to path or replace extension with "webp", depending on what is appropriate.
+     * Append the format extension (e.g. ".webp") to path or replace the source
+     * extension with it, depending on what is appropriate.
      *
      * If destination-folder is set to mingled and destination-extension is set to "set" and
      * the path is inside upload folder, the appropriate thing is to SET the extension.
      * Otherwise, it is to APPEND.
      *
-     * @param  string  $path
-     * @param  string  $destinationFolder
-     * @param  string  $destinationExt
-     * @param  boolean $inUploadFolder
+     * @param  string                    $path
+     * @param  string                    $destinationFolder
+     * @param  string                    $destinationExt
+     * @param  boolean                   $inUploadFolder
+     * @param  OutputFormat|string|null  $format             Output format (defaults to webp).
      */
-    public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder)
+    public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder, $format = null)
     {
+        $dotExt = OutputFormat::coerce($format)->dotExtension();
         if (($destinationFolder == 'mingled') && ($destinationExt == 'set') && $inUploadFolder) {
-            return preg_replace('/\\.(jpe?g|png)$/i', '', $path) . '.webp';
+            return preg_replace('/\\.(jpe?g|png)$/i', '', $path) . $dotExt;
         } else {
-            return $path . '.webp';
+            return $path . $dotExt;
         }
     }
 

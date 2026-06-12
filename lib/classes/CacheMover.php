@@ -3,19 +3,20 @@
 namespace MagicConvert;
 
 use \MagicConvert\FileHelper;
+use \MagicConvert\OutputFormat;
 use \MagicConvert\PathHelper;
 use \MagicConvert\Paths;
 
 class CacheMover
 {
 
-    public static function getUploadFolder($destinationFolder)
+    public static function getUploadFolder($destinationFolder, $format = null)
     {
         switch ($destinationFolder) {
             case 'mingled':
                 return Paths::getUploadDirAbs();
             case 'separate':
-                return Paths::getCacheDirAbs() . '/doc-root/' . Paths::getUploadDirRel();
+                return Paths::getCacheDirAbs($format) . '/doc-root/' . Paths::getUploadDirRel();
         }
     }
 
@@ -43,12 +44,26 @@ class CacheMover
                 $uid = $stat['gid'];
             }
         }
-        FileHelper::chmod_r($dir, $dirPerm, $filePerm, $uid, $gid, '#\.webp$#', ($alsoSetOnDirs ? null : '#^$#'));
+        // chmod converted artifacts of ALL registered formats (data-driven).
+        FileHelper::chmod_r($dir, $dirPerm, $filePerm, $uid, $gid, '#\.' . self::formatExtAlternation() . '$#', ($alsoSetOnDirs ? null : '#^$#'));
     }
 
-    public static function getDestinationFolderForImageRoot($config, $imageRootId)
+    /**
+     *  Regex alternation (no delimiters) of every registered format extension,
+     *  e.g. "(?:webp|avif)". Data-driven from OutputFormat::all().
+     */
+    private static function formatExtAlternation()
     {
-        return Paths::getCacheDirForImageRoot($config['destination-folder'], $config['destination-structure'], $imageRootId);
+        $exts = [];
+        foreach (OutputFormat::all() as $format) {
+            $exts[] = preg_quote($format->extension(), '#');
+        }
+        return '(?:' . implode('|', $exts) . ')';
+    }
+
+    public static function getDestinationFolderForImageRoot($config, $imageRootId, $format = null)
+    {
+        return Paths::getCacheDirForImageRoot($config['destination-folder'], $config['destination-structure'], $imageRootId, $format);
     }
 
     /**
@@ -79,28 +94,34 @@ class CacheMover
 
         $numFilesMovedTotal = 0;
         $numFilesFailedMovingTotal = 0;
-        foreach ($rootIds as $rootId) {
 
-            $isUploadsMingled = (($newConfig['destination-folder'] == 'mingled') && ($rootId == 'uploads'));
+        // Move every registered format's cache tree (webp-images/, avif-images/, ...).
+        // With AVIF disabled the avif trees simply do not exist, so a webp-only
+        // install moves exactly what it did before.
+        foreach (OutputFormat::all() as $format) {
+            foreach ($rootIds as $rootId) {
 
-            $fromDir = self::getDestinationFolderForImageRoot($oldConfig, $rootId);
-            $fromExt = $oldConfig['destination-extension'];
+                $isUploadsMingled = (($newConfig['destination-folder'] == 'mingled') && ($rootId == 'uploads'));
 
-            $toDir = self::getDestinationFolderForImageRoot($newConfig, $rootId);
-            $toExt = $newConfig['destination-extension'];
+                $fromDir = self::getDestinationFolderForImageRoot($oldConfig, $rootId, $format);
+                $fromExt = $oldConfig['destination-extension'];
 
-            $srcDir = Paths::getAbsDirById($rootId);
+                $toDir = self::getDestinationFolderForImageRoot($newConfig, $rootId, $format);
+                $toExt = $newConfig['destination-extension'];
 
-            list($numFilesMoved, $numFilesFailedMoving) = self::moveRecursively($fromDir, $toDir, $srcDir, $fromExt, $toExt);
-            if (!$isUploadsMingled) {
-                FileHelper::removeEmptySubFolders($fromDir);
+                $srcDir = Paths::getAbsDirById($rootId);
+
+                list($numFilesMoved, $numFilesFailedMoving) = self::moveRecursively($fromDir, $toDir, $srcDir, $fromExt, $toExt, $format);
+                if (!$isUploadsMingled) {
+                    FileHelper::removeEmptySubFolders($fromDir);
+                }
+
+                $numFilesMovedTotal += $numFilesMoved;
+                $numFilesFailedMovingTotal += $numFilesFailedMoving;
+
+                $chmodFixFoldersToo = !$isUploadsMingled;
+                self::chmodFixSubDirs($toDir, $chmodFixFoldersToo);
             }
-
-            $numFilesMovedTotal += $numFilesMoved;
-            $numFilesFailedMovingTotal += $numFilesFailedMoving;
-
-            $chmodFixFoldersToo = !$isUploadsMingled;
-            self::chmodFixSubDirs($toDir, $chmodFixFoldersToo);
         }
         return [$numFilesMovedTotal, $numFilesFailedMovingTotal];
 /*
@@ -137,10 +158,17 @@ class CacheMover
     }
 
     /**
+     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     *
      *  @return [$numFilesMoved, $numFilesFailedMoving]
      */
-    public static function moveRecursively($fromDir, $toDir, $srcDir, $fromExt, $toExt)
+    public static function moveRecursively($fromDir, $toDir, $srcDir, $fromExt, $toExt, $format = null)
     {
+        $format = OutputFormat::coerce($format);
+        $dotExt = $format->dotExtension();        // e.g. ".webp"
+        $dotExtLen = strlen($dotExt);             // e.g. 5
+        $extQuoted = preg_quote($format->extension(), '/');
+
         if (!@is_dir($fromDir)) {
             return [0, 0];
         }
@@ -168,7 +196,7 @@ class CacheMover
                 //$filePerm = FileHelper::filePermWithFallback($filename, 0777);
 
                 if (@is_dir($fromDir . "/" . $filename)) {
-                    list($r1, $r2) = self::moveRecursively($fromDir . "/" . $filename, $toDir . "/" . $filename, $srcDir . "/" . $filename, $fromExt, $toExt);
+                    list($r1, $r2) = self::moveRecursively($fromDir . "/" . $filename, $toDir . "/" . $filename, $srcDir . "/" . $filename, $fromExt, $toExt, $format);
                     $numFilesMoved += $r1;
                     $numFilesFailedMoving += $r2;
 
@@ -182,38 +210,38 @@ class CacheMover
                     }
                 } else {
                     // its a file.
-                    // check if its a webp
-                    if (strpos($filename, '.webp', strlen($filename) - 5) !== false) {
+                    // check if its a converted artifact of THIS format (e.g. .webp / .avif)
+                    if (strpos($filename, $dotExt, strlen($filename) - $dotExtLen) !== false) {
 
-                        $filenameWithoutWebp = substr($filename, 0, strlen($filename) - 5);
-                        $srcFilePathWithoutWebp = $srcDir . "/" . $filenameWithoutWebp;
+                        $filenameWithoutExt = substr($filename, 0, strlen($filename) - $dotExtLen);
+                        $srcFilePathWithoutExt = $srcDir . "/" . $filenameWithoutExt;
 
                         // check if a corresponding source file exists
                         $newFilename = null;
-                        if (($fromExt == 'append') && (@file_exists($srcFilePathWithoutWebp))) {
+                        if (($fromExt == 'append') && (@file_exists($srcFilePathWithoutExt))) {
                             if ($toExt == 'append') {
                                 $newFilename = $filename;
                             } else {
                                 // remove ".jpg" part of filename (or ".png")
-                                $newFilename = preg_replace("/\.(jpe?g|png)\.webp$/", '.webp', $filename);
+                                $newFilename = preg_replace("/\.(jpe?g|png)\." . $extQuoted . "$/", $dotExt, $filename);
                             }
                         } elseif ($fromExt == 'set') {
                             if ($toExt == 'set') {
                                 if (
-                                    @file_exists($srcFilePathWithoutWebp . ".jpg") ||
-                                    @file_exists($srcFilePathWithoutWebp . ".jpeg") ||
-                                    @file_exists($srcFilePathWithoutWebp . ".png")
+                                    @file_exists($srcFilePathWithoutExt . ".jpg") ||
+                                    @file_exists($srcFilePathWithoutExt . ".jpeg") ||
+                                    @file_exists($srcFilePathWithoutExt . ".png")
                                 ) {
                                     $newFilename = $filename;
                                 }
                             } else {
                                 // append
-                                if (@file_exists($srcFilePathWithoutWebp . ".jpg")) {
-                                    $newFilename = $filenameWithoutWebp . ".jpg.webp";
-                                } elseif (@file_exists($srcFilePathWithoutWebp . ".jpeg")) {
-                                    $newFilename = $filenameWithoutWebp . ".jpeg.webp";
-                                } elseif (@file_exists($srcFilePathWithoutWebp . ".png")) {
-                                    $newFilename = $filenameWithoutWebp . ".png.webp";
+                                if (@file_exists($srcFilePathWithoutExt . ".jpg")) {
+                                    $newFilename = $filenameWithoutExt . ".jpg" . $dotExt;
+                                } elseif (@file_exists($srcFilePathWithoutExt . ".jpeg")) {
+                                    $newFilename = $filenameWithoutExt . ".jpeg" . $dotExt;
+                                } elseif (@file_exists($srcFilePathWithoutExt . ".png")) {
+                                    $newFilename = $filenameWithoutExt . ".png" . $dotExt;
                                 }
                             }
                         }

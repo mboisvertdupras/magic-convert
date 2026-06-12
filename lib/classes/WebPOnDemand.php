@@ -184,6 +184,9 @@ class WebPOnDemand extends WodConfigLoader
         // Check destination path
         // --------------------------------------------
         self::$checking = 'destination path';
+        // On-demand serving is WebP-only by default (on-demand AVIF is gated and
+        // arrives in step 2.4). Pass the format explicitly to make that intent clear.
+        $outputFormat = OutputFormat::webp();
         $destination = ConvertHelperIndependent::getDestination(
             $source,
             $wodOptions['destination-folder'],
@@ -191,11 +194,12 @@ class WebPOnDemand extends WodConfigLoader
             self::$webExpressContentDirAbs,
             $uploadDirAbs,
             self::$usingDocRoot,
-            self::getImageRootsDef()
+            self::getImageRootsDef(),
+            $outputFormat
         );
 
         //$destination = SanityCheck::absPathIsInDocRoot($destination);
-        $destination = SanityCheck::pregMatch('#\.webp$#', $destination, 'Does not end with .webp');
+        $destination = SanityCheck::pregMatch('#\.' . $outputFormat->extension() . '$#', $destination, 'Does not end with .' . $outputFormat->extension());
 
         //self::exitWithError($destination);
 
@@ -252,7 +256,8 @@ class WebPOnDemand extends WodConfigLoader
             $destination,
             $serveOptions,
             $logDir,
-            'Conversion triggered with the conversion script (wod/webp-on-demand.php)'
+            'Conversion triggered with the conversion script (wod/webp-on-demand.php)',
+            $outputFormat
         );
 
         BiggerThanSourceDummyFiles::updateStatus(
@@ -261,7 +266,8 @@ class WebPOnDemand extends WodConfigLoader
             self::$webExpressContentDirAbs,
             self::getImageRootsDef(),
             $wodOptions['destination-folder'],
-            $wodOptions['destination-extension']
+            $wodOptions['destination-extension'],
+            $outputFormat
         );
 
         self::fixConfigIfEwwwDiscoveredNonFunctionalApiKeys();

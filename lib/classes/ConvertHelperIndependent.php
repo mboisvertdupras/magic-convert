@@ -13,6 +13,7 @@ use \WebPConvert\Loggers\BufferLogger;
 
 use \MagicConvert\FileHelper;
 use \MagicConvert\FileLock;
+use \MagicConvert\OutputFormat;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
 
@@ -38,31 +39,36 @@ class ConvertHelperIndependent
      *  rename it onto the final destination.
      *
      *  The temp name is derived from the final destination and MUST still end in
-     *  ".webp" so that both the plugin's own '#\.webp$#' destination sanity check
-     *  AND the webp-convert library's destination validator accept it. We insert
-     *  a per-process token before a trailing ".webp" so two concurrent writers
-     *  (which should be serialized by the lock anyway, but belt-and-suspenders)
-     *  never collide on the temp file, and a crash leaves an obviously-temporary
-     *  artifact next to the destination rather than a corrupt destination.
+     *  the format extension (e.g. ".webp") so that both the plugin's own
+     *  '#\.<ext>$#' destination sanity check AND the underlying encode library's
+     *  destination validator accept it. We insert a per-process token before the
+     *  trailing extension so two concurrent writers (which should be serialized by
+     *  the lock anyway, but belt-and-suspenders) never collide on the temp file,
+     *  and a crash leaves an obviously-temporary artifact next to the destination
+     *  rather than a corrupt destination.
      *
-     *  Example:
+     *  Example (webp):
      *    /cache/logo.jpg.webp  ->  /cache/logo.jpg.<pid>.tmp.webp
+     *  Example (avif):
+     *    /cache/logo.jpg.avif  ->  /cache/logo.jpg.<pid>.tmp.avif
      *
      *  Pure string logic (no filesystem access) so it can be unit-tested.
      *
-     *  @param  string    $destination  The FINAL destination path (ends in .webp).
-     *  @param  int|null  $pid          Process id token (defaults to getmypid()).
-     *  @return string                  The temp destination path (ends in .webp).
+     *  @param  string                      $destination  The FINAL destination path (ends in .<ext>).
+     *  @param  int|null                    $pid          Process id token (defaults to getmypid()).
+     *  @param  OutputFormat|string|null    $format       Output format (defaults to webp).
+     *  @return string                                    The temp destination path (ends in .<ext>).
      */
-    public static function tempDestinationFor($destination, $pid = null)
+    public static function tempDestinationFor($destination, $pid = null, $format = null)
     {
         if ($pid === null) {
             $pid = function_exists('getmypid') ? getmypid() : 0;
         }
-        // Strip a trailing ".webp" (case-insensitive) and re-append our token + ".webp",
-        // guaranteeing the result still matches '#\.webp$#'.
-        $base = preg_replace('#\.webp$#i', '', $destination);
-        return $base . '.' . $pid . '.tmp.webp';
+        $ext = OutputFormat::coerce($format)->extension();
+        // Strip a trailing ".<ext>" (case-insensitive) and re-append our token + ".<ext>",
+        // guaranteeing the result still matches '#\.<ext>$#'.
+        $base = preg_replace('#\.' . preg_quote($ext, '#') . '$#i', '', $destination);
+        return $base . '.' . $pid . '.tmp.' . $ext;
     }
 
     /**
@@ -124,23 +130,26 @@ class ConvertHelperIndependent
     }
 
     /**
-     * Append ".webp" to path or replace extension with "webp", depending on what is appropriate.
+     * Append the format extension (e.g. ".webp") to path or replace the source
+     * extension with it, depending on what is appropriate.
      *
      * If destination-folder is set to mingled and destination-extension is set to "set" and
      * the path is inside upload folder, the appropriate thing is to SET the extension.
      * Otherwise, it is to APPEND.
      *
-     * @param  string  $path
-     * @param  string  $destinationFolder
-     * @param  string  $destinationExt
-     * @param  boolean $inUploadFolder
+     * @param  string                    $path
+     * @param  string                    $destinationFolder
+     * @param  string                    $destinationExt
+     * @param  boolean                   $inUploadFolder
+     * @param  OutputFormat|string|null  $format             Output format (defaults to webp).
      */
-    public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder)
+    public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder, $format = null)
     {
+        $dotExt = OutputFormat::coerce($format)->dotExtension();
         if (($destinationFolder == 'mingled') && ($destinationExt == 'set') && $inUploadFolder) {
-            return preg_replace('/\\.(jpe?g|png)$/i', '', $path) . '.webp';
+            return preg_replace('/\\.(jpe?g|png)$/i', '', $path) . $dotExt;
         } else {
-            return $path . '.webp';
+            return $path . $dotExt;
         }
     }
 
@@ -157,6 +166,7 @@ class ConvertHelperIndependent
      * @param  string   $uploadDirAbs
      * @param  boolean  $useDocRootForStructuringCacheDir
      * @param  ImageRoots  $imageRoots                An image roots object
+     * @param  OutputFormat|string|null  $format     Output format (defaults to webp).
      *
      * @return string|false   Returns path to destination corresponding to source, or false on failure
      */
@@ -167,8 +177,11 @@ class ConvertHelperIndependent
         $webExpressContentDirAbs,
         $uploadDirAbs,
         $useDocRootForStructuringCacheDir,
-        $imageRoots)
+        $imageRoots,
+        $format = null)
     {
+        $format = OutputFormat::coerce($format);
+        $cacheDirName = $format->cacheDirName();
         // At this point, everything has already been checked for sanity. But for good meassure, lets
         // check the most important parts again. This is after all a public method.
         // ------------------------------------------------------------------
@@ -182,7 +195,7 @@ class ConvertHelperIndependent
             // Calculate destination and check that the result is sane
             // -------------------------------------------------------
             if (self::storeMingledOrNot($source, $destinationFolder, $uploadDirAbs)) {
-                $destination = self::appendOrSetExtension($source, $destinationFolder, $destinationExt, true);
+                $destination = self::appendOrSetExtension($source, $destinationFolder, $destinationExt, true, $format);
             } else {
 
                 if ($useDocRootForStructuringCacheDir) {
@@ -238,14 +251,14 @@ class ConvertHelperIndependent
                         );
                     }
                     $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
-                    $imageRoot = $webExpressContentDirAbs . '/webp-images';
+                    $imageRoot = $webExpressContentDirAbs . '/' . $cacheDirName;
 
                     // TODO: make this check work with symlinks
                     //SanityCheck::absPathIsInDocRoot($imageRoot);
 
                     $sourceRel = substr(realpath($source), strlen($docRoot) + 1);
                     $destination = $imageRoot . '/doc-root/' . $sourceRel;
-                    $destination = self::appendOrSetExtension($destination, $destinationFolder, $destinationExt, false);
+                    $destination = self::appendOrSetExtension($destination, $destinationFolder, $destinationExt, false, $format);
 
 
                     // TODO: make this check work with symlinks
@@ -279,9 +292,9 @@ class ConvertHelperIndependent
                         // So: Resolve both! and test if the resolved source begins with the resolved rootPath.
                         if (strpos($sourceResolved, realpath($rootPath)) !== false) {
                             $relPath = substr($sourceResolved, strlen(realpath($rootPath)) + 1);
-                            $relPath = self::appendOrSetExtension($relPath, $destinationFolder, $destinationExt, false);
+                            $relPath = self::appendOrSetExtension($relPath, $destinationFolder, $destinationExt, false, $format);
 
-                            $destination = $webExpressContentDirAbs . '/webp-images/' . $imageRoot->id . '/' . $relPath;
+                            $destination = $webExpressContentDirAbs . '/' . $cacheDirName . '/' . $imageRoot->id . '/' . $relPath;
                             break;
                         }
                     }
@@ -310,11 +323,14 @@ class ConvertHelperIndependent
      * @param  string      $destinationStructure      "doc-root" or "image-roots"
      * @param  string      $webExpressContentDirAbs
      * @param  ImageRoots  $imageRoots                An image roots object
+     * @param  OutputFormat  $format                  Output format (already coerced).
      *
      * @return string|false   Returns path to source, if found. If not - or a path is not sane, false is returned
      */
-    private static function findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots)
+    private static function findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots, $format)
     {
+        $cacheDirName = $format->cacheDirName();
+        $extQuoted = preg_quote($format->extension(), '/');
         try {
 
             if ($destinationStructure == 'doc-root') {
@@ -326,7 +342,7 @@ class ConvertHelperIndependent
 
                 // Check that calculated image root is sane and inside document root
                 // --------------------------
-                $imageRoot = SanityCheck::absPathIsInDocRoot($webExpressContentDirAbs . '/webp-images/doc-root');
+                $imageRoot = SanityCheck::absPathIsInDocRoot($webExpressContentDirAbs . '/' . $cacheDirName . '/doc-root');
 
 
                 // Calculate source and check that it is sane and exists
@@ -342,7 +358,7 @@ class ConvertHelperIndependent
 
                     $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
                     $source = $docRoot . '/' . $sourceRel;
-                    $source =  preg_replace('/\\.(webp)$/', '', $source);
+                    $source =  preg_replace('/\\.(' . $extQuoted . ')$/', '', $source);
                 } else {
                     // Try with symlinks resolved
                     // This is not trivial as this must also work when the destination path doesn't exist, and
@@ -383,7 +399,7 @@ class ConvertHelperIndependent
 
                             $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
                             $source = $docRoot . '/' . $sourceRel;
-                            $source =  preg_replace('/\\.(webp)$/', '', $source);
+                            $source =  preg_replace('/\\.(' . $extQuoted . ')$/', '', $source);
                             return $source;
                         } else {
                             return false;
@@ -413,7 +429,7 @@ class ConvertHelperIndependent
                 //   The first path component is the root id, the rest is the relative path to the source.
 
                 $closestExistingResolved = PathHelper::findClosestExistingFolderSymLinksExpanded($destination);
-                $cacheRoot = $webExpressContentDirAbs . '/webp-images';
+                $cacheRoot = $webExpressContentDirAbs . '/' . $cacheDirName;
                 if ($closestExistingResolved == '') {
                     return false;
                 } else {
@@ -437,7 +453,7 @@ class ConvertHelperIndependent
                         $sourceRel = implode('/', $parts);
 
                         $source = $imageRoots->byId($imageRoot)->getAbsPath() . '/' . $sourceRel;
-                        $source = preg_replace('/\\.(webp)$/', '', $source);
+                        $source = preg_replace('/\\.(' . $extQuoted . ')$/', '', $source);
                         return $source;
                     } else {
                         return false;
@@ -459,11 +475,13 @@ class ConvertHelperIndependent
      * @param  string  $destination             Path to destination file (does not have to exist)
      * @param  string  $destinationExt          Extension ('append' or 'set')
      * @param  string  $destinationStructure    "doc-root" or "image-roots"
+     * @param  OutputFormat  $format             Output format (already coerced).
      *
      * @return string|false   Returns path to source, if found. If not - or a path is not sane, false is returned
      */
-    private static function findSourceMingled($destination, $destinationExt, $destinationStructure)
+    private static function findSourceMingled($destination, $destinationExt, $destinationStructure, $format)
     {
+        $extQuoted = preg_quote($format->extension(), '#');
         try {
 
             if ($destinationStructure == 'doc-root') {
@@ -478,25 +496,25 @@ class ConvertHelperIndependent
             // Calculate source and check that it is sane and exists
             // -----------------------------------------------------
             if ($destinationExt == 'append') {
-                $source =  preg_replace('/\\.(webp)$/', '', $destination);
+                $source =  preg_replace('#\\.(' . $extQuoted . ')$#', '', $destination);
             } else {
-                $source =  preg_replace('#\\.webp$#', '.jpg', $destination);
+                $source =  preg_replace('#\\.' . $extQuoted . '$#', '.jpg', $destination);
                 // TODO!
                 // Also check for "Jpeg", "JpEg" etc.
                 if (!@file_exists($source)) {
-                    $source =  preg_replace('/\\.webp$/', '.jpeg', $destination);
+                    $source =  preg_replace('#\\.' . $extQuoted . '$#', '.jpeg', $destination);
                 }
                 if (!@file_exists($source)) {
-                    $source =  preg_replace('/\\.webp$/', '.JPG', $destination);
+                    $source =  preg_replace('#\\.' . $extQuoted . '$#', '.JPG', $destination);
                 }
                 if (!@file_exists($source)) {
-                    $source =  preg_replace('/\\.webp$/', '.JPEG', $destination);
+                    $source =  preg_replace('#\\.' . $extQuoted . '$#', '.JPEG', $destination);
                 }
                 if (!@file_exists($source)) {
-                    $source =  preg_replace('/\\.webp$/', '.png', $destination);
+                    $source =  preg_replace('#\\.' . $extQuoted . '$#', '.png', $destination);
                 }
                 if (!@file_exists($source)) {
-                    $source =  preg_replace('/\\.webp$/', '.PNG', $destination);
+                    $source =  preg_replace('#\\.' . $extQuoted . '$#', '.PNG', $destination);
                 }
             }
             if ($destinationStructure == 'doc-root') {
@@ -523,11 +541,13 @@ class ConvertHelperIndependent
      * @param  string  $destinationStructure      "doc-root" or "image-roots"
      * @param  string  $webExpressContentDirAbs
      * @param  ImageRoots  $imageRoots                An image roots object
+     * @param  OutputFormat|string|null  $format     Output format (defaults to webp).
      *
      * @return string|false  Returns path to source, if found. If not - or a path is not sane, false is returned
      */
-    public static function findSource($destination, $destinationFolder, $destinationExt, $destinationStructure, $webExpressContentDirAbs, $imageRoots)
+    public static function findSource($destination, $destinationFolder, $destinationExt, $destinationStructure, $webExpressContentDirAbs, $imageRoots, $format = null)
     {
+        $format = OutputFormat::coerce($format);
 
         try {
 
@@ -545,26 +565,35 @@ class ConvertHelperIndependent
         }
 
         if ($destinationFolder == 'mingled') {
-            $result = self::findSourceMingled($destination, $destinationExt, $destinationStructure);
+            $result = self::findSourceMingled($destination, $destinationExt, $destinationStructure, $format);
             if ($result === false) {
-                $result = self::findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots);
+                $result = self::findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots, $format);
             }
             return $result;
         } else {
-            return self::findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots);
+            return self::findSourceSeparate($destination, $destinationStructure, $webExpressContentDirAbs, $imageRoots, $format);
         }
     }
 
     /**
      *
-     * @param  string  $source  Path to source file
-     * @param  string  $logDir  The folder where log files are kept
+     * @param  string                    $source  Path to source file
+     * @param  string                    $logDir  The folder where log files are kept
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
      *
      * @return string|false   Returns computed filename of log - or false if a path is not sane
      *
+     * LOG LAYOUT (Phase 2.1): logs are stored per-format under
+     * '/log/conversions/<format-id>/doc-root/...'. The format-id subdir lets
+     * webp and avif conversions of the same source keep distinct logs instead of
+     * clobbering each other. This is an internal-only path change (no public
+     * compat needed in a fork); old webp logs are migrated by convention (see
+     * the migration note in the roadmap summary) and the log viewer
+     * (ConvertLog.php) is adjusted to the new layout.
      */
-    public static function getLogFilename($source, $logDir)
+    public static function getLogFilename($source, $logDir, $format = null)
     {
+        $formatId = OutputFormat::coerce($format)->id();
         try {
 
             // Check that source path is sane and inside document root
@@ -579,7 +608,8 @@ class ConvertHelperIndependent
 
             // Compute and check log path
             // --------------------------
-            $logDirForConversions = $logDir .= '/conversions';
+            // Per-format subdir: /log/conversions/<format-id>/...
+            $logDir .= '/conversions/' . $formatId;
 
             // We store relative to document root.
             // "Eat" the left part off the source parameter which contains the document root.
@@ -629,14 +659,15 @@ APACHE
     /**
      * Saves the log file corresponding to a conversion.
      *
-     * @param  string  $source   Path to the source file that was converted
-     * @param  string  $logDir   The folder where log files are kept
-     * @param  string  $text     Content of the log file
-     * @param  string  $msgTop   A message that is printed before the conversion log (containing version info)
+     * @param  string                    $source   Path to the source file that was converted
+     * @param  string                    $logDir   The folder where log files are kept
+     * @param  string                    $text     Content of the log file
+     * @param  string                    $msgTop   A message that is printed before the conversion log (containing version info)
+     * @param  OutputFormat|string|null  $format   Output format (defaults to webp).
      *
      *
      */
-    private static function saveLog($source, $logDir, $text, $msgTop)
+    private static function saveLog($source, $logDir, $text, $msgTop, $format = null)
     {
 
         if (!file_exists($logDir)) {
@@ -648,7 +679,7 @@ APACHE
         // TODO: Put version number somewhere else. Ie \MagicConvert\VersionNumber::version
         $text = 'Magic Convert 0.25.14. ' . $msgTop . ', ' . date("Y-m-d H:i:s") . "\n\r\n\r" . $text;
 
-        $logFile = self::getLogFilename($source, $logDir);
+        $logFile = self::getLogFilename($source, $logDir, $format);
 
         if ($logFile === false) {
             return;
@@ -672,11 +703,15 @@ APACHE
      *
      * PS: To convert with a specific converter, set it in the $converter param.
      *
-     * @param  string  $source          Full path to the source file that was converted.
-     * @param  string  $destination     Full path to the destination file (may exist or not).
-     * @param  array   $convertOptions  Conversion options.
-     * @param  string  $logDir          The folder where log files are kept or null for no logging
-     * @param  string  $converter       (optional) Set it to convert with a specific converter.
+     * @param  string                    $source          Full path to the source file that was converted.
+     * @param  string                    $destination     Full path to the destination file (may exist or not).
+     * @param  array                     $convertOptions  Conversion options.
+     * @param  string                    $logDir          The folder where log files are kept or null for no logging
+     * @param  string                    $converter       (optional) Set it to convert with a specific converter.
+     * @param  OutputFormat|string|null  $format          (optional) Output format (defaults to webp). The
+     *                                                     encode dispatch is WebP-only for now; a non-webp
+     *                                                     format throws a clear "not yet supported" exception
+     *                                                     (the AVIF encoder lands in step 2.3).
      *
      * Concurrency / atomicity (Phase 1.1):
      *  - A cross-process lock on '<destination>.lock' serializes writers of the
@@ -693,8 +728,11 @@ APACHE
      *    failure/exception the temp file is removed in the finally block, so a
      *    concurrent reader never sees a half-written destination.
      */
-    public static function convert($source, $destination, $convertOptions, $logDir = null, $converter = null) {
+    public static function convert($source, $destination, $convertOptions, $logDir = null, $converter = null, $format = null) {
         include_once __DIR__ . '/../../vendor/autoload.php';
+
+        $format = OutputFormat::coerce($format);
+        $extQuoted = preg_quote($format->extension(), '#');
 
         // The 'skip-if-fresh' flag is a plugin-level option, not a webp-convert
         // option. Pull it out so it never reaches the library.
@@ -717,10 +755,11 @@ APACHE
             // Check that destination path is sane and is inside document root
             // -------------------------------------------------------
             // NOTE: We validate the FINAL destination here. The temp file we hand
-            // to the library is derived from it and also ends in ".webp", so it
-            // satisfies both this check and the library's own validator.
+            // to the library is derived from it and also ends in the format
+            // extension (e.g. ".webp"), so it satisfies both this check and the
+            // library's own validator.
             $destination = SanityCheck::absPathIsInDocRoot($destination);
-            $destination = SanityCheck::pregMatch('#\.webp$#', $destination, 'Destination does not end with .webp');
+            $destination = SanityCheck::pregMatch('#\.' . $extQuoted . '$#', $destination, 'Destination does not end with .' . $format->extension());
 
 
             // Check that log path is sane and inside document root
@@ -757,7 +796,7 @@ APACHE
         }
 
         // Everything from here MUST release the lock (and clean up the temp file).
-        $tempDestination = self::tempDestinationFor($destination);
+        $tempDestination = self::tempDestinationFor($destination, null, $format);
         $success = false;
         $msg = '';
         $logger = new BufferLogger();
@@ -775,6 +814,19 @@ APACHE
             }
 
             try {
+                // Encode dispatch is WebP-only for now. The OutputFormat parameter is
+                // threaded everywhere (paths, temp names, logs, markers, cache dirs)
+                // so the rest of the core is multi-format ready, but the actual
+                // encoder for non-webp formats arrives in step 2.3. Until then any
+                // non-webp format is a clear, logged failure rather than a silent
+                // mis-encode.
+                if (!$format->isDefault()) {
+                    throw new \Exception(
+                        'Output format "' . $format->id() . '" is not yet supported by the conversion core ' .
+                        '(the ' . strtoupper($format->id()) . ' encoder is added in a later step). Only "webp" is currently encodable.'
+                    );
+                }
+
                 if (!is_null($converter)) {
                 //if (isset($convertOptions['converter'])) {
                     //print_r($convertOptions);exit;
@@ -812,7 +864,7 @@ APACHE
             }
 
             if (!is_null($logDir)) {
-                self::saveLog($source, $logDir, $logger->getMarkDown("\n\r"), 'Conversion triggered using bulk conversion');
+                self::saveLog($source, $logDir, $logger->getMarkDown("\n\r"), 'Conversion triggered using bulk conversion', $format);
             }
 
             return [
@@ -836,10 +888,17 @@ APACHE
     /**
      *  Serve a converted file (if it does not already exist, a conversion is triggered - all handled in webp-convert).
      *
+     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp). On-demand serving stays
+     *                                             WebP-only by default for now (on-demand AVIF is gated and
+     *                                             arrives in step 2.4); the parameter is threaded so the path
+     *                                             validation / inner convert() / log layout are format-aware.
      */
-    public static function serveConverted($source, $destination, $serveOptions, $logDir = null, $logMsgTop = '')
+    public static function serveConverted($source, $destination, $serveOptions, $logDir = null, $logMsgTop = '', $format = null)
     {
         include_once __DIR__ . '/../../vendor/autoload.php';
+
+        $format = OutputFormat::coerce($format);
+        $extQuoted = preg_quote($format->extension(), '#');
 
         // At this point, everything has already been checked for sanity. But for good meassure, lets
         // check again. This is after all a public method.
@@ -856,7 +915,7 @@ APACHE
             // -------------------------------------------------------
             //$destination = SanityCheck::absPathIsInDocRoot($destination);
             $destination = SanityCheck::absPath($destination);
-            $destination = SanityCheck::pregMatch('#\.webp$#', $destination, 'Destination does not end with .webp');
+            $destination = SanityCheck::pregMatch('#\.' . $extQuoted . '$#', $destination, 'Destination does not end with .' . $format->extension());
 
 
             // Check that log path is sane
@@ -903,7 +962,7 @@ APACHE
             && isset($serveOptions['convert'])
             && is_array($serveOptions['convert'])
         ) {
-            $preConvertResult = self::convert($source, $destination, $serveOptions['convert'], $logDir);
+            $preConvertResult = self::convert($source, $destination, $serveOptions['convert'], $logDir, null, $format);
             // If another process holds the lock ('in-progress'), do nothing special
             // here — fall through and let the library serve/convert as a fallback.
             // On our success the file now exists and the library just serves it.
@@ -914,7 +973,7 @@ APACHE
         if (!is_null($logDir)) {
             $convertLog = $convertLogger->getMarkDown("\n\r");
             if ($convertLog != '') {
-                self::saveLog($source, $logDir, $convertLog, $logMsgTop);
+                self::saveLog($source, $logDir, $convertLog, $logMsgTop, $format);
             }
         }
     }

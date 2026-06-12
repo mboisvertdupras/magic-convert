@@ -11,8 +11,14 @@ class BiggerThanSourceDummyFilesBulk
     /**
      * Update the status for a all images.
      *
+     * @param  array|null                $config  Config array (loaded if null).
+     * @param  OutputFormat|string|null  $format  Output format (defaults to webp). The bulk
+     *                                            marker sweep stays webp-only by default for now
+     *                                            (multi-format bulk arrives in step 2.5); the
+     *                                            parameter is threaded so the sweep can target a
+     *                                            specific format once that lands.
      */
-    public static function updateStatus($config = null)
+    public static function updateStatus($config = null, $format = null)
     {
         if (is_null($config)) {
             $config = Config::loadConfigAndFix(false);
@@ -26,6 +32,7 @@ class BiggerThanSourceDummyFilesBulk
             //'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds($config['scope'])),   // (Paths::getImageRootsDef()
             'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds(Paths::getImageRootIds())),   // (Paths::getImageRootsDef()
             'image-types' => $config['image-types'],
+            'format' => OutputFormat::coerce($format),
         ];
 
 
@@ -92,6 +99,7 @@ class BiggerThanSourceDummyFilesBulk
                             self::$settings['uploadDirAbs'],
                             self::$settings['useDocRootForStructuringCacheDir'],
                             self::$settings['imageRoots'],
+                            self::$settings['format']
                             //$rootId
 
                         );
@@ -106,6 +114,7 @@ class BiggerThanSourceDummyFilesBulk
                             self::$settings['imageRoots'],
                             self::$settings['destination-folder'],
                             self::$settings['ext'],
+                            self::$settings['format']
                             // TODO: send rootId so the function doesn't need to try all
                             // $rootId,
                         );
