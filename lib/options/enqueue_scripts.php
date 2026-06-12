@@ -9,7 +9,7 @@ use \MagicConvert\Config;
 // a change of filename is neccessary, as there is a plugin that strips version strings out there...!
 // If only one file update is critical: change the name of the file
 // If several files are critical: rename the folder (ie "js2")
-$ver = '3';  // note: Minimum 1.
+$ver = '4';  // note: Minimum 1.  (bumped for the Phase 1.2 parallel bulk-convert rewrite)
 $jsDir = 'js';
 
 if (!function_exists('magic_convert_add_inline_script')) {
@@ -126,6 +126,13 @@ $javascriptVars = [
         'purge-log' => wp_create_nonce('magicconvert-ajax-purge-log-nonce'),
         'view-log' => wp_create_nonce('magicconvert-ajax-view-log-nonce'),
         'self-test' => wp_create_nonce('magicconvert-ajax-self-test-nonce'),
+    ],
+    // REST endpoint used by the parallel bulk-conversion promise pool (Phase 1.2).
+    // 'root' is the site's REST base; 'nonce' is the standard 'wp_rest' nonce the
+    // pool sends as X-WP-Nonce (and swaps when a response returns a fresher one).
+    'rest' => [
+        'root' => esc_url_raw(rest_url('magic-convert/v1')),
+        'nonce' => wp_create_nonce('wp_rest'),
     ],
     'can-use-doc-root-for-structuring' => Paths::canUseDocRootForRelPaths()
 ];

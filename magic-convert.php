@@ -58,6 +58,12 @@ if (is_admin()) {
     \MagicConvert\AdminInit::init();
 }
 
+// Register the REST API routes for parallel bulk conversion (Phase 1.2).
+// IMPORTANT: this must run on EVERY request, not only is_admin() — REST requests
+// are served outside wp-admin, so gating this behind is_admin() would make the
+// routes invisible. The routes themselves enforce manage_options + X-WP-Nonce.
+add_action('rest_api_init', array('\MagicConvert\RestApi', 'registerRoutes'));
+
 if ( class_exists( 'WP_CLI' ) ) {
     \WP_CLI::add_command('magic-convert', '\MagicConvert\CLI');
 }

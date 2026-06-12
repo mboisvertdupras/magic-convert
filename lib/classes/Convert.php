@@ -8,6 +8,7 @@ use \MagicConvert\ConvertHelperIndependent;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
 use \MagicConvert\ImageRoots;
+use \MagicConvert\PathHelper;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
 use \MagicConvert\Validate;
@@ -50,7 +51,24 @@ class Convert
         );
     }
 
-    public static function convertFile($source, $config = null, $convertOptions = null, $converter = null)
+    /**
+     *  Convert a single source file.
+     *
+     *  @param  string      $source          Absolute path to the source image.
+     *  @param  array|null  $config          Config array (loaded if null).
+     *  @param  array|null  $convertOptions  webp-convert options (derived from
+     *                                       config if null).
+     *  @param  string|null $converter       Specific converter id, or null for the
+     *                                       configured converter stack.
+     *  @param  bool        $skipIfFresh     When true, the conversion core skips
+     *                                       re-encoding a destination that is
+     *                                       already newer than its source (Phase
+     *                                       1.1 idempotency). Used by the parallel
+     *                                       bulk path so re-runs are cheap; the
+     *                                       explicit "reconvert" UI action passes
+     *                                       false to force a fresh encode.
+     */
+    public static function convertFile($source, $config = null, $convertOptions = null, $converter = null, $skipIfFresh = false)
     {
         try {
             // Check source
@@ -61,6 +79,11 @@ class Convert
             // PS: No need to check mime type as the WebPConvert library does that (it only accepts image/jpeg and image/png)
 
             // Check that source is within a valid image root
+            // ----------------------------------------------
+            // SECURITY-CRITICAL: this containment check is the guard that the
+            // plugin's history (CVE-2019-15330, arbitrary file disclosure) makes
+            // mandatory. It must run for EVERY conversion regardless of caller
+            // (admin-ajax OR the REST endpoint). Do not bypass it.
             $activeRootIds = Paths::getImageRootIds();  // Currently, root ids cannot be selected, so all root ids are active.
             $rootId = Paths::findImageRootOfPath($source, $activeRootIds);
             if ($rootId === false) {
@@ -115,6 +138,14 @@ class Convert
                 'msg' => 'Check failed for ' . $checking . ': '. $e->getMessage(),
                 'log' => '',
             ];
+        }
+
+        // Idempotency opt-in (Phase 1.1). The 'skip-if-fresh' flag is a
+        // plugin-level option that the conversion core consumes and strips before
+        // it reaches webp-convert. When set, an already-fresh destination is left
+        // untouched and reported as 'already-converted' rather than re-encoded.
+        if ($skipIfFresh) {
+            $convertOptions['skip-if-fresh'] = true;
         }
 
         // Done with sanitizing, lets get to work!
@@ -219,6 +250,8 @@ class Convert
 
         // Check input
         // --------------
+        $converterId = null;
+        $configOverrides = null;
         try {
             // Check "filename"
             $checking = '"filename" argument';
@@ -267,43 +300,17 @@ class Convert
 
         // Input has been processed, now lets get to work!
         // -----------------------------------------------
-        if (isset($configOverrides)) {
-            $config = Config::loadConfigAndFix();
-
-
-            // convert using specific converter
-            if (!is_null($converterId)) {
-
-                // Merge in the config-overrides (config-overrides only have effect when using a specific converter)
-                $config = array_merge($config, $configOverrides);
-
-                $converter = ConvertersHelper::getConverterById($config, $converterId);
-                if ($converter === false) {
-                    wp_send_json_error('Converter could not be loaded');
-                    wp_die();
-                }
-
-                // the converter options stored in config.json is not precisely the same as the ones
-                // we send to webp-convert.
-                // We need to "regenerate" webp-convert options in order to use the ones specified in the config-overrides
-                // And we need to merge the general options (such as quality etc) into the option for the specific converter
-
-                $generalWebpConvertOptions = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
-                $converterSpecificWebpConvertOptions = isset($converter['options']) ? $converter['options'] : [];
-
-                $webpConvertOptions = array_merge($generalWebpConvertOptions, $converterSpecificWebpConvertOptions);
-                unset($webpConvertOptions['converters']);
-
-                // what is this? - I forgot why!
-                //$config = array_merge($config, $converter['options']);
-                $result = self::convertFile($filename, $config, $webpConvertOptions, $converterId);
-
-            } else {
-                $result = self::convertFile($filename, $config);
-            }
-        } else {
-            $result = self::convertFile($filename);
-        }
+        // The actual conversion (config-overrides handling, specific-converter
+        // option regeneration, and the final convertFile() call) lives in the
+        // shared runConversion() core so the REST endpoint executes the exact same
+        // code path. The AJAX path never opts into skip-if-fresh: a manual
+        // single-file convert from the test/convert UI should always re-encode.
+        $result = self::runConversion(
+            $filename,
+            $converterId,
+            $configOverrides,
+            false
+        );
 
         $nonceTick = wp_verify_nonce($_REQUEST['nonce'], 'magicconvert-ajax-convert-nonce');
         if ($nonceTick == 2) {
@@ -319,6 +326,126 @@ class Convert
         echo json_encode($result, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
 
         wp_die();
+    }
+
+    /**
+     *  Shared conversion core used by BOTH the admin-ajax endpoint
+     *  (processAjaxConvertFile) and the REST endpoint (RestApi::convert).
+     *
+     *  Given an already-sanitized absolute source path, it handles the
+     *  config-overrides / specific-converter option regeneration that used to live
+     *  inline in the AJAX handler and dispatches to convertFile(). Keeping this in
+     *  one place guarantees the security-critical path-containment validation
+     *  inside convertFile() (the CVE-2019-15330 guard) runs identically for every
+     *  caller — it is refactored, never reimplemented.
+     *
+     *  @param  string       $source           Absolute source path. Callers MUST
+     *                                          have already run it through the
+     *                                          relevant SanityCheck (the AJAX path
+     *                                          via wp_unslash + convertFile's
+     *                                          absPathExistsAndIsFile; the REST path
+     *                                          via resolveImageSourcePath()).
+     *  @param  string|null  $converterId      Specific converter id, or null.
+     *  @param  array|null   $configOverrides  Converter option overrides, or null.
+     *  @param  bool         $skipIfFresh      Pass true to skip already-fresh
+     *                                          destinations (bulk/REST default
+     *                                          unless the caller forces reconvert).
+     *
+     *  @return array  The per-file result array from convertFile().
+     */
+    public static function runConversion($source, $converterId = null, $configOverrides = null, $skipIfFresh = false)
+    {
+        if (!is_null($configOverrides)) {
+            $config = Config::loadConfigAndFix();
+
+            // convert using specific converter
+            if (!is_null($converterId)) {
+
+                // Merge in the config-overrides (config-overrides only have effect when using a specific converter)
+                $config = array_merge($config, $configOverrides);
+
+                $converter = ConvertersHelper::getConverterById($config, $converterId);
+                if ($converter === false) {
+                    return [
+                        'success' => false,
+                        'msg' => 'Converter could not be loaded',
+                        'log' => '',
+                    ];
+                }
+
+                // the converter options stored in config.json is not precisely the same as the ones
+                // we send to webp-convert.
+                // We need to "regenerate" webp-convert options in order to use the ones specified in the config-overrides
+                // And we need to merge the general options (such as quality etc) into the option for the specific converter
+
+                $generalWebpConvertOptions = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
+                $converterSpecificWebpConvertOptions = isset($converter['options']) ? $converter['options'] : [];
+
+                $webpConvertOptions = array_merge($generalWebpConvertOptions, $converterSpecificWebpConvertOptions);
+                unset($webpConvertOptions['converters']);
+
+                // what is this? - I forgot why!
+                //$config = array_merge($config, $converter['options']);
+                return self::convertFile($source, $config, $webpConvertOptions, $converterId, $skipIfFresh);
+            }
+
+            return self::convertFile($source, $config, null, null, $skipIfFresh);
+        }
+
+        return self::convertFile($source, null, null, null, $skipIfFresh);
+    }
+
+    /**
+     *  Resolve a REST {root, path} pair to a sanitized absolute source path.
+     *
+     *  The REST endpoint receives an image-root id (e.g. "uploads") plus a path
+     *  RELATIVE to that root, instead of an absolute filename. This is the safer
+     *  shape: the absolute base is server-controlled and the only attacker-
+     *  influenced part is the relative path, which we explicitly reject for
+     *  directory traversal and stream wrappers before joining.
+     *
+     *  Layered defenses (any one of which is sufficient on its own):
+     *    1. $rootId must be a known image-root id (whitelist).
+     *    2. $relPath is run through SanityCheck::path (no NUL, no control chars,
+     *       no stream wrappers) and noDirectoryTraversal (no "..").
+     *    3. After joining, findImageRootOfPath() (inside convertFile) re-asserts
+     *       containment — the same belt-and-suspenders check the AJAX path relies
+     *       on. This is the CVE-2019-15330 guard.
+     *
+     *  @param  string  $rootId   Image-root id.
+     *  @param  string  $relPath  Path relative to that root.
+     *
+     *  @return string  Sanitized absolute source path.
+     *
+     *  @throws SanityException  When the root id is unknown or the path is unsafe.
+     */
+    public static function resolveImageSourcePath($rootId, $relPath)
+    {
+        $rootId = SanityCheck::noControlChars((string) $rootId);
+        if (!in_array($rootId, Paths::getImageRootIds(), true)) {
+            throw new SanityException('Unknown image root id');
+        }
+
+        $baseDir = Paths::getAbsDirById($rootId);
+        if ($baseDir === false) {
+            throw new SanityException('Image root could not be resolved');
+        }
+
+        // Sanitize the relative path: reject NUL/control chars, stream wrappers
+        // and any directory-traversal before we ever touch the filesystem.
+        $relPath = SanityCheck::path($relPath);
+        $relPath = SanityCheck::noDirectoryTraversal($relPath);
+        $relPath = ltrim($relPath, '/');
+        if ($relPath === '') {
+            throw new SanityException('Empty source path');
+        }
+
+        $source = PathHelper::canonicalize($baseDir . '/' . $relPath);
+
+        // Final, authoritative containment + existence check. absPathExists
+        // confirms it is inside any restricted open_basedir; convertFile() will
+        // additionally re-run findImageRootOfPath() on it.
+        return SanityCheck::absPathExistsAndIsFile($source);
     }
 
     private static function utf8ize($d) {
