@@ -44,13 +44,15 @@ Repository: `mboisvertdupras/magic-convert` · Plugin name: **Magic Convert** ·
 - Idempotency check inside the lock (source mtime vs destination), making every retry safe.
 - Atomic config saves (temp+rename) in `Config::saveConfigFile`.
 
-**1.2 Parallel bulk in the admin UI.**
-- New REST controller `magic-convert/v1`: `POST /convert` (one file), `GET /unconverted` (paged listing, ~500 paths/page — replaces the single 50k-entry JSON blob), `permission_callback` = `manage_options`, `X-WP-Nonce` auth.
-- `bulk-convert.js` rewritten as a fixed-size promise pool: default **N=3**, UI slider 1–6, auto-throttle (halve N) on timeout/429/5xx with exponential backoff, rolling nonce refresh preserved. Guidance copy: N ≤ half of `pm.max_children`, N ≤ cores.
+**1.2 Parallel bulk in the admin UI — automatic, zero-knob.**
+- New `ConcurrencyAdvisor` class: detects CPU cores (`nproc`/`sysctl`/`/proc/cpuinfo`, fallback 2) and load (`sys_getloadavg()` per core); recommends web concurrency (`clamp(floor(cores/2), 1, 6)`, drops to 1 when busy) and CLI procs (`clamp(cores − 1, 1, 8)`, halved under load); exposes `isBusy()` (load/core > 1.5).
+- New REST controller `magic-convert/v1`: `POST /convert` (one file, response carries a `server_busy` signal), `GET /unconverted` (paged listing + the advisor's recommended/max concurrency — replaces the single 50k-entry JSON blob), `permission_callback` = `manage_options`, `X-WP-Nonce` auth.
+- `bulk-convert.js` rewritten as an **adaptive promise pool — no user configuration needed**: starts at 2 workers, additive-increase (+1 after a success streak) up to the server-recommended cap (≤6), multiplicative-decrease (halve, floor 1) on timeout/429/5xx or `server_busy`, exponential backoff on retries, rolling nonce refresh preserved. The default UX is one Start button and a progress bar; a collapsed Advanced section offers a manual override (default "Automatic").
 
-**1.3 WP-CLI sharding for the 50k+ crowd.**
-- `wp magic-convert convert --shard=<i>/<n>` (stable partition: `crc32(path) % n`).
-- `--procs=<n>`: parent builds the list once, `proc_open()`s n self-invocations (shards), streams aggregated progress. Coarse shards only — one WP bootstrap per thousands of files (per-image spawning measured ~178% slower than sequential). Default procs = cores − 1.
+**1.3 WP-CLI — parallel by default, no flags needed.**
+- `wp magic-convert convert` automatically parallelizes: when the backlog is large enough (≥ ~50 files) and the advisor recommends > 1 proc, the parent `proc_open()`s children of itself over internal shards (`crc32(path) % n` stable partition); otherwise it runs sequentially. Falls back to sequential gracefully when `proc_open` is unavailable.
+- `--procs=<n>` is an optional override for power users (`--procs=1` forces sequential); `--shard=<i>/<n>` exists only as an internal flag used by the parent→child orchestration and is not part of the documented interface.
+- Coarse shards only — one WP bootstrap per thousands of files (per-image spawning measured ~178% slower than sequential).
 - No Action Scheduler, no pcntl-in-web-requests (unavailable under FPM; AS's own docs point to WP-CLI for throughput).
 
 ## Phase 2 — Multi-format core + AVIF
