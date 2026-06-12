@@ -17,6 +17,28 @@
 
 if (!defined('ABSPATH')) exit; // Exit if accessed directly
 
+// --- Minimum PHP version guard -------------------------------------------------
+// Magic Convert requires PHP 8.1+ (needed for GD imageavif(), typed properties,
+// enums and the modern conversion core). The rest of the plugin uses PHP 8.1+
+// syntax that would fatal-error during parse on older PHP. This guard block is
+// deliberately kept PHP 5.6-parseable (no short closures, no typed properties,
+// no named args) so that, on an ancient host, the admin sees an explanatory
+// notice instead of a white-screen fatal error. Do not add modern syntax here.
+if (PHP_VERSION_ID < 80100) {
+    if (!function_exists('magic_convert_php_version_notice')) {
+        function magic_convert_php_version_notice() {
+            echo '<div class="notice notice-error"><p><strong>Magic Convert</strong> requires PHP 8.1 or higher. ';
+            echo 'You are running PHP ' . esc_html(PHP_VERSION) . '. ';
+            echo 'The plugin has been deactivated-in-effect (not loaded) to avoid errors. ';
+            echo 'Please ask your host to upgrade PHP, then the plugin will load automatically.</p></div>';
+        }
+    }
+    add_action('admin_notices', 'magic_convert_php_version_notice');
+    add_action('network_admin_notices', 'magic_convert_php_version_notice');
+    return; // Stop here. Do NOT load any of the PHP 8.1+ plugin code below.
+}
+// -------------------------------------------------------------------------------
+
 if (defined('MAGIC_CONVERT_PLUGIN')) exit;  // Prevent problems if plugin is included twice (#472)
 
 define('MAGIC_CONVERT_PLUGIN', __FILE__);

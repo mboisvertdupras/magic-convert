@@ -13,10 +13,13 @@
         "rosell-dk/image-mime-type-guesser": "^1.1.1"
     },
     "require-dev": {
+        "phpunit/phpunit": "^10"
     },
     "scripts": {
+        "test": "phpunit",
         "ci": [
-            "@composer validate --no-check-all --strict"
+            "@composer validate --no-check-all --strict",
+            "@php vendor/bin/phpunit"
         ]
     },
     "authors": [

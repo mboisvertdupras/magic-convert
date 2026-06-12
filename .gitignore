@@ -1,3 +1,27 @@
-composer.lock
 composer.phar
 .vscode
+.DS_Store
+node_modules/
+*.log
+
+# PHPUnit
+.phpunit.cache/
+.phpunit.result.cache
+
+# --- Dev-only Composer dependencies -------------------------------------------
+# This repo commits its PRODUCTION vendor/ directory (standard WordPress plugin
+# distribution convention), so that the .zip works without a build step.
+#
+# Dev dependencies (PHPUnit and its transitive packages), however, are NOT
+# committed. They are installed locally / in CI via `composer install` and are
+# reproducible from the committed composer.lock. Keep this list in sync with
+# what `composer install` actually pulls into vendor/ for require-dev.
+/vendor/bin/
+/vendor/phpunit/
+/vendor/sebastian/
+/vendor/myclabs/
+/vendor/nikic/
+/vendor/phar-io/
+/vendor/theseer/
+# Generated only when dev deps with file-autoload are installed (phpunit, deep-copy):
+/vendor/composer/autoload_files.php
