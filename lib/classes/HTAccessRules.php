@@ -29,6 +29,13 @@ class HTAccessRules
     private static $alterHtmlEnabled;
     private static $docRootString;
 
+    /**
+     * @var bool  Whether AVIF serving is enabled (config formats.avif.enabled). When false
+     *            (the default), NO avif rules / AddType lines are emitted and the generated
+     *            .htaccess is byte-for-byte identical to before Phase 2.4.
+     */
+    private static $avifEnabled;
+
     private static function trueFalseNullString($var)
     {
         if ($var === true) {
@@ -292,9 +299,62 @@ class HTAccessRules
 
     /**
      *  @return  string  rules for redirecting to existing
+     *
+     *  This is the WebP entry point. It is kept as a zero-argument method so the WebP
+     *  output is produced by exactly the same code path as before — byte-for-byte
+     *  identical — while the actual rule strings are now built by the format-parameterised
+     *  builder below (called with the default 'webp' OutputFormat).
      */
     private static function redirectToExistingRules()
     {
+        return self::redirectToExistingRulesForFormat(OutputFormat::webp());
+    }
+
+    /**
+     *  AVIF redirect-to-existing rules.
+     *
+     *  Mirrors the WebP redirect-to-existing rule shapes exactly (same mingled / separate
+     *  branches, same capability-gated T= mime flag, Vary handling and E= flags), but for
+     *  the avif cache structure ('avif-images', '.avif', 'image/avif').
+     *
+     *  IMPORTANT — fallthrough policy (per roadmap 2.4): there is deliberately NO converter
+     *  (wod) route for avif. These rules ONLY ever match when the corresponding .avif file
+     *  EXISTS (every branch is guarded by a `-f` file-exists RewriteCond). When a browser
+     *  sends `Accept: image/avif` but no .avif file is present, none of these rules match and
+     *  Apache falls through CLEANLY to the WebP redirect-to-existing rules (which run next),
+     *  then to the WebP converter, then to the original image. Ordering this block BEFORE the
+     *  WebP block is what makes avif preferred when present.
+     *
+     *  @return  string
+     */
+    private static function avifRedirectToExistingRules()
+    {
+        return self::redirectToExistingRulesForFormat(OutputFormat::byId('avif'));
+    }
+
+    /**
+     *  Format-parameterised builder for the redirect-to-existing rules.
+     *
+     *  Extracted from the original (WebP-only) redirectToExistingRules() so a second format
+     *  (avif) can reuse the identical rule shapes. The ONLY per-format substitutions are the
+     *  destination extension ('.webp' / '.avif'), the mime flag (`T=image/webp` / `T=image/avif`)
+     *  and the cache-dir name ('webp-images' / 'avif-images', supplied by the format-aware
+     *  Paths helpers). All capability gating (Vary E= flags, doc-root vs image-root structure,
+     *  mingled vs separate) is shared verbatim.
+     *
+     *  @param  OutputFormat  $fmt
+     *  @return string
+     */
+    private static function redirectToExistingRulesForFormat($fmt)
+    {
+        // Per-format literals. dot+ext is regex-escaped exactly as the original '.webp' literal
+        // was written ("\.webp"). mime is the value of the T= flag.
+        $ext = $fmt->extension();          // 'webp' | 'avif'
+        $dotExt = '\.' . $ext;             // '\.webp' | '\.avif'
+        $mime = $fmt->mimeType();          // 'image/webp' | 'image/avif'
+        $tFlag = 'T=' . $mime;             // 'T=image/webp' | 'T=image/avif'
+        $varyFlag = (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '');
+
         $rules = '';
 
         if (self::$mingled) {
@@ -302,8 +362,8 @@ class HTAccessRules
             // Only write mingled rules for "uploads" dir.
             // - UNLESS no .htaccess has been placed in uploads dir (is unwritable) (in that case also write for wp-content / index)
             // (self::$htaccessDir == 'uploads')
-            $rules .= "  # Redirect to existing converted image in same dir (if browser supports webp)\n";
-            $rules .= "  RewriteCond %{HTTP_ACCEPT} image/webp\n";
+            $rules .= "  # Redirect to existing converted image in same dir (if browser supports " . $ext . ")\n";
+            $rules .= "  RewriteCond %{HTTP_ACCEPT} " . $mime . "\n";
 
             if (self::$htaccessDir == 'index') {
                 // TODO: Add the following rule if configured to
@@ -322,20 +382,20 @@ class HTAccessRules
 
             if (self::$useDocRootForStructuringCacheDir) {
                 if (self::$config['destination-extension'] == 'append') {
-                    $rules .= "  RewriteCond %{REQUEST_FILENAME}.webp -f\n";
-                    //$rules .= "  RewriteCond " . self::$docRootString . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2.webp -f\n";
-                    $rules .= "  RewriteRule ^/?(.*)\.(" . self::$fileExt . ")$ $1.$2.webp [NC,T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    $rules .= "  RewriteCond %{REQUEST_FILENAME}." . $ext . " -f\n";
+                    //$rules .= "  RewriteCond " . self::$docRootString . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2." . $ext . " -f\n";
+                    $rules .= "  RewriteRule ^/?(.*)\.(" . self::$fileExt . ")$ $1.$2." . $ext . " [NC," . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
                 } else {
-                    // extension: set to webp
+                    // extension: set to converted
 
-                    //$rules .= "  RewriteCond " . self::$docRootString . "/" . self::$htaccessDirRelToDocRoot . "/$1.webp -f\n";
-                    //$rules .= "  RewriteRule " . $rewriteRuleStart . "\.(" . self::$fileExt . ")$ $1.webp [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    //$rules .= "  RewriteCond " . self::$docRootString . "/" . self::$htaccessDirRelToDocRoot . "/$1." . $ext . " -f\n";
+                    //$rules .= "  RewriteRule " . $rewriteRuleStart . "\.(" . self::$fileExt . ")$ $1." . $ext . " [" . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
 
                     // Got these new rules here: https://www.digitalocean.com/community/tutorials/how-to-create-and-serve-webp-images-to-speed-up-your-website
                     // (but are they actually better than the ones we use for append?)
                     $rules .= "  RewriteCond %{REQUEST_URI} (?i)(.*)(" . self::$fileExtIncludingDot . ")$\n";
-                    $rules .= "  RewriteCond " . self::$docRootString . "%1\.webp -f\n";
-                    $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ %1\.webp [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    $rules .= "  RewriteCond " . self::$docRootString . "%1" . $dotExt . " -f\n";
+                    $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ %1" . $dotExt . " [" . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
 
                     // Instead of using REQUEST_URI, I can use REQUEST_FILENAME and remove DOCUMENT_ROOT
                     // I suppose REQUEST_URI is what was requested (ie "/wp-content/uploads/image.jpg").
@@ -349,9 +409,9 @@ class HTAccessRules
                 $appendWebP = !(self::$config['destination-extension'] == 'set');
 
                 $rules .= "  RewriteCond %{REQUEST_FILENAME} (?i)(.*)(" . self::$fileExtIncludingDot . ")$\n";
-                $rules .= "  RewriteCond %1" . ($appendWebP ? "%2" : "") . "\.webp -f\n";
+                $rules .= "  RewriteCond %1" . ($appendWebP ? "%2" : "") . $dotExt . " -f\n";
                 $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ %1" . ($appendWebP ? "%2" : "") .
-                    "\.webp [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    $dotExt . " [" . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
 
             }
 
@@ -367,18 +427,19 @@ class HTAccessRules
         // Redirect to existing converted image in cache-dir.
         // Do not write these rules for uploads in mingled (there are no "uploads" images in cache-dir when in mingled mode)
         if (!(self::$mingled && (self::$htaccessDir == 'uploads'))) {
-            $rules .= "  # Redirect to existing converted image in cache-dir (if browser supports webp)\n";
-            $rules .= "  RewriteCond %{HTTP_ACCEPT} image/webp\n";
+            $rules .= "  # Redirect to existing converted image in cache-dir (if browser supports " . $ext . ")\n";
+            $rules .= "  RewriteCond %{HTTP_ACCEPT} " . $mime . "\n";
 
             if (self::$useDocRootForStructuringCacheDir) {
-                $cacheDirRel = Paths::getCacheDirRelToDocRoot() . '/doc-root';
+                // Per-format cache dir ('webp-images' | 'avif-images'); Paths is format-aware (2.1).
+                $cacheDirRel = Paths::getCacheDirRelToDocRoot($fmt) . '/doc-root';
 
                 $rules .= "  RewriteCond %{REQUEST_FILENAME} -f\n";
                 $rules .= "  RewriteCond " .
                     self::$docRootString .
-                    "/" . $cacheDirRel . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2.webp -f\n";
+                    "/" . $cacheDirRel . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2." . $ext . " -f\n";
                 $rules .= "  RewriteRule ^/?(.+)\.(" . self::$fileExt . ")$ /" . $cacheDirRel . "/" . self::$htaccessDirRelToDocRoot .
-                    "/$1.$2.webp [NC,T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    "/$1.$2." . $ext . " [NC," . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
 
             } else {
                 // Make sure source image exists
@@ -387,24 +448,25 @@ class HTAccessRules
                 // Find relative path of source (accessible as %2%3)
                 $rules .= "  RewriteCond %{REQUEST_FILENAME} (?i)(" . self::$htaccessDirAbs . "/)(.*)(" . self::$fileExtIncludingDot . ")$\n";
 
-                // Make sure there is a webp in the cache-dir
+                // Make sure there is a converted file in the cache-dir
                 $cacheDirForThisRoot = Paths::getCacheDirForImageRoot(
                     self::$config['destination-folder'],
                     'image-roots',
-                    self::$htaccessDir
+                    self::$htaccessDir,
+                    $fmt
                 );
                 $cacheDirForThisRoot = PathHelper::fixAbsPathToUseUnresolvedDocRoot($cacheDirForThisRoot);
                 $cacheDirForThisRoot = PathHelper::backslashesToForwardSlashes($cacheDirForThisRoot); #512
-                $rules .= "  RewriteCond " . $cacheDirForThisRoot . "/%2%3.webp -f\n";
+                $rules .= "  RewriteCond " . $cacheDirForThisRoot . "/%2%3." . $ext . " -f\n";
                 //RewriteCond /var/www/magic-convert-tests/we0/wp-content-moved/magic-convert/webp-images/uploads/%2%3.webp -f
 
-                $urlPath = '/' . Paths::getContentUrlPath() . "/magic-convert/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
-                //$rules .= "  RewriteCond %1" . (self::$appendWebP ? "%2" : "") . "\.webp -f\n";
+                $urlPath = '/' . Paths::getContentUrlPath() . "/magic-convert/" . $fmt->cacheDirName() . "/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . $dotExt;
+                //$rules .= "  RewriteCond %1" . (self::$appendWebP ? "%2" : "") . $dotExt . " -f\n";
                 $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ " . $urlPath .
-                    " [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
+                    " [" . $tFlag . ",E=EXISTING:1," . $varyFlag . "L]\n\n";
             }
 
-            //$rules .= "  RewriteRule ^\/?(.*)\.(" . self::$fileExt . ")$ /" . $cacheDirRel . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2.webp [NC,T=image/webp,E=EXISTING:1,L]\n\n";
+            //$rules .= "  RewriteRule ^\/?(.*)\.(" . self::$fileExt . ")$ /" . $cacheDirRel . "/" . self::$htaccessDirRelToDocRoot . "/$1.$2." . $ext . " [NC," . $tFlag . ",E=EXISTING:1,L]\n\n";
         }
 
         return $rules;
@@ -883,6 +945,13 @@ class HTAccessRules
             self::$alterHtmlEnabled = true;
         }
 
+        // AVIF serving gate. Read defensively: a v1 config (pre-2.2) has no 'formats' section,
+        // and we must treat that exactly like avif-disabled so the output stays byte-identical.
+        self::$avifEnabled = (
+            isset($config['formats']['avif']['enabled']) &&
+            ($config['formats']['avif']['enabled'] === true)
+        );
+
         $capTests = self::$config['base-htaccess-on-these-capability-tests'];
 
         self::$docRootString = '%{DOCUMENT_ROOT}';
@@ -1111,10 +1180,20 @@ class HTAccessRules
             // RewriteRule ^uploads/2021/06/ - [L]
 
             if (self::$config['redirect-to-existing-in-htaccess']) {
+                // AVIF redirect-to-existing MUST come before the WebP rules so that, for a browser
+                // that accepts both, an existing .avif wins over an existing .webp. There is no
+                // avif converter route: if no .avif exists these rules don't match and Apache falls
+                // through cleanly to the webp rules below. Gated on formats.avif.enabled, so with
+                // avif disabled (the default) nothing is emitted and output stays byte-identical.
+                if (self::$avifEnabled) {
+                    $rules .= self::avifRedirectToExistingRules();
+                }
                 $rules .= self::redirectToExistingRules();
             }
 
             if (self::$config['enable-redirection-to-converter']) {
+                // NB: webp-only on purpose. AVIF is bulk-only (encode cost makes on-demand AVIF
+                // dangerous, per roadmap 2.4) — there is deliberately no avif converter route here.
                 $rules .= self::webpOnDemandRules();
             }
 
@@ -1184,6 +1263,11 @@ class HTAccessRules
             $rules .= "\n# Register webp mime type \n";
             $rules .= "<IfModule mod_mime.c>\n";
             $rules .= "  AddType image/webp .webp\n";
+            // Register the avif mime type alongside webp (gated; with avif disabled this line is
+            // not emitted, keeping the block byte-identical to before).
+            if (self::$avifEnabled) {
+                $rules .= "  AddType image/avif .avif\n";
+            }
             $rules .= "</IfModule>\n";
         }
 

@@ -16,6 +16,5 @@ return array(
     'FileUtil\\' => array($vendorDir . '/rosell-dk/file-util/src'),
     'ExecWithFallback\\' => array($vendorDir . '/rosell-dk/exec-with-fallback/src'),
     'DeepCopy\\' => array($vendorDir . '/myclabs/deep-copy/src/DeepCopy'),
-    'DOMUtilForWebP\\' => array($vendorDir . '/rosell-dk/dom-util-for-webp/src'),
     'Composer\\Installers\\' => array($vendorDir . '/composer/installers/src/Composer/Installers'),
 );

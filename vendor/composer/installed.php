@@ -3,7 +3,7 @@
         'name' => 'mboisvertdupras/magic-convert',
         'pretty_version' => 'dev-master',
         'version' => 'dev-master',
-        'reference' => '1cd8c6a27052367405b1807a8115d744ee70f93d',
+        'reference' => 'cc2e4cd99cbd5eeb3cd97ae6dbf5e1b1b2463575',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -31,7 +31,7 @@
         'mboisvertdupras/magic-convert' => array(
             'pretty_version' => 'dev-master',
             'version' => 'dev-master',
-            'reference' => '1cd8c6a27052367405b1807a8115d744ee70f93d',
+            'reference' => 'cc2e4cd99cbd5eeb3cd97ae6dbf5e1b1b2463575',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -126,15 +126,6 @@
             'install_path' => __DIR__ . '/../phpunit/phpunit',
             'aliases' => array(),
             'dev_requirement' => true,
-        ),
-        'rosell-dk/dom-util-for-webp' => array(
-            'pretty_version' => '0.7.1',
-            'version' => '0.7.1.0',
-            'reference' => '4f9102e404ee137a781c8580b829a340c5a5d428',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../rosell-dk/dom-util-for-webp',
-            'aliases' => array(),
-            'dev_requirement' => false,
         ),
         'rosell-dk/exec-with-fallback' => array(
             'pretty_version' => '1.2.0',

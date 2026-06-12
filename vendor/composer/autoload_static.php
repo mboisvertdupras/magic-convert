@@ -45,7 +45,6 @@ class ComposerStaticInit16597e36dd1bfcd787ed5a8e6d908243
         'D' =>
         array (
             'DeepCopy\\' => 9,
-            'DOMUtilForWebP\\' => 15,
         ),
         'C' =>
         array (
@@ -93,10 +92,6 @@ class ComposerStaticInit16597e36dd1bfcd787ed5a8e6d908243
         'DeepCopy\\' =>
         array (
             0 => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy',
-        ),
-        'DOMUtilForWebP\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/rosell-dk/dom-util-for-webp/src',
         ),
         'Composer\\Installers\\' =>
         array (

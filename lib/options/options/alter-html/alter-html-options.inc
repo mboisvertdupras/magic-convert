@@ -132,9 +132,12 @@ namespace MagicConvert;
                 magicconvert_radioButton(
                   'alter-html-replacement',
                   'url',
-                  'Replace image URLs',
+                  'Replace image URLs <em>(serves WebP only)</em>',
                   $config['alter-html']['replacement'],  // PS: the function takes care of the escaping
-                  '<p>"Image URLs" replaces the image URLs to point to ' .
+                  '<p><strong>URL replacement mode serves WebP only; choose picture-tag mode to also serve AVIF.</strong> ' .
+                        'A plain URL swap rewrites the same markup for every visitor, so it cannot negotiate ' .
+                        'per-browser between AVIF and WebP. Picture-tag mode lets the browser pick the best format.</p>' .
+                        '<p>"Image URLs" replaces the image URLs to point to ' .
                         'the webp <i>rather than</i> the original. Handles src, srcset, common lazy-load attributes and even ' .
                         'inline styles</p>' .
                         '<p><b>Does not work with page caching</b> &ndash; <i>unless</i> you are using the <i>Cache Enabler</i> plugin</p>' .
@@ -150,6 +153,9 @@ namespace MagicConvert;
                 ?>
                 </li>
                 <li><div id="alter_html_url_options_div" style="margin-left:18px; margin-bottom: 13px;">
+                    <p style="margin: 4px 0; font-style: italic; color: #555;">
+                        Note: URL replacement mode serves WebP only; choose picture-tag mode to also serve AVIF.
+                    </p>
                     <?php
                     magicconvert_checkbox(
                         'alter-html-only-for-webp-enabled-browsers',

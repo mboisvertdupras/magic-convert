@@ -1,53 +1,58 @@
 <?php
 
-namespace DOMUtilForWebP;
+namespace MagicConvert\AlterHtml;
 
-//use Sunra\PhpSimple\HtmlDomParser;
 use KubAT\PhpSimple\HtmlDomParser;
 
 /**
- *  Highly configurable class for replacing image URLs in HTML (both src and srcset syntax)
+ *  Highly configurable class for replacing image URLs in HTML (both src and srcset syntax).
  *
- *  Uses http://simplehtmldom.sourceforge.net/ - a library for easily manipulating HTML by means of a DOM.
- *  The great thing about this library is that it supports working on invalid HTML and it only applies the changes you
- *  make - very gently (however, not as gently as we do in PictureTags).
- *  PS: The library is a bit old, so perhaps we should look for another.
- *  ie https://packagist.org/packages/masterminds/html5 ??
+ * ---------------------------------------------------------------------------------------------------
+ * ATTRIBUTION (MIT)
  *
- *  Behaviour can be customized by overriding the public methods (replaceUrl, $searchInTags, etc)
+ * This is a fork of rosell-dk/dom-util-for-webp (src/ImageUrlReplacer.php), MIT-licensed:
+ *
+ *   Copyright (c) Bjørn Rosell
+ *   https://github.com/rosell-dk/dom-util-for-webp
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ *   and associated documentation files (the "Software"), to deal in the Software without restriction,
+ *   ... (full MIT terms).
+ * ---------------------------------------------------------------------------------------------------
+ *
+ *  Uses kub-at/php-simple-html-dom-parser - a library for easily manipulating HTML by means of a DOM.
+ *  The great thing about this library is that it supports working on invalid HTML and it only applies the
+ *  changes you make - very gently (however, not as gently as we do in PictureTags).
+ *
+ *  Behaviour can be customized by overriding the public methods (replaceUrl, $searchInTags, etc).
+ *
+ *  ===========================================================================================
+ *  URL-REPLACEMENT MODE IS SINGLE-FORMAT (WEBP-ONLY) BY DESIGN.
+ *
+ *  A plain URL swap rewrites the markup that EVERY browser receives — there is no per-request
+ *  content negotiation at the HTML layer, so we cannot serve avif to avif-capable browsers and
+ *  webp to the rest from the same cached HTML. Picking avif here would break every browser that
+ *  doesn't support it. Therefore replaceUrl() targets WebP only (the near-universally supported
+ *  next-gen format). To ALSO serve AVIF, use picture-tag mode (PictureTags), which emits a
+ *  <source> per format and lets the browser choose. This is surfaced to the admin in the
+ *  alter-html options UI as well.
+ *  ===========================================================================================
  *
  *  Default behaviour:
  *  - The modified URL is the same as the original, with ".webp" appended                   (replaceUrl)
- *  - Limits to these tags: <img>, <source>, <input> and <iframe>                           ($searchInTags)
- *  - Limits to these attributes: "src", "src-set" and any attribute starting with "data-"  (attributeFilter)
+ *  - Limits to these tags (see $searchInTags)
+ *  - Limits to these attributes: "src", "srcset" and any attribute starting with "data-"   (attributeFilter)
  *  - Only replaces URLs that ends with "png", "jpg" or "jpeg" (no query strings either)    (replaceUrl)
- *
- *
  */
 class ImageUrlReplacer
 {
 
     // define tags to be searched.
-    // The div and li are on the list because these are often used with lazy loading
-    // should we add <meta> ?
-    // Probably not for open graph images or twitter
-    // so not these:
-    // - <meta property="og:image" content="[url]">
-    // - <meta property="og:image:secure_url" content="[url]">
-    // - <meta name="twitter:image" content="[url]">
-    // Meta can also be used in schema.org micro-formatting, ie:
-    // - <meta itemprop="image" content="[url]">
-    //
-    // How about preloaded images? - yes, suppose we should replace those
-    // - <link rel="prefetch" href="[url]">
-    // - <link rel="preload" as="image" href="[url]">
     public static $searchInTags = ['img', 'source', 'input', 'iframe', 'div', 'li', 'link', 'a', 'section', 'video'];
 
     /**
      * Empty constructor for preventing child classes from creating constructors.
-     *
-     * We do this because otherwise the "new static()" call inside the ::replace() method
-     * would be unsafe. See #21
+     * (donor library, see #21)
      * @return  void
      */
     final public function __construct()
@@ -55,11 +60,11 @@ class ImageUrlReplacer
     }
 
     /**
-     *
      * @return string|null webp url or, if URL should not be changed, return nothing
      **/
     public function replaceUrl($url)
     {
+        // WEBP-ONLY by design (see class docblock): URL replacement cannot negotiate per-browser.
         if (!preg_match('#(png|jpe?g)$#', $url)) {
             return null;
         }
@@ -71,12 +76,6 @@ class ImageUrlReplacer
         $url = $this->replaceUrl($url);
         return (isset($url) ? $url : $returnValueIfDenied);
     }
-
-    /*
-    public function isValidUrl($url)
-    {
-        return preg_match('#(png|jpe?g)$#', $url);
-    }*/
 
     public function handleSrc($attrValue)
     {
@@ -109,13 +108,6 @@ class ImageUrlReplacer
 
     /**
      *  Test if attribute value looks like it has srcset syntax.
-     *  "image.jpg 100w" does for example. And "image.jpg 1x". Also "image1.jpg, image2.jpg 1x"
-     *  Mixing x and w is invalid (according to
-     *         https://stackoverflow.com/questions/26928828/html5-srcset-mixing-x-and-w-syntax)
-     *  But we accept it anyway
-     *  It is not the job of this function to see if the first part is an image URL
-     *  That will be done in handleSrcSet.
-     *
      */
     public function looksLikeSrcSet($value)
     {
@@ -154,18 +146,14 @@ class ImageUrlReplacer
         foreach ($declarations as $i => &$declaration) {
             if (preg_match('#(background(-image)?)\\s*:#', $declaration)) {
                 // https://regexr.com/46qdg
-                //$regex = '#(url\s*\(([\"\']?))([^\'\";\)]*)(\2\s*\))#';
                 $parts = explode(',', $declaration);
-                //print_r($parts);
                 foreach ($parts as &$part) {
-                    //echo 'part:' . $part . "\n";
                     $regex = '#(url\\s*\\(([\\"\\\']?))([^\\\'\\";\\)]*)(\\2\\s*\\))#';
                     $part = preg_replace_callback(
                         $regex,
-                        '\DOMUtilForWebP\ImageUrlReplacer::processCSSRegExCallback',
+                        array($this, 'processCSSRegExCallback'),
                         $part
                     );
-                    //echo 'result:' . $part . "\n";
                 }
                 $declarations[$i] = implode(',', $parts);
             }
@@ -179,17 +167,9 @@ class ImageUrlReplacer
             return '';
         }
 
-        // https://stackoverflow.com/questions/4812691/preserve-line-breaks-simple-html-dom-parser
-
-        // function str_get_html($str, $lowercase=true, $forceTagsClosed=true, $target_charset = DEFAULT_TARGET_CHARSET,
-        //    $stripRN=true, $defaultBRText=DEFAULT_BR_TEXT, $defaultSpanText=DEFAULT_SPAN_TEXT)
-
         $dom = HtmlDomParser::str_get_html($html, false, true, 'UTF-8', false);
-        //$dom = str_get_html($html, false, false, 'UTF-8', false);
 
-
-        // MAX_FILE_SIZE is defined in simple_html_dom.
-        // For safety sake, we make sure it is defined before using
+        // MAX_FILE_SIZE is defined in simple_html_dom. For safety, ensure it is defined.
         defined('MAX_FILE_SIZE') || define('MAX_FILE_SIZE', 600000);
 
         if ($dom === false) {
@@ -205,7 +185,6 @@ class ImageUrlReplacer
         foreach (self::$searchInTags as $tagName) {
             $elems = $dom->find($tagName);
             foreach ($elems as $index => $elem) {
-                $attributes = $elem->getAllAttributes();
                 foreach ($elem->getAllAttributes() as $attrName => $attrValue) {
                     if ($this->attributeFilter($attrName)) {
                         $elem->setAttribute($attrName, $this->handleAttribute($attrValue));
@@ -223,7 +202,7 @@ class ImageUrlReplacer
             }
         }
 
-        // Replace "style attributes
+        // Replace "style" attributes
         $elems = $dom->find('*[style]');
         foreach ($elems as $index => $elem) {
             $css = $this->processCSS($elem->style);
@@ -238,9 +217,6 @@ class ImageUrlReplacer
     /* Main replacer function */
     public static function replace($html)
     {
-        /*if (!function_exists('str_get_html')) {
-            require_once __DIR__ . '/../src-vendor/simple_html_dom/simple_html_dom.inc';
-        }*/
         $iur = new static();
         return $iur->replaceHtml($html);
     }

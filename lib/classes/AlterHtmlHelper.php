@@ -8,6 +8,7 @@ use \MagicConvert\Paths;
 use \MagicConvert\PathHelper;
 use \MagicConvert\Multisite;
 use \MagicConvert\Option;
+use \MagicConvert\OutputFormat;
 
 class AlterHtmlHelper
 {
@@ -153,22 +154,48 @@ class AlterHtmlHelper
 
 
     /**
-     * Get url for webp from source url,  (if ), given a certain baseUrl / baseDir.
+     *  Generalized Accept-header check: does the current request accept the given mime type?
+     *
+     *  This is the format-agnostic version of the historical `image/webp` strpos check.
+     *  Used by url-replacement mode's "only-for-webp-enabled-browsers" gate, and available for
+     *  any other dynamic per-browser decision (e.g. a future avif url-mode, were that ever safe).
+     *
+     *  @param  string  $mimeType  e.g. 'image/webp' or 'image/avif'
+     *  @return bool
+     */
+    public static function acceptsMimeType($mimeType)
+    {
+        return isset($_SERVER['HTTP_ACCEPT']) && (strpos($_SERVER['HTTP_ACCEPT'], $mimeType) !== false);
+    }
+
+    /**
+     * Get url for webp from source url (webp-only, backward-compatible wrapper).
+     *
+     * @see getConvertedUrlInImageRoot() — this delegates to it with the webp OutputFormat.
+     */
+    public static function getWebPUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir)
+    {
+        return self::getConvertedUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir, OutputFormat::webp());
+    }
+
+    /**
+     * Get url for a converted image (any format) from a source url, given a certain baseUrl / baseDir.
      * Base can for example be uploads or wp-content.
      *
      * returns false:
      * - if no source file found in that base
-     * - if source file is found but webp file isn't there and the `only-for-webps-that-exists` option is set
-     * - if webp is marked as bigger than source
+     * - if source file is found but the converted file isn't there and the `only-for-webps-that-exists` option is set
+     * - if the converted file is marked as bigger than source
      *
-     *  @param  string  $sourceUrl   Url of source image (ie http://example.com/wp-content/image.jpg)
-     *  @param  string  $rootId      Id (created in Config::updateAutoloadedOptions). Ie "uploads", "content" or any image root id
-     *  @param  string  $baseUrl     Base url of source image (ie http://example.com/wp-content)
-     *  @param  string  $baseDir     Base dir of source image (ie /var/www/example.com/wp-content)
+     *  @param  string                    $sourceUrl   Url of source image (ie http://example.com/wp-content/image.jpg)
+     *  @param  string                    $rootId      Id (created in Config::updateAutoloadedOptions). Ie "uploads", "content" or any image root id
+     *  @param  string                    $baseUrl     Base url of source image (ie http://example.com/wp-content)
+     *  @param  string                    $baseDir     Base dir of source image (ie /var/www/example.com/wp-content)
+     *  @param  OutputFormat|string|null  $format      Output format (defaults to webp).
      */
-    public static function getWebPUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir)
+    public static function getConvertedUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir, $format = null)
     {
-
+        $format = OutputFormat::coerce($format);
 
         $srcPathRel = self::getRelUrlPath($sourceUrl, $baseUrl);
 
@@ -191,7 +218,7 @@ class AlterHtmlHelper
             return false;
         }
 
-        // Calculate destination of webp (both path and url)
+        // Calculate destination of the converted file (both path and url)
         // ----------------------------------------
 
         // We are calculating: $destPathAbs and $destUrl.
@@ -202,7 +229,8 @@ class AlterHtmlHelper
             self::$options['destination-folder'] == 'mingled',
             self::$options['destination-structure'] == 'doc-root',
             self::$options['destination-extension'] == 'set',
-            self::$options['scope']
+            self::$options['scope'],
+            $format
         );
 
         if (!isset(self::$options['scope']) || !in_array($rootId, self::$options['scope'])) {
@@ -219,7 +247,8 @@ class AlterHtmlHelper
             $relPathFromImageRootToSource,
             self::$options['destination-folder'],
             self::$options['destination-extension'],
-            ($rootId == 'uploads')
+            ($rootId == 'uploads'),
+            $format
         );
         $destPathAbs = $destinationRoot['abs-path'] . '/' . $relPathFromImageRootToDest;
         $webpMustExist = self::$options['only-for-webps-that-exists'];
@@ -270,7 +299,7 @@ class AlterHtmlHelper
 
 
     /**
-     *  Get url for webp
+     *  Get url for webp (webp-only, backward-compatible wrapper).
      *  returns second argument if no webp
      *
      *  @param $sourceUrl
@@ -278,12 +307,29 @@ class AlterHtmlHelper
      */
     public static function getWebPUrl($sourceUrl, $returnValueOnFail)
     {
+        return self::getConvertedUrl($sourceUrl, $returnValueOnFail, OutputFormat::webp());
+    }
+
+    /**
+     *  Get url for a converted image (any format).
+     *  returns second argument if not available.
+     *
+     *  @param  string                    $sourceUrl
+     *  @param  mixed                     $returnValueOnFail
+     *  @param  OutputFormat|string|null  $format             Output format (defaults to webp).
+     */
+    public static function getConvertedUrl($sourceUrl, $returnValueOnFail, $format = null)
+    {
+        $format = OutputFormat::coerce($format);
+
         // Get the options
         self::getOptions();
 
-        // Fail for webp-disabled  browsers (when "only-for-webp-enabled-browsers" is set)
+        // Fail for browsers that don't accept this format (when "only-for-webp-enabled-browsers" is set).
+        // NOTE: this gate is only meaningful in url-replacement mode (which is webp-only). In picture-tag
+        // mode the browser does the negotiating via <source type>, so the option is not consulted there.
         if (self::$options['only-for-webp-enabled-browsers']) {
-            if (!isset($_SERVER['HTTP_ACCEPT']) || (strpos($_SERVER['HTTP_ACCEPT'], 'image/webp') === false)) {
+            if (!self::acceptsMimeType($format->mimeType())) {
                 return $returnValueOnFail;
             }
         }
@@ -327,7 +373,7 @@ class AlterHtmlHelper
                 $baseDir = Paths::getUploadDirAbs();
             }
 
-            $result = self::getWebPUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir);
+            $result = self::getConvertedUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir, $format);
             if ($result !== false) {
                 return $result;
             }
@@ -357,7 +403,7 @@ class AlterHtmlHelper
                 $baseUrlOnAlias = $baseUrlComponents['scheme'] . '://' . $hostnameAlias . $baseUrlComponents['path'];
                 //error_log('baseurl (alias):' . $baseUrlOnAlias);
 
-                $result = self::getWebPUrlInImageRoot($sourceUrl, $rootId, $baseUrlOnAlias, $baseDir);
+                $result = self::getConvertedUrlInImageRoot($sourceUrl, $rootId, $baseUrlOnAlias, $baseDir, $format);
                 if ($result !== false) {
                     $resultUrlComponents = parse_url($result);
                     return $sourceUrlComponents['scheme'] . '://' . $hostnameAlias . $resultUrlComponents['path'];

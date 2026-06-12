@@ -642,6 +642,13 @@ class Config
         $obj['scope'] = $config['scope'];
         $obj['image-types'] = $config['image-types'];   // 0=none,1=jpg, 2=png, 3=both
         $obj['prevent-using-webps-larger-than-original'] = $config['prevent-using-webps-larger-than-original'];
+        // Whether AVIF serving is enabled, so the front-end picture-tag replacer can decide to emit an
+        // <source type="image/avif"> without loading the full config on every request. Defaults to false
+        // (avif disabled => picture-tag output is byte-identical to today's webp-only output).
+        $obj['avif-enabled'] = (
+            isset($config['formats']['avif']['enabled']) &&
+            ($config['formats']['avif']['enabled'] === true)
+        );
 
         Option::updateOption(
             'magic-convert-alter-html-options',
