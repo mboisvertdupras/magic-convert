@@ -12,11 +12,81 @@ use \WebPConvert\Exceptions\WebPConvertException;
 use \WebPConvert\Loggers\BufferLogger;
 
 use \MagicConvert\FileHelper;
+use \MagicConvert\FileLock;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
 
 class ConvertHelperIndependent
 {
+
+    /**
+     *  Compute the path of the lock file guarding a given destination.
+     *
+     *  Pure string logic (no filesystem access) so it can be unit-tested.
+     *  The lock lives right next to the destination: '<destination>.lock'.
+     *
+     *  @param  string  $destination  The FINAL destination path.
+     *  @return string                The lock file path.
+     */
+    public static function lockPathForDestination($destination)
+    {
+        return $destination . '.lock';
+    }
+
+    /**
+     *  Compute the temp path the library converts INTO before we atomically
+     *  rename it onto the final destination.
+     *
+     *  The temp name is derived from the final destination and MUST still end in
+     *  ".webp" so that both the plugin's own '#\.webp$#' destination sanity check
+     *  AND the webp-convert library's destination validator accept it. We insert
+     *  a per-process token before a trailing ".webp" so two concurrent writers
+     *  (which should be serialized by the lock anyway, but belt-and-suspenders)
+     *  never collide on the temp file, and a crash leaves an obviously-temporary
+     *  artifact next to the destination rather than a corrupt destination.
+     *
+     *  Example:
+     *    /cache/logo.jpg.webp  ->  /cache/logo.jpg.<pid>.tmp.webp
+     *
+     *  Pure string logic (no filesystem access) so it can be unit-tested.
+     *
+     *  @param  string    $destination  The FINAL destination path (ends in .webp).
+     *  @param  int|null  $pid          Process id token (defaults to getmypid()).
+     *  @return string                  The temp destination path (ends in .webp).
+     */
+    public static function tempDestinationFor($destination, $pid = null)
+    {
+        if ($pid === null) {
+            $pid = function_exists('getmypid') ? getmypid() : 0;
+        }
+        // Strip a trailing ".webp" (case-insensitive) and re-append our token + ".webp",
+        // guaranteeing the result still matches '#\.webp$#'.
+        $base = preg_replace('#\.webp$#i', '', $destination);
+        return $base . '.' . $pid . '.tmp.webp';
+    }
+
+    /**
+     *  Idempotency test: is an existing destination "fresh" relative to its source?
+     *
+     *  A destination is considered fresh when it exists and its mtime is greater
+     *  than or equal to the source's mtime (i.e. it was produced from the current
+     *  source and the source has not changed since). Used to skip re-encoding when
+     *  the caller opts in via the 'skip-if-fresh' option.
+     *
+     *  Pure logic (only stat-style numeric comparison); callers pass in the mtimes
+     *  so it is trivially unit-testable without touching the filesystem.
+     *
+     *  @param  int|false  $destinationMtime  mtime of destination, or false if missing.
+     *  @param  int|false  $sourceMtime       mtime of source, or false if missing.
+     *  @return bool                          True if destination is fresh (skip convert).
+     */
+    public static function isDestinationFresh($destinationMtime, $sourceMtime)
+    {
+        if ($destinationMtime === false || $sourceMtime === false) {
+            return false;
+        }
+        return $destinationMtime >= $sourceMtime;
+    }
 
     /**
      *
@@ -285,8 +355,11 @@ class ConvertHelperIndependent
                     // 4. If it does, we could create a dummy file at the destination to get its real path, but we want to avoid that, so instead
                     //    we can create the containing directory.
                     // 5. We can now use realpath to get the resolved path of the containing directory. The rest is simple enough.
-                    if (!file_exists($imageRoot)) {
-                        mkdir($imageRoot, 0777, true);
+                    // Tolerant of the concurrent-creation race (@mkdir then re-check):
+                    // a racer winning the create makes our mkdir fail with EEXIST, but
+                    // the dir then exists, which is all realpath() below needs.
+                    if (!@is_dir($imageRoot)) {
+                        @mkdir($imageRoot, 0777, true);
                     }
                     $closestExistingResolved = PathHelper::findClosestExistingFolderSymLinksExpanded($destination);
                     if ($closestExistingResolved == '') {
@@ -295,10 +368,11 @@ class ConvertHelperIndependent
                         $imageRootResolved = realpath($imageRoot);
                         if (strpos($closestExistingResolved . '/', $imageRootResolved . '/') === 0) {
 //                            echo $destination . '<br>' . $closestExistingResolved . '<br>' . $imageRootResolved . '/'; exit;
-                            // Create containing dir for destination
+                            // Create containing dir for destination (tolerant of the
+                            // concurrent-creation race: @mkdir then re-check is_dir()).
                             $containingDir = PathHelper::dirname($destination);
-                            if (!file_exists($containingDir)) {
-                                mkdir($containingDir, 0777, true);
+                            if (!@is_dir($containingDir)) {
+                                @mkdir($containingDir, 0777, true);
                             }
                             $containingDirResolved = realpath($containingDir);
 
@@ -346,10 +420,11 @@ class ConvertHelperIndependent
                     $cacheRootResolved = realpath($cacheRoot);
                     if (strpos($closestExistingResolved . '/', $cacheRootResolved . '/') === 0) {
 
-                        // Create containing dir for destination
+                        // Create containing dir for destination (tolerant of the
+                        // concurrent-creation race: @mkdir then re-check is_dir()).
                         $containingDir = PathHelper::dirname($destination);
-                        if (!file_exists($containingDir)) {
-                            mkdir($containingDir, 0777, true);
+                        if (!@is_dir($containingDir)) {
+                            @mkdir($containingDir, 0777, true);
                         }
                         $containingDirResolved = realpath($containingDir);
 
@@ -580,11 +655,15 @@ APACHE
         }
 
         $logFolder = @dirname($logFile);
-        if (!@file_exists($logFolder)) {
-            mkdir($logFolder, 0777, true);
+        // Tolerant of the concurrent-creation race: @mkdir then re-check is_dir().
+        if (!@is_dir($logFolder)) {
+            @mkdir($logFolder, 0777, true);
         }
-        if (@file_exists($logFolder)) {
-            file_put_contents($logFile, $text);
+        if (@is_dir($logFolder)) {
+            // Atomic write (temp + rename). The same-destination lock already
+            // serializes same-source log writes; temp+rename adds crash safety so
+            // a killed process never leaves a truncated .md log behind.
+            FileHelper::atomicPutContents($logFile, $text);
         }
     }
 
@@ -598,9 +677,32 @@ APACHE
      * @param  array   $convertOptions  Conversion options.
      * @param  string  $logDir          The folder where log files are kept or null for no logging
      * @param  string  $converter       (optional) Set it to convert with a specific converter.
+     *
+     * Concurrency / atomicity (Phase 1.1):
+     *  - A cross-process lock on '<destination>.lock' serializes writers of the
+     *    same destination (parallel FPM requests AND concurrent CLI procs). When
+     *    the lock is held by another live process this returns a structured,
+     *    non-fatal failure with 'status' => 'in-progress' so bulk callers can retry.
+     *  - Idempotency: when $convertOptions['skip-if-fresh'] === true and the
+     *    destination already exists and is newer than the source, the conversion
+     *    is skipped and 'status' => 'already-converted' is returned. Without the
+     *    flag the behaviour is exactly as before (always (re)convert) so explicit
+     *    reconvert from the UI and the wod path keep their semantics.
+     *  - Atomic write: the library converts into '<destination>.<pid>.tmp.webp'
+     *    and we rename() that onto the final destination on success. On any
+     *    failure/exception the temp file is removed in the finally block, so a
+     *    concurrent reader never sees a half-written destination.
      */
     public static function convert($source, $destination, $convertOptions, $logDir = null, $converter = null) {
         include_once __DIR__ . '/../../vendor/autoload.php';
+
+        // The 'skip-if-fresh' flag is a plugin-level option, not a webp-convert
+        // option. Pull it out so it never reaches the library.
+        $skipIfFresh = false;
+        if (is_array($convertOptions) && isset($convertOptions['skip-if-fresh'])) {
+            $skipIfFresh = ($convertOptions['skip-if-fresh'] === true);
+            unset($convertOptions['skip-if-fresh']);
+        }
 
         // At this point, everything has already been checked for sanity. But for good meassure, lets
         // check the most important parts again. This is after all a public method.
@@ -614,6 +716,9 @@ APACHE
 
             // Check that destination path is sane and is inside document root
             // -------------------------------------------------------
+            // NOTE: We validate the FINAL destination here. The temp file we hand
+            // to the library is derived from it and also ends in ".webp", so it
+            // satisfies both this check and the library's own validator.
             $destination = SanityCheck::absPathIsInDocRoot($destination);
             $destination = SanityCheck::pregMatch('#\.webp$#', $destination, 'Destination does not end with .webp');
 
@@ -635,42 +740,97 @@ APACHE
             ];
         }
 
+        // Acquire the cross-process lock guarding this destination.
+        // -------------------------------------------------------
+        $lockPath = self::lockPathForDestination($destination);
+        $lockToken = FileLock::acquire($lockPath);
+        if ($lockToken === false) {
+            // Another process is converting this exact destination right now.
+            // Surface a distinct, non-fatal status so callers can retry rather
+            // than treat it as a hard failure.
+            return [
+                'success' => false,
+                'status' => 'in-progress',
+                'msg' => 'Conversion already in progress for this destination (held by another process)',
+                'log' => '',
+            ];
+        }
+
+        // Everything from here MUST release the lock (and clean up the temp file).
+        $tempDestination = self::tempDestinationFor($destination);
         $success = false;
         $msg = '';
         $logger = new BufferLogger();
         try {
-            if (!is_null($converter)) {
-            //if (isset($convertOptions['converter'])) {
-                //print_r($convertOptions);exit;
-                $logger->logLn('Converter set to: ' . $converter);
-                $logger->logLn('');
-                $converter = ConverterFactory::makeConverter($converter, $source, $destination, $convertOptions, $logger);
-                $converter->doConvert();
-            } else {
-//error_log('options:' . print_r(json_encode($convertOptions,JSON_PRETTY_PRINT), true));
-                WebPConvert::convert($source, $destination, $convertOptions, $logger);
+
+            // Idempotency: skip re-encoding when the caller opted in and the
+            // destination is already fresh relative to the source.
+            if ($skipIfFresh && self::isDestinationFresh(@filemtime($destination), @filemtime($source))) {
+                return [
+                    'success' => true,
+                    'status' => 'already-converted',
+                    'msg' => '',
+                    'log' => '',
+                ];
             }
-            $success = true;
-        } catch (\WebpConvert\Exceptions\WebPConvertException $e) {
-            $msg = $e->getMessage();
-        } catch (\Exception $e) {
-            //$msg = 'An exception was thrown!';
-            $msg = $e->getMessage();
-        } catch (\Throwable $e) {
-            //Executed only in PHP 7 and 8, will not match in PHP 5
-            $msg = $e->getMessage();
+
+            try {
+                if (!is_null($converter)) {
+                //if (isset($convertOptions['converter'])) {
+                    //print_r($convertOptions);exit;
+                    $logger->logLn('Converter set to: ' . $converter);
+                    $logger->logLn('');
+                    $converterObj = ConverterFactory::makeConverter($converter, $source, $tempDestination, $convertOptions, $logger);
+                    $converterObj->doConvert();
+                } else {
+    //error_log('options:' . print_r(json_encode($convertOptions,JSON_PRETTY_PRINT), true));
+                    WebPConvert::convert($source, $tempDestination, $convertOptions, $logger);
+                }
+
+                // The library wrote (atomically, for the 'auto' path) into the temp
+                // file. Atomically move it onto the final destination. rename() within
+                // the same directory is atomic on POSIX, so a concurrent reader sees
+                // either the previous destination or the new one, never a partial file.
+                if (@file_exists($tempDestination)) {
+                    if (@rename($tempDestination, $destination)) {
+                        $success = true;
+                    } else {
+                        $msg = 'Conversion succeeded but the converted file could not be moved into place';
+                    }
+                } else {
+                    // Defensive: library reported success but produced no file.
+                    $msg = 'Conversion did not produce an output file';
+                }
+            } catch (\WebpConvert\Exceptions\WebPConvertException $e) {
+                $msg = $e->getMessage();
+            } catch (\Exception $e) {
+                //$msg = 'An exception was thrown!';
+                $msg = $e->getMessage();
+            } catch (\Throwable $e) {
+                //Executed only in PHP 7 and 8, will not match in PHP 5
+                $msg = $e->getMessage();
+            }
+
+            if (!is_null($logDir)) {
+                self::saveLog($source, $logDir, $logger->getMarkDown("\n\r"), 'Conversion triggered using bulk conversion');
+            }
+
+            return [
+                'success' => $success,
+                'msg' => $msg,
+                'log' => $logger->getMarkDown("\n"),
+            ];
+        } finally {
+            // Always clean up the temp file (it only lingers on failure/crash-before-rename)
+            // and always release the lock.
+            if (@file_exists($tempDestination)) {
+                @unlink($tempDestination);
+            }
+            // Release only OUR lock: release() verifies the token still matches,
+            // so if this conversion ran long and another process stole the lock
+            // as stale and re-acquired it, we will not delete their live lock.
+            FileLock::release($lockPath, $lockToken);
         }
-
-        if (!is_null($logDir)) {
-            self::saveLog($source, $logDir, $logger->getMarkDown("\n\r"), 'Conversion triggered using bulk conversion');
-        }
-
-        return [
-            'success' => $success,
-            'msg' => $msg,
-            'log' => $logger->getMarkDown("\n"),
-        ];
-
     }
 
     /**
@@ -714,6 +874,39 @@ APACHE
             header('X-Magic-Convert-Error: ' . $msg, true);
             // TODO: error_log() ?
             exit;
+        }
+
+        // Concurrency hardening of the on-demand (wod) serve-and-convert path
+        // (Phase 1.1).
+        // -------------------------------------------------------------------
+        // The library's serveConverted() converts directly into $destination when
+        // the file is missing — a non-atomic write that a second concurrent reader
+        // could observe half-finished. To avoid that, when the destination is
+        // missing we first run our OWN hardened convert() (cross-process lock +
+        // convert-into-temp + atomic rename + idempotency). On success the library
+        // call below simply finds and serves the now-existing, fully-written file.
+        //
+        // We only intervene when the destination is missing AND we have convert
+        // options to work with; everything else (serving an existing file, serving
+        // the original, header/redirect handling, serve-on-failure) is left to the
+        // library exactly as before.
+        //
+        // Residual race (acceptable): if our convert() reports 'in-progress' (a
+        // sibling process holds the lock for this exact destination), we fall
+        // through to the library serve. The sibling is writing atomically via our
+        // path, so the worst case is that this request's library call also tries to
+        // convert and writes $destination directly; because that only happens for
+        // the rare overlapping first-request-per-missing-file, and any file written
+        // by our path lands atomically, a corrupt file is never *served* from our
+        // path. This narrow window is documented in docs/development.md.
+        if (!@file_exists($destination)
+            && isset($serveOptions['convert'])
+            && is_array($serveOptions['convert'])
+        ) {
+            $preConvertResult = self::convert($source, $destination, $serveOptions['convert'], $logDir);
+            // If another process holds the lock ('in-progress'), do nothing special
+            // here — fall through and let the library serve/convert as a fallback.
+            // On our success the file now exists and the library just serves it.
         }
 
         $convertLogger = new BufferLogger();

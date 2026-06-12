@@ -115,12 +115,15 @@ APACHE
         if ($bigWebP === true) {
             // place dummy file, which marks that webp is bigger than source
 
+            // Tolerant of the concurrent-creation race: @mkdir then re-check is_dir().
             $folder = @dirname($file);
-            if (!@file_exists($folder)) {
-                mkdir($folder, 0777, true);
+            if (!@is_dir($folder)) {
+                @mkdir($folder, 0777, true);
             }
-            if (@file_exists($folder)) {
-                file_put_contents($file, '');
+            if (@is_dir($folder)) {
+                // The dummy file is empty; a partial/racing write is harmless (its
+                // mere existence is the signal), so a plain write is fine here.
+                @file_put_contents($file, '');
             }
 
         } else {

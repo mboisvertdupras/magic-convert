@@ -101,8 +101,11 @@ class SelfTestHelper
         $destDir = Paths::getAbsDirById($rootId) . '/magic-convert-test-images';
         $destination = $destDir . '/' . $filenameOfDestination;
 
-        if (!@file_exists($destDir)) {
-            if (!@mkdir($destDir)) {
+        if (!@is_dir($destDir)) {
+            // Tolerant of the concurrent-creation race: re-check is_dir() after the
+            // attempt so a racer winning the create is not mistaken for a failure.
+            @mkdir($destDir);
+            if (!@is_dir($destDir)) {
                 $log[count($log) - 1] .= '. FAILED';
                 $log[] = 'Failed to create folder for test images: ' . $destDir;
                 return [$log, false, ''];
@@ -134,16 +137,20 @@ class SelfTestHelper
 
         $log[] = 'Copying dummy webp to the cache root for ' . $rootId;
         $destDir = Paths::getCacheDirForImageRoot($destinationFolder, $destinationStructure, $rootId);
-        if (!file_exists($destDir)) {
+        if (!@is_dir($destDir)) {
             $log[] = 'The folder did not exist. Creating folder at: ' . $destinationFolder;
-            if (!mkdir($destDir, 0777, true)) {
+            // Tolerant of the concurrent-creation race: re-check is_dir() afterwards.
+            @mkdir($destDir, 0777, true);
+            if (!@is_dir($destDir)) {
                 $log[] = 'Failed creating folder!';
                 return [$log, false, ''];
             }
         }
         $destDir .= '/magic-convert-test-images';
-        if (!file_exists($destDir)) {
-            if (!mkdir($destDir, 0755, false)) {
+        if (!@is_dir($destDir)) {
+            // Tolerant of the concurrent-creation race: re-check is_dir() afterwards.
+            @mkdir($destDir, 0755, false);
+            if (!@is_dir($destDir)) {
                 $log[] = 'Failed creating the folder for the test images:';
                 $log[] = $destDir;
                 $log[] = 'To run this test, you must grant write permissions';

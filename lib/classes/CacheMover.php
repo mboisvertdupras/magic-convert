@@ -144,9 +144,12 @@ class CacheMover
         if (!@is_dir($fromDir)) {
             return [0, 0];
         }
-        if (!@file_exists($toDir)) {
-            // Note: 0777 is default. Default umask is 0022, so the default result is 0755
-            if (!@mkdir($toDir, 0777, true)) {
+        if (!@is_dir($toDir)) {
+            // Note: 0777 is default. Default umask is 0022, so the default result is 0755.
+            // Tolerant of the concurrent-creation race: @mkdir may fail because a
+            // racer already created the dir; treat "dir exists afterwards" as success.
+            @mkdir($toDir, 0777, true);
+            if (!@is_dir($toDir)) {
                 return [0, 0];
             }
         }

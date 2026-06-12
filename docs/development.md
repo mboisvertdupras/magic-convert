@@ -139,3 +139,62 @@ git remote add upstream https://github.com/rosell-dk/webp-express.git
 
 `vendor/rosell-dk/*` is never modified in place — generalizations happen at the
 plugin layer or in code forked into `lib/`.
+
+## Concurrency model (Phase 1.1)
+
+The conversion core is safe for **multiple concurrent writers** — parallel
+admin-ajax/REST requests served by separate PHP-FPM workers *and* concurrent
+WP-CLI processes (the planned `--procs` shard fan-out). The mechanism:
+
+- **`MagicConvert\FileLock`** — a cross-process advisory lock built on atomic
+  `fopen($path, 'x')` (`O_CREAT | O_EXCL`). We use O_EXCL rather than `flock()`
+  because the lock must span separate OS processes and behave consistently on
+  NFS / across FPM workers, which `flock()` does not. Each destination is guarded
+  by `<destination>.lock`; a lock older than 10 minutes is treated as abandoned
+  and stolen. When the lock is held, `ConvertHelperIndependent::convert()`
+  returns a structured, non-fatal `'status' => 'in-progress'` result so bulk
+  callers can retry instead of treating it as a hard failure.
+
+- **Atomic destination writes** — `convert()` hands the webp-convert library a
+  temp path (`<destination>.<pid>.tmp.webp`, still ending in `.webp` so both the
+  plugin's own `#\.webp$#` check and the library validator accept it) and
+  `rename()`s it onto the final destination on success. A `rename()` within one
+  directory is atomic on POSIX, so a concurrent reader never sees a half-written
+  file. The temp is unlinked in a `finally` block on any failure/crash-before-rename.
+
+- **Atomic JSON/state writes** — `FileHelper::atomicPutContents()` (temp +
+  rename) backs `config.json`, `wod-options.json`, and the per-source conversion
+  log `.md` files. `State.php` is DB-backed (WordPress options), so it inherits
+  the DB's write atomicity and needs no file-level treatment.
+
+- **Tolerant mkdir** — every `mkdir` in `lib/` that creates a cache/log/lock
+  directory uses the EEXIST-race pattern: `if (!is_dir($d)) { @mkdir($d, …, true); }`
+  then `is_dir($d)` is the real success test, so two processes creating the same
+  directory at once never produce a spurious failure.
+
+### Residual race in the on-demand (wod) serve path — accepted
+
+The on-demand path (`WebPOnDemand` / `WebPRealizer` →
+`ConvertHelperIndependent::serveConverted()` → the library's `serveConverted()`)
+converts inside the **library** when a requested destination is missing, writing
+directly to the destination (non-atomic). We harden this without modifying
+`vendor/`: when the destination is missing, `serveConverted()` first runs our own
+hardened `convert()` (lock + temp + atomic rename + idempotency), then lets the
+library serve the now-existing, fully-written file.
+
+One narrow residual race remains and is **accepted**: if our `convert()` reports
+`'in-progress'` (a sibling process holds the lock for that exact destination), we
+fall through and let the library serve/convert as a fallback. In that rare
+overlapping first-request-per-missing-file window the library may write the
+destination directly. This is acceptable because:
+
+1. it only occurs on the *first* concurrent requests for a *not-yet-converted*
+   file (steady-state serving of an existing file never enters this branch);
+2. any file produced by our own path lands atomically via rename, so a corrupted
+   file is never *served* through the plugin path; and
+3. the sibling holding the lock is itself writing atomically, so the destination
+   converges on a complete file.
+
+Eliminating it entirely would require either modifying `vendor/` (forbidden in
+this phase) or reimplementing the library's serve/header/fallback logic at the
+plugin layer, which is disproportionate to the residual risk.

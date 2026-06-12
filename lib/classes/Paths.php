@@ -508,12 +508,14 @@ APACHE
         // Why not simply use wp_mkdir_p ? - it sets the permissions to same as parent. Isn't that better?
         // or perhaps not... - Because we need write permissions in the config dir.
         if (!is_dir($configDir)) {
-            @mkdir($configDir, 0775);
+            // Tolerant of the concurrent-creation race (two requests/CLI procs
+            // creating the config dir at once): @mkdir then re-check is_dir().
+            @mkdir($configDir, 0775, true);
             @chmod($configDir, 0775);
-
+        }
+        if (is_dir($configDir)) {
             self::doCreateIndexPHPInConfigDirIfMissing();
             self::doCreateHTAccessInConfigDirIfMissing();
-
         }
         return is_dir($configDir);
     }
