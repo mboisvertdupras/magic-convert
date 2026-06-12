@@ -122,6 +122,36 @@ function magicconvert_getSanitizedQuality($keyInPOST, $fallback = 75) {
     return max(0, min($q, 100));
 }
 
+/**
+ * Clamp an integer into [$min, $max].
+ *
+ * Pure helper (no $_POST / WordPress) so it is directly unit-testable. Used to clamp the AVIF
+ * quality (0-100) and AVIF encoding speed (0-10) fields.
+ *
+ * @param  int  $value  the value to clamp
+ * @param  int  $min    inclusive lower bound
+ * @param  int  $max    inclusive upper bound
+ *
+ * @return int  the clamped integer
+ */
+function magicconvert_clampInt($value, $min, $max) {
+    return max($min, min(intval($value), $max));
+}
+
+/**
+ * Get a sanitized integer from $_POST, clamped into [$min, $max].
+ *
+ * @param  string  $keyInPOST  key in $_POST
+ * @param  int     $fallback   fallback when nothing in POST / unparseable
+ * @param  int     $min        inclusive lower bound
+ * @param  int     $max        inclusive upper bound
+ *
+ * @return int  the clamped, sanitized integer
+ */
+function magicconvert_getSanitizedClampedInt($keyInPOST, $fallback, $min, $max) {
+    return magicconvert_clampInt(magicconvert_getSanitizedInt($keyInPOST, $fallback), $min, $max);
+}
+
 function magicconvert_getSanitizedScope() {
     $scopeText = magicconvert_getSanitizedText('scope');
     if ($scopeText == '') {
@@ -433,6 +463,15 @@ $sanitized = [
     'converters' => magicconvert_getSanitizedConverters(),
 
 
+    // Formats (schema v2)
+    // -------------------
+    // WebP is always on (no posted field). AVIF: enable flag + clamped quality (0-100) and
+    // encoding speed (0-10).
+    'avif-enabled' => isset($_POST['avif-enabled']),
+    'avif-quality' => magicconvert_getSanitizedClampedInt('avif-quality', 30, 0, 100),
+    'avif-speed' => magicconvert_getSanitizedClampedInt('avif-speed', 6, 0, 10),
+
+
     // Serve options
     // ---------------
     'fail' => magicconvert_getSanitizedChooseFromSet('fail', 'original', [
@@ -633,6 +672,20 @@ if ($sanitized['operation-mode'] != 'no-conversion') {
             }
         }
     }
+
+
+    // Formats (schema v2)
+    // -------------------
+    // WebP stays always-enabled (its quality/converter settings are the top-level options above).
+    // AVIF gets its enable flag + clamped quality/speed. loadConfigAndFix() guarantees
+    // $config['formats'] is already present and filled with defaults.
+    if (!isset($config['formats']) || !is_array($config['formats'])) {
+        $config['formats'] = Config::getDefaultFormats();
+    }
+    $config['formats']['webp']['enabled'] = true;
+    $config['formats']['avif']['enabled'] = $sanitized['avif-enabled'];
+    $config['formats']['avif']['quality'] = $sanitized['avif-quality'];
+    $config['formats']['avif']['speed'] = $sanitized['avif-speed'];
 }
 
 $config['destination-structure'] = $sanitized['destination-structure'];

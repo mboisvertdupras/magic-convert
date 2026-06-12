@@ -99,6 +99,54 @@ class Config
         return FileHelper::loadJSONOptions(Paths::getConfigFileName());
     }
 
+    /**
+     * The current config schema version.
+     *
+     * v1 = upstream WebP Express era (no explicit version key, single implicit WebP format).
+     * v2 = Magic Convert multi-format era: adds an explicit 'config-version' and a per-format
+     *      'formats' section (see getDefaultFormats() / migrateToV2()).
+     */
+    const CONFIG_VERSION = 2;
+
+    /**
+     * Default per-format section (schema v2).
+     *
+     * IMPORTANT — WHY WEBP'S QUALITY/CONVERTER SETTINGS ARE *NOT* HERE:
+     * --------------------------------------------------------------------
+     * The WebP format's quality, converter stack, jpeg/png encoding, metadata, etc. deliberately
+     * REMAIN at the existing top level of the config ('quality-auto', 'converters', 'jpeg-encoding',
+     * ...). Those keys are read directly by dozens of consumers (HTAccessRules, the wod scripts,
+     * generateWodOptionsFromConfigObj(), the options UI partials, CacheMover, ...). Moving them
+     * under formats.webp would churn every one of those call sites for zero functional gain.
+     *
+     * So formats.webp carries ONLY an `enabled` flag (always true today — WebP is the baseline
+     * output and cannot be turned off). Its real encoding settings stay top-level.
+     *
+     * formats.avif, by contrast, is a brand-new format with no legacy consumers, so it owns its
+     * own settings here: `enabled` (false by default — see the zero-config / byte-for-byte
+     * equivalence requirement), `quality` (30, "AVIF Q30 ≈ JPEG Q75"), and `speed` (0-10 encoding
+     * effort, 6 = good balance). The AVIF converter stack (Phase 2.3) will read these.
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    public static function getDefaultFormats()
+    {
+        return [
+            'webp' => [
+                // WebP is the baseline format and is always enabled. Its quality / converter /
+                // encoding settings live at the top level of config (see note above), NOT here.
+                'enabled' => true,
+            ],
+            'avif' => [
+                // Disabled by default: with AVIF off, behaviour must be byte-for-byte equivalent
+                // to today (zero-config requirement).
+                'enabled' => false,
+                'quality' => 30,    // AVIF Q30 looks similar to JPEG Q75.
+                'speed' => 6,       // Encoding effort 0-10. Lower = smaller but much slower; 6 balances.
+            ],
+        ];
+    }
+
     public static function getDefaultConfig($skipQualityAuto = false) {
         if ($skipQualityAuto) {
             $qualityAuto = null;
@@ -107,6 +155,13 @@ class Config
         }
 
         return [
+
+            // Schema version marker (introduced in Magic Convert; absent => legacy v1, see migrateToV2()).
+            'config-version' => self::CONFIG_VERSION,
+
+            // Per-format section (schema v2). See getDefaultFormats() for the important note on why
+            // WebP's quality/converter settings stay top-level rather than moving under formats.webp.
+            'formats' => self::getDefaultFormats(),
 
             'operation-mode' => 'varied-image-responses',
 
@@ -191,6 +246,58 @@ class Config
     }
 
     /**
+     * Migrate a v1-shaped config array up to schema v2.
+     *
+     * v1 configs (everything saved by upstream WebP Express, and by Magic Convert before this
+     * step) have no 'config-version' key and no 'formats' section. This injects the per-format
+     * section from defaults (WebP enabled, AVIF disabled) and stamps 'config-version' = 2.
+     *
+     * Pure & static: no WordPress, no filesystem, no side effects — just array in, array out.
+     * Idempotent: running it on an already-v2 config (or repeatedly) leaves it unchanged. Any
+     * format keys the caller already has are preserved; only MISSING per-format keys are filled
+     * from defaults (so a partially-migrated config doesn't lose a user's AVIF quality choice).
+     *
+     * Note: this only handles the structural v1 -> v2 lift. The fuller merge-with-defaults that
+     * fix() performs still runs afterwards; calling this first guarantees the version stamp and
+     * formats skeleton exist before anything else looks at them.
+     *
+     * @param  array  $config  A config array (typically freshly loaded from disk).
+     * @return array  The same array, guaranteed to be at config-version 2.
+     */
+    public static function migrateToV2(array $config)
+    {
+        // Already v2 (or newer): nothing structural to do. Still defensively ensure 'formats'
+        // exists, in case a future hand-edited file set the version but dropped the section.
+        $alreadyVersioned = isset($config['config-version']) && ($config['config-version'] >= 2);
+
+        $defaultFormats = self::getDefaultFormats();
+
+        if (!isset($config['formats']) || !is_array($config['formats'])) {
+            // v1 (or corrupt): no formats section at all -> take defaults wholesale.
+            $config['formats'] = $defaultFormats;
+        } else {
+            // Some formats present already: fill in only the per-format keys that are missing,
+            // preserving anything the user/config already specified (idempotent + non-destructive).
+            foreach ($defaultFormats as $formatId => $formatDefaults) {
+                if (!isset($config['formats'][$formatId]) || !is_array($config['formats'][$formatId])) {
+                    $config['formats'][$formatId] = $formatDefaults;
+                } else {
+                    $config['formats'][$formatId] = array_merge(
+                        $formatDefaults,
+                        $config['formats'][$formatId]
+                    );
+                }
+            }
+        }
+
+        if (!$alreadyVersioned) {
+            $config['config-version'] = self::CONFIG_VERSION;
+        }
+
+        return $config;
+    }
+
+    /**
      *   Apply operation mode (set the hidden defaults that comes along with the mode)
      *   @return An altered configuration array
      */
@@ -266,6 +373,21 @@ class Config
             // Make sure new defaults below "alter-html" are added into the existing array
             // (note that this will not remove old unused properties, if some key should become obsolete)
             $config['alter-html'] = array_replace_recursive($defaultConfig['alter-html'], $config['alter-html']);
+
+            // Make sure the per-format section (schema v2) is present and its defaults are filled in.
+            // array_merge() above pulls 'formats' from $config when set (a v1 config that skipped
+            // migrateToV2 simply inherits $defaultConfig['formats']); this fills any missing per-format
+            // keys (e.g. a config that has formats.avif but no 'speed') without clobbering user values.
+            if (!isset($config['formats']) || !is_array($config['formats'])) {
+                $config['formats'] = $defaultConfig['formats'];
+            } else {
+                $config['formats'] = array_replace_recursive($defaultConfig['formats'], $config['formats']);
+            }
+
+            // Stamp the schema version if missing (e.g. a direct fix() caller bypassing loadConfigAndFix).
+            if (!isset($config['config-version'])) {
+                $config['config-version'] = self::CONFIG_VERSION;
+            }
 
             // Make sure new defaults below "environment-when-config-was-saved" are added into the existing array
             $config['environment-when-config-was-saved'] = array_replace_recursive($defaultConfig['environment-when-config-was-saved'], $config['environment-when-config-was-saved']);
@@ -367,7 +489,18 @@ class Config
     public static function loadConfigAndFix($checkQualityDetection = true)
     {
         // PS: Yes, loadConfig may return false. "fix" handles this by returning default config
-        return self::fix(Config::loadConfig(), $checkQualityDetection);
+        $config = Config::loadConfig();
+
+        // Schema migration: lift a legacy v1 config (no 'config-version', no 'formats' section)
+        // up to v2 BEFORE fix() merges defaults, so the version stamp and per-format skeleton
+        // are present for everything downstream. Idempotent — a v2 config passes through
+        // untouched. (loadConfig() may return false on first run; skip migration in that case,
+        // fix() will then return the default config which is already v2.)
+        if (is_array($config)) {
+            $config = self::migrateToV2($config);
+        }
+
+        return self::fix($config, $checkQualityDetection);
     }
 
     /**
@@ -693,6 +826,31 @@ class Config
         ];
 
 
+        // Per-format block (schema v2)
+        // -------------
+        // Expose the per-format enabled flags + AVIF quality/speed so the non-WordPress wod
+        // scripts and future serving logic can read them WITHOUT WordPress or the full config.
+        // Read defensively from $config['formats'] (which fix()/migrateToV2 guarantee), falling
+        // back to defaults so a malformed config never produces a broken wod-options.json.
+        $formatDefaults = self::getDefaultFormats();
+        $cfgFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
+
+        $webpFmt = (isset($cfgFormats['webp']) && is_array($cfgFormats['webp'])) ? $cfgFormats['webp'] : [];
+        $avifFmt = (isset($cfgFormats['avif']) && is_array($cfgFormats['avif'])) ? $cfgFormats['avif'] : [];
+
+        $formats = [
+            'webp' => [
+                // WebP is the baseline output and is always on.
+                'enabled' => isset($webpFmt['enabled']) ? (bool) $webpFmt['enabled'] : true,
+            ],
+            'avif' => [
+                'enabled' => isset($avifFmt['enabled']) ? (bool) $avifFmt['enabled'] : false,
+                'quality' => isset($avifFmt['quality']) ? intval($avifFmt['quality']) : $formatDefaults['avif']['quality'],
+                'speed' => isset($avifFmt['speed']) ? intval($avifFmt['speed']) : $formatDefaults['avif']['speed'],
+            ],
+        ];
+
+
         // Put it all together
         // -------------
 
@@ -707,7 +865,8 @@ class Config
 
         $options = [
             'wod' => $wod,
-            'webp-convert' => array_merge($serve, ['convert' => $wc])
+            'webp-convert' => array_merge($serve, ['convert' => $wc]),
+            'formats' => $formats,
         ];
 
 

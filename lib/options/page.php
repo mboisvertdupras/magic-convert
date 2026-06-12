@@ -229,6 +229,7 @@ if ($config['operation-mode'] == 'no-conversion') {
     include_once 'options/alter-html/alter-html.inc';
 } else {
     include_once 'options/redirection-rules/redirection-rules.inc';
+    include_once 'options/formats/formats.inc';
     include_once 'options/conversion-options/conversion-options.inc';
     //include_once 'options/conversion-options/destination-extension.inc';
     include_once 'options/serve-options/serve-options.inc';
