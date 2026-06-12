@@ -1,22 +1,22 @@
 <?php
 /*
 This class is used by wod/webp-realizer.php, which does not do a Wordpress bootstrap, but does register an autoloader for
-the WebPExpress classes.
+the MagicConvert classes.
 
 Calling Wordpress functions will FAIL. Make sure not to do that in either this class or the helpers.
 */
 //error_reporting(E_ALL);
 //ini_set('display_errors', 1);
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\ConvertHelperIndependent;
-use \WebPExpress\Sanitize;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
-use \WebPExpress\ValidateException;
-use \WebPExpress\Validate;
-use \WebPExpress\WodConfigLoader;
+use \MagicConvert\ConvertHelperIndependent;
+use \MagicConvert\Sanitize;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
+use \MagicConvert\ValidateException;
+use \MagicConvert\Validate;
+use \MagicConvert\WodConfigLoader;
 
 class WebPRealizer extends WodConfigLoader
 {
@@ -98,7 +98,7 @@ class WebPRealizer extends WodConfigLoader
         if ($dirIdOfHtaccess == 'uploads') {
             return $imageRoots->byId('uploads')->getAbsPath() . '/' . $destinationRelHtaccess;
         } elseif ($dirIdOfHtaccess == 'cache') {
-            return $imageRoots->byId('wp-content')->getAbsPath() . '/webp-express/webp-images/' . $destinationRelHtaccess;
+            return $imageRoots->byId('wp-content')->getAbsPath() . '/magic-convert/webp-images/' . $destinationRelHtaccess;
         }
         /*
         $pathTokens = explode('/', $destinationRelCacheRoot);
@@ -190,7 +190,7 @@ class WebPRealizer extends WodConfigLoader
         //echo '<pre>' . print_r($wodOptions, true) . '</pre>'; exit;
 
 
-        // Validate that WebPExpress was configured to redirect to this conversion script
+        // Validate that MagicConvert was configured to redirect to this conversion script
         // (but do not require that for Nginx)
         // ------------------------------------------------------------------------------
         self::$checking = 'settings';
@@ -223,7 +223,7 @@ class WebPRealizer extends WodConfigLoader
         //echo '<h3>destination:</h3> ' . $destination . '<h3>source:</h3>' . $source; exit;
 
         if ($source === false) {
-            header('X-WebP-Express-Error: webp-realizer.php could not find an existing jpg/png that corresponds to the webp requested', true);
+            header('X-Magic-Convert-Error: webp-realizer.php could not find an existing jpg/png that corresponds to the webp requested', true);
 
             $protocol = isset($_SERVER["SERVER_PROTOCOL"]) ? $_SERVER["SERVER_PROTOCOL"] : 'HTTP/1.0';
             header($protocol . " 404 Not Found");

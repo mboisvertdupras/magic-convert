@@ -7,12 +7,12 @@ This file is actually not included, only when debugging activation errors, I inc
 Haven't used it in a quite a while...
 */
 
-function webpexpress_activated() {
-  update_option( 'webp-express-activation-error',  ob_get_contents() );
+function magicconvert_activated() {
+  update_option( 'magic-convert-activation-error',  ob_get_contents() );
 }
-add_action( 'activated_plugin', 'webpexpress_activated' );
-if (!empty(get_option('webp-express-activation-error'))) {
+add_action( 'activated_plugin', 'magicconvert_activated' );
+if (!empty(get_option('magic-convert-activation-error'))) {
     add_filter( 'admin_footer_text', function() {
-        return 'Activation error:' . get_option('webp-express-activation-error');
+        return 'Activation error:' . get_option('magic-convert-activation-error');
     });
 }

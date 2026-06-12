@@ -1,23 +1,23 @@
 <?php
 /*
 This class is used by wod/webp-on-demand.php, which does not do a Wordpress bootstrap, but does register an autoloader for
-the WebPExpress classes.
+the MagicConvert classes.
 
 Calling Wordpress functions will FAIL. Make sure not to do that in either this class or the helpers.
 */
 //error_reporting(E_ALL);
 //ini_set('display_errors', 1);
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 use \WebPConvert\Convert\Converters\Ewww;
 
-use \WebPExpress\ImageRoots;
-use \WebPExpress\Sanitize;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
-use \WebPExpress\ValidateException;
-use \WebPExpress\Validate;
+use \MagicConvert\ImageRoots;
+use \MagicConvert\Sanitize;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
+use \MagicConvert\ValidateException;
+use \MagicConvert\Validate;
 
 class WodConfigLoader
 {
@@ -30,7 +30,7 @@ class WodConfigLoader
     protected static $webExpressContentDirAbs;
 
     public static function exitWithError($msg) {
-        header('X-WebP-Express-Error: ' . $msg, true);
+        header('X-Magic-Convert-Error: ' . $msg, true);
         echo $msg;
         exit;
     }
@@ -64,7 +64,7 @@ class WodConfigLoader
         if (self::isApache() && (!self::isNginxHandlingImages())) {
             if (strpos($_SERVER['REQUEST_URI'], $filename) !== false) {
                 self::exitWithError(
-                    'It seems you are visiting this file (plugins/webp-express/wod/' . $filename . ') directly. We do not allow this.'
+                    'It seems you are visiting this file (plugins/magic-convert/wod/' . $filename . ') directly. We do not allow this.'
                 );
                 exit;
             }
@@ -104,7 +104,7 @@ class WodConfigLoader
     }
 
 
-    protected static function getWebPExpressContentDirWithDocRoot()
+    protected static function getMagicConvertContentDirWithDocRoot()
     {
         // Get relative path to wp-content
         // --------------------------------
@@ -122,21 +122,21 @@ class WodConfigLoader
             }
         }
 
-        // Check WebP Express content dir
+        // Check Magic Convert content dir
         // ---------------------------------
-        self::$checking = 'WebP Express content dir';
+        self::$checking = 'Magic Convert content dir';
 
-        $webExpressContentDirAbs = SanityCheck::absPathExistsAndIsDir(self::$docRoot . '/' . $wpContentDirRel . '/webp-express');
+        $webExpressContentDirAbs = SanityCheck::absPathExistsAndIsDir(self::$docRoot . '/' . $wpContentDirRel . '/magic-convert');
         return $webExpressContentDirAbs;
     }
 
-    protected static function getWebPExpressContentDirNoDocRoot() {
+    protected static function getMagicConvertContentDirNoDocRoot() {
         // Check wp-content
         // ----------------------
-        self::$checking = 'relative path between webp-express plugin dir and wp-content dir';
+        self::$checking = 'relative path between magic-convert plugin dir and wp-content dir';
 
-        // From v0.22.0, we pass relative to webp-express dir rather than to the general plugin dir.
-        // - this allows symlinking the webp-express dir.
+        // From v0.22.0, we pass relative to magic-convert dir rather than to the general plugin dir.
+        // - this allows symlinking the magic-convert dir.
         $wpContentDirRelToWEPluginDir = self::getEnvPassedInRewriteRule('WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR');
         if (!$wpContentDirRelToWEPluginDir) {
             // Passed in QS?
@@ -166,22 +166,22 @@ class WodConfigLoader
         }
 
 
-        // Check WebP Express content dir
+        // Check Magic Convert content dir
         // ---------------------------------
-        self::$checking = 'WebP Express content dir';
+        self::$checking = 'Magic Convert content dir';
 
         $pathToWEPluginDir = dirname(dirname(__DIR__));
-        $webExpressContentDirAbs = SanityCheck::pathDirectoryTraversalAllowed($pathToWEPluginDir . '/' . $wpContentDirRelToWEPluginDir . '/webp-express');
+        $webExpressContentDirAbs = SanityCheck::pathDirectoryTraversalAllowed($pathToWEPluginDir . '/' . $wpContentDirRelToWEPluginDir . '/magic-convert');
 
         //$pathToPluginDir = dirname(dirname(dirname(__DIR__)));
-        //$webExpressContentDirAbs = SanityCheck::pathDirectoryTraversalAllowed($pathToPluginDir . '/' . $wpContentDirRelToPluginDir . '/webp-express');
+        //$webExpressContentDirAbs = SanityCheck::pathDirectoryTraversalAllowed($pathToPluginDir . '/' . $wpContentDirRelToPluginDir . '/magic-convert');
         //echo $webExpressContentDirAbs; exit;
         if (@!file_exists($webExpressContentDirAbs)) {
             throw new \Exception('Dir not found');
         }
         $webExpressContentDirAbs = @realpath($webExpressContentDirAbs);
         if ($webExpressContentDirAbs === false) {
-            throw new \Exception('WebP Express content dir is outside restricted open_basedir!');
+            throw new \Exception('Magic Convert content dir is outside restricted open_basedir!');
         }
         return $webExpressContentDirAbs;
     }
@@ -203,13 +203,13 @@ class WodConfigLoader
     {
         if (!is_dir($configDir)) {
             throw new \Exception(
-              'WebP Express configuration directory was not found. ' .
-              'Please check that wp-content/webp-express/config exists and is readable.'
+              'Magic Convert configuration directory was not found. ' .
+              'Please check that wp-content/magic-convert/config exists and is readable.'
             );
         }
 
         if (!is_readable($configDir)) {
-            throw new \Exception('WebP Express configuration directory is not readable. Please fix the permissions (wp-content/webp-express/config)');
+            throw new \Exception('Magic Convert configuration directory is not readable. Please fix the permissions (wp-content/magic-convert/config)');
         }
 
         $files = glob($configDir . '/wod-options.*.json');
@@ -220,7 +220,7 @@ class WodConfigLoader
             if (file_exists($oldFileName)) {
                 return $oldFileName;
             }
-            throw new \Exception('Could not find a file that matches the pattern "wod-options.[hash].json" in the config dir. Is it there? Please check manually in this folder: wp-content/webp-express/config');
+            throw new \Exception('Could not find a file that matches the pattern "wod-options.[hash].json" in the config dir. Is it there? Please check manually in this folder: wp-content/magic-convert/config');
         }
 
         // We expect only one match. But failed migrations / manual restores could perhaps cause there to be several
@@ -242,7 +242,7 @@ class WodConfigLoader
         if (preg_match('/^wod-options\.([a-f0-9]+)\.json$/i', $filename, $matches)) {
             return $matches[1];
         }*/
-        // throw new \Exception('The filename Could not find a file that matches the pattern "wod-options.[hash].json" in the config dir. Is it there? Please check manually in this folder: wp-content/webp-express/config');
+        // throw new \Exception('The filename Could not find a file that matches the pattern "wod-options.[hash].json" in the config dir. Is it there? Please check manually in this folder: wp-content/magic-convert/config');
     }
 
     protected static function loadConfig() {
@@ -274,9 +274,9 @@ class WodConfigLoader
         }
 
         if ($usingDocRoot) {
-            self::$webExpressContentDirAbs = self::getWebPExpressContentDirWithDocRoot();
+            self::$webExpressContentDirAbs = self::getMagicConvertContentDirWithDocRoot();
         } else {
-            self::$webExpressContentDirAbs = self::getWebPExpressContentDirNoDocRoot();
+            self::$webExpressContentDirAbs = self::getMagicConvertContentDirNoDocRoot();
         }
 
         // Check config file name

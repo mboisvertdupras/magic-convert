@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Multisite;
+use \MagicConvert\Multisite;
 
 /**
  *
@@ -21,8 +21,8 @@ class AdminUi
             ];
         } else {
             $mylinks = array(
-                '<a href="' . admin_url('options-general.php?page=webp_express_settings_page') . '">Settings</a>',
-                '<a href="https://wordpress.org/plugins/webp-express/#%0Ahow%20do%20i%20buy%20you%20a%20cup%20of%20coffee%3F%0A" target="_blank">Provide coffee for the developer</a>',
+                '<a href="' . admin_url('options-general.php?page=magic_convert_settings_page') . '">Settings</a>',
+                '<a href="https://wordpress.org/plugins/magic-convert/#%0Ahow%20do%20i%20buy%20you%20a%20cup%20of%20coffee%3F%0A" target="_blank">Provide coffee for the developer</a>',
             );
 
         }
@@ -34,7 +34,7 @@ class AdminUi
     public static function networkPluginActionLinksFilter($links)
     {
         $mylinks = array(
-            '<a href="' . network_admin_url('settings.php?page=webp_express_settings_page') . '">Settings</a>',
+            '<a href="' . network_admin_url('settings.php?page=magic_convert_settings_page') . '">Settings</a>',
             '<a href="https://ko-fi.com/rosell" target="_blank">donate?</a>',
         );
         return array_merge($links, $mylinks);
@@ -46,20 +46,20 @@ class AdminUi
     {
         add_submenu_page(
             'settings.php', // Parent element
-            'WebP Express settings (for network)', // Text in browser title bar
-            'WebP Express', // Text to be displayed in the menu.
+            'Magic Convert settings (for network)', // Text in browser title bar
+            'Magic Convert', // Text to be displayed in the menu.
             'manage_network_options', // Capability
-            'webp_express_settings_page', // slug
-            array('\WebPExpress\OptionsPage', 'display') // Callback function which displays the page
+            'magic_convert_settings_page', // slug
+            array('\MagicConvert\OptionsPage', 'display') // Callback function which displays the page
         );
 
         add_submenu_page(
             'settings.php', // Parent element
-            'WebP Express File Manager', //Page Title
-            'WebP Express File Manager', //Menu Title
+            'Magic Convert File Manager', //Page Title
+            'Magic Convert File Manager', //Menu Title
             'manage_network_options', //capability
-            'webp_express_conversion_page', // slug
-            array('\WebPExpress\WCFMPage', 'display') //The function to be called to output the content for this page.
+            'magic_convert_conversion_page', // slug
+            array('\MagicConvert\WCFMPage', 'display') //The function to be called to output the content for this page.
         );
 
     }
@@ -72,11 +72,11 @@ class AdminUi
 
         add_submenu_page(
           'upload.php', // Parent element
-          'WebP Express', //Page Title
-          'WebP Express', //Menu Title
+          'Magic Convert', //Page Title
+          'Magic Convert', //Menu Title
           'manage_network_options', //capability
-          'webp_express_conversion_page', // slug
-          array('\WebPExpress\WCFMPage', 'display') //The function to be called to output the content for this page.
+          'magic_convert_conversion_page', // slug
+          array('\MagicConvert\WCFMPage', 'display') //The function to be called to output the content for this page.
         );
         */
 
@@ -86,20 +86,20 @@ class AdminUi
     {
         //Add Settings Page
         add_options_page(
-            'WebP Express Settings', //Page Title
-            'WebP Express', //Menu Title
+            'Magic Convert Settings', //Page Title
+            'Magic Convert', //Menu Title
             'manage_options', //capability
-            'webp_express_settings_page', // slug
-            array('\WebPExpress\OptionsPage', 'display') //The function to be called to output the content for this page.
+            'magic_convert_settings_page', // slug
+            array('\MagicConvert\OptionsPage', 'display') //The function to be called to output the content for this page.
         );
 
         // Add Media page
         add_media_page(
-          'WebP Express', //Page Title
-          'WebP Express', //Menu Title
+          'Magic Convert', //Page Title
+          'Magic Convert', //Menu Title
           'manage_options', //capability
-          'webp_express_conversion_page', // slug
-          array('\WebPExpress\WCFMPage', 'display') //The function to be called to output the content for this page.
+          'magic_convert_conversion_page', // slug
+          array('\MagicConvert\WCFMPage', 'display') //The function to be called to output the content for this page.
         );
 
     }

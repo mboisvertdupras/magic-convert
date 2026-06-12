@@ -2,7 +2,7 @@
 <tr id="destination_structure_row">
     <th scope="row">Destination structure<?php
         echo helpIcon(
-            '<p>This setting determines how the converted files are structured within the folder that WebP Express ' .
+            '<p>This setting determines how the converted files are structured within the folder that Magic Convert ' .
             'uses for storing webp images (from here on called "the cache root")</p>' .
             '<p><span style="text-decoration:underline">"document root"</span><br>' .
             'When "document root" is selected, the webp images will be stored in:<br>' .
@@ -26,13 +26,13 @@
     ?></th>
     <td>
         <!--
-        The "image roots" option was added to make WebP Express work on systems where the document root is set up incorrectly or
+        The "image roots" option was added to make Magic Convert work on systems where the document root is set up incorrectly or
         is outside opendir restriction or an image root is located outside document root.
-        WebP Express automatically detects this and will not allow you to select "document root" in those cases.
+        Magic Convert automatically detects this and will not allow you to select "document root" in those cases.
     -->
         <select name="destination-structure" id="destination_structure">
             <?php
-            webpexpress_selectBoxOptions($config['destination-structure'], [
+            magicconvert_selectBoxOptions($config['destination-structure'], [
                 'doc-root' => 'Document root',
                 'image-roots' => 'Image roots',
             ]);

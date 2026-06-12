@@ -1,16 +1,16 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
 
-function webpexpress_migrate15() {
+function magicconvert_migrate15() {
 
     // Update migrate version right away to minimize risk of running the update twice in a multithreaded environment
-    Option::updateOption('webp-express-migration-version', '17');   // Skip the next migration! Originally, this was set to '15'. Users that did not install 0.25.10 will not need the next update (migrate16). And migrate17 is also no longer needed
+    Option::updateOption('magic-convert-migration-version', '17');   // Skip the next migration! Originally, this was set to '15'. Users that did not install 0.25.10 will not need the next update (migrate16). And migrate17 is also no longer needed
 
     Paths::createIndexPHPInConfigDirIfMissing();
 
@@ -21,7 +21,7 @@ function webpexpress_migrate15() {
 
             // We need to regenerate .htaccess files if web-realizer or webp-on-demand is active,
             // so they get the new ConfigHash
-            wp_schedule_single_event(time() + 1, 'webp_express_task_regenerate_config_and_htaccess');
+            wp_schedule_single_event(time() + 1, 'magic_convert_task_regenerate_config_and_htaccess');
         }
         DismissableGlobalMessages::addDismissableMessage('0.25.10/renamed-config-file');
 
@@ -30,4 +30,4 @@ function webpexpress_migrate15() {
     }
 }
 
-webpexpress_migrate15();
+magicconvert_migrate15();

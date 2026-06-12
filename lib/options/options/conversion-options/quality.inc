@@ -30,7 +30,7 @@ if ($canDetectQuality) {
         'of jpeg images, you would have had the option to choose "Same as jpeg". To get that option, you ' .
         'either need to get the imagick extension running (PECL >= 2.2.2) or imagick or gmagick installed plus ' .
         'exec() rights.</p>' .
-        '<p>Note: If you use the <i>Remote WebP Express</i> converter, you can configure it to ask the remote ' .
+        '<p>Note: If you use the <i>Remote Magic Convert</i> converter, you can configure it to ask the remote ' .
         'to do the automatic quality detection for jpegs. This will override the value entered here.</p>'
     );
 }
@@ -68,7 +68,7 @@ if ($canDetectQuality) {
     echo helpIcon('All converted images will be encoded with this quality');
 } else {
     echo helpIcon('All converted images will be encoded with this quality. ' .
-        'For Remote WebP Express and Imagick, you however have the option to use override this, and use ' .
+        'For Remote Magic Convert and Imagick, you however have the option to use override this, and use ' .
         '"auto". With some setup, you can get quality detection working and you will then be able to set ' .
         'quality to "auto" generally. For that you either need to get the imagick extension running ' .
         '(PECL >= 2.2.2) or exec() rights and either imagick or gmagick installed.'

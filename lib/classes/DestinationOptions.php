@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class DestinationOptions
 {
@@ -26,7 +26,7 @@ class DestinationOptions
     /**
      * Set properties from config file
      *
-     * @param  array  $config   WebP Express configuration object
+     * @param  array  $config   Magic Convert configuration object
      */
     public static function createFromConfig(&$config)
     {

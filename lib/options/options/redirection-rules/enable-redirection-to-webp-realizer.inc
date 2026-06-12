@@ -25,7 +25,7 @@
             value="true"
             type="checkbox"
         >
-        <button style="margin-left: 30px;" onclick="WebPExpress.SelfTest.openPopup('redirectToWebPRealizer')" class="button button-secondary" type="button">
+        <button style="margin-left: 30px;" onclick="MagicConvert.SelfTest.openPopup('redirectToWebPRealizer')" class="button button-secondary" type="button">
             Live test
         </button>
     </td>

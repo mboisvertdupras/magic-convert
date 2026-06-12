@@ -1,9 +1,9 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 
-function webpexpress_migrate13_add_ffmpeg_message_if_relevant()
+function magicconvert_migrate13_add_ffmpeg_message_if_relevant()
 {
     $config = Config::loadConfigAndFix(false);  // false, because we do not need to test if quality detection is working
     $config = Config::updateConverterStatusWithFreshTest($config);  // Test all converters (especially we are excited to learn if the new ffmpeg converter is working)
@@ -33,10 +33,10 @@ function webpexpress_migrate13_add_ffmpeg_message_if_relevant()
 
 }
 
-function webpexpress_migrate13() {
-    Option::updateOption('webp-express-migration-version', '13');
+function magicconvert_migrate13() {
+    Option::updateOption('magic-convert-migration-version', '13');
 
-    webpexpress_migrate13_add_ffmpeg_message_if_relevant();
+    magicconvert_migrate13_add_ffmpeg_message_if_relevant();
 }
 
-webpexpress_migrate13();
+magicconvert_migrate13();

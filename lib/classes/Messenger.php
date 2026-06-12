@@ -1,9 +1,9 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Option;
-use \WebPExpress\State;
+use \MagicConvert\Option;
+use \MagicConvert\State;
 
 class Messenger
 {
@@ -14,12 +14,12 @@ class Messenger
      *  @param string   $msg      the message (not translated)
      *
      *  Hm... we should add some sprintf-like support
-     *  $msg = sprintf(__( 'You are on a very old version of PHP (%s). WebP Express may not work as intended.', 'webp-express' ), phpversion());
+     *  $msg = sprintf(__( 'You are on a very old version of PHP (%s). Magic Convert may not work as intended.', 'magic-convert' ), phpversion());
      */
     public static function addMessage($level, $msg) {
         //error_log('add message:' . $msg);
 
-        Option::updateOption('webp-express-messages-pending', true, true);  // We want this option to be autoloaded
+        Option::updateOption('magic-convert-messages-pending', true, true);  // We want this option to be autoloaded
         $pendingMessages = State::getState('pendingMessages', []);
 
         // Ensure we do not add a message that is already pending.
@@ -43,7 +43,7 @@ class Messenger
             self::$printedStyles = true;
         }
 
-        //$msg = __( $msg, 'webp-express');     // uncommented. We should add some sprintf-like functionality before making the plugin translatable
+        //$msg = __( $msg, 'magic-convert');     // uncommented. We should add some sprintf-like functionality before making the plugin translatable
         printf(
           '<div class="%1$s"><div style="margin:10px 0">%2$s</div></div>',
           //esc_attr('notice notice-' . $level . ' is-dismissible'),
@@ -90,7 +90,7 @@ class Messenger
 
         State::setState('pendingMessages', []);
 
-        Option::updateOption('webp-express-messages-pending', false, true);
+        Option::updateOption('magic-convert-messages-pending', false, true);
     }
 
 }

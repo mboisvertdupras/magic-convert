@@ -1,12 +1,12 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Convert;
-use \WebPExpress\FileHelper;
-use \WebPExpress\DismissableMessages;
-use \WebPExpress\Paths;
-use WebPExpress\MediaLibraryHelper;
+use \MagicConvert\Convert;
+use \MagicConvert\FileHelper;
+use \MagicConvert\DismissableMessages;
+use \MagicConvert\Paths;
+use MagicConvert\MediaLibraryHelper;
 
 
 
@@ -164,7 +164,7 @@ class CachePurge
     public static function processAjaxPurgeCache()
     {
 
-        if (!check_ajax_referer('webpexpress-ajax-purge-cache-nonce', 'nonce', false)) {
+        if (!check_ajax_referer('magicconvert-ajax-purge-cache-nonce', 'nonce', false)) {
             wp_send_json_error('The security nonce has expired. You need to reload the settings page (press F5) and try again)');
             wp_die();
         }

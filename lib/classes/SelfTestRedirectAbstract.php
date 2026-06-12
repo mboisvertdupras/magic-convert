@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 abstract class SelfTestRedirectAbstract
 {

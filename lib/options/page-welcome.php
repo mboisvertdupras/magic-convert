@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
@@ -28,7 +28,7 @@ if ($weKnowThereAreNoWorkingConverters) {
     echo '<p>Unfortunately your server cannot convert webp files in PHP without resorting to cloud conversion.</p>' .
         '<p>But do not despear! - You have options!</p>' .
         '<ol style="list-style-position:outside">' .
-        '<li>You can install this plugin on another website, which supports a "local" webp conversion method and connect to that using the "Remote WebP Express" conversion method' .
+        '<li>You can install this plugin on another website, which supports a "local" webp conversion method and connect to that using the "Remote Magic Convert" conversion method' .
         '<li>You can purchase a key for the <a target="_blank" href="https://ewww.io/plans/">ewww cloud converter</a>. They do not charge credits for webp conversions, so all you ever have to pay is the one dollar start-up fee :)</li>' .
         '<li>I have written a <a target="_blank" href="https://github.com/rosell-dk/webp-convert/wiki/A-template-letter-for-shared-hosts">template letter</a> which you can try sending to your webhost</li>' .
         '<li>You can set up a <a target="_blank" href="https://github.com/rosell-dk/webp-convert-cloud-service">webp-convert-cloud-service</a> on another server and connect to that. Its open source.</li>' .
@@ -56,21 +56,21 @@ if ($weKnowThereAreNoWorkingConverters) {
 if (Paths::isWPContentDirMovedOutOfAbsPath()) {
     if (!Paths::canWriteHTAccessRulesHere($wpContentDir)) {
         echo '<p><b>Oh, one more thing</b>. Unless you are going to put the rewrite rules into your configuration manually, ';
-        echo '<i>WebP Express</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file in your <i>wp-content</i> directory ';
+        echo '<i>Magic Convert</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file in your <i>wp-content</i> directory ';
         echo '(we need to store them there rather than in your root, because you have moved your wp-content folder out of the Wordpress root). ';
         echo 'Please adjust the file permissions of your <i>wp-content</i> dir. ';
 
         if (Paths::isPluginDirMovedOutOfWpContent()) {
             echo '<br>But that is not all. Besides moving your wp-content dir, you have <i>also</i> moved your plugin dir... ';
-            echo 'If you want WebP-Express to work on the images delivered by your plugins, you must also grant write access to your plugin dir (you can revoke the access after we have written the rules).<br>';
+            echo 'If you want Magic Convert to work on the images delivered by your plugins, you must also grant write access to your plugin dir (you can revoke the access after we have written the rules).<br>';
         }
         echo 'You can reload this page aftewards, and this message should be gone</p>';
     } else {
         if (Paths::isPluginDirMovedOutOfWpContent()) {
             echo '<p><b>Oh, one more thing</b>. I can see that your plugin dir has been moved out of your wp-content folder. ';
-            echo 'If you want WebP-Express to work on the images delivered by your plugins, you must grant write access to your ';
+            echo 'If you want Magic Convert to work on the images delivered by your plugins, you must grant write access to your ';
             echo 'plugin dir (you can revoke the access after we have written the rules, but beware that the plugin may need ';
-            echo 'access rights again. Some of the options affects the .htaccess rules. And WebP Express also have to remove the rules if the plugin is disabled)';
+            echo 'access rights again. Some of the options affects the .htaccess rules. And Magic Convert also have to remove the rules if the plugin is disabled)';
         }
     }
     if (Paths::isUploadDirMovedOutOfWPContentDir()) {
@@ -90,9 +90,9 @@ if (Paths::isWPContentDirMovedOutOfAbsPath()) {
     $firstWritable = Paths::returnFirstWritableHTAccessDir([$wpContentDir, $indexDir]);
     if ($firstWritable === false) {
         echo '<p><b>Oh, one more thing</b>. Unless you are going to put the rewrite rules into your configuration manually, ';
-        echo '<i>WebP Express</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file. ';
+        echo '<i>Magic Convert</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file. ';
         echo 'However, your current file permissions does not allow that. ';
-        echo '<i>WebP Express</i> would prefer to put the rewrite rules into your <i>wp-content</i> folder, but ';
+        echo '<i>Magic Convert</i> would prefer to put the rewrite rules into your <i>wp-content</i> folder, but ';
         echo 'will store them in your main <i>.htaccess</i> file if it can write to that, but not your wp-content. ';
         echo '(The preference for storing in wp-content is simply that it minimizes the risk of conflicts with rules from other plugins. ';
         echo 'deeper <i>.htaccess</i> files takes precedence). ';
@@ -101,9 +101,9 @@ if (Paths::isWPContentDirMovedOutOfAbsPath()) {
     } else {
         if ($firstWritable != $wpContentDir) {
             echo '<p>Oh, one more thing. Unless you are going to put the rewrite rules into your configuration manually, ';
-            echo '<i>WebP Express</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file. ';
+            echo '<i>Magic Convert</i> would be needing to store the rewrite rules in a <i>.htaccess</i> file. ';
             echo 'Your current file permissions <i>does</i> allow us to store rules in your main <i>.htaccess</i> file. ';
-            echo 'However, <i>WebP Express</i> would prefer to put the rewrite rules into your <i>wp-content</i> folder. ';
+            echo 'However, <i>Magic Convert</i> would prefer to put the rewrite rules into your <i>wp-content</i> folder. ';
             echo 'Putting them there will minimize the risk of conflict with rules from other plugins, as ';
             echo 'deeper <i>.htaccess</i> files takes precedence. ';
             echo 'If you would like the <i>.htaccess</i> file to be stored in your wp-content folder, please adjust your file permissions. ';
@@ -126,7 +126,7 @@ if (Paths::isWPContentDirMovedOutOfAbsPath()) {
     if (Paths::isPluginDirMovedOutOfAbsPath()) {
         if (!Paths::canWriteHTAccessRulesHere($pluginDir)) {
             echo '<p>Oh, one more thing. I see you have moved your plugins dir out of your root. ';
-            echo 'If you want WebP-Express to work on the images delivered by your plugins, you must also grant write access ';
+            echo 'If you want Magic Convert to work on the images delivered by your plugins, you must also grant write access ';
             echo 'to your ';
             if (FileHelper::fileExists($pluginDir . '/.htaccess')) {
                 echo '<i>.htaccess</i> file in your plugin dir';
@@ -143,16 +143,16 @@ if (Paths::isWPContentDirMovedOutOfAbsPath()) {
 if(Paths::canWriteHTAccessRulesHere($wpContentDir)) {
 
     if ($firstWritable === false) {
-        echo 'Actually, WebP Express does not have permission to write to your main <i>.htaccess</i> either. Please fix. Preferably ';
+        echo 'Actually, Magic Convert does not have permission to write to your main <i>.htaccess</i> either. Please fix. Preferably ';
     }
 
 
     $firstWritable = Paths::returnFirstWritableHTAccessDir([$indexDir, $homeDir]);
     if ($firstWritable === false) {
-        echo 'Actually, WebP Express does not have permission to write to your main <i>.htaccess</i> either. Please fix. Preferably ';
+        echo 'Actually, Magic Convert does not have permission to write to your main <i>.htaccess</i> either. Please fix. Preferably ';
     }
     if(Paths::canWriteHTAccessRulesHere($wpContentDir)) {
-        echo '<i>WebP Express</i> however does have rights to write to your main <i>.htaccess</i>. It will work too - probably. But to minimize risk of conflict with rules from other plugins, I recommended you to adjust the file permissions to allow us to write to a <i>.htaccess</i> file in your <i>wp-content dir</i>';
+        echo '<i>Magic Convert</i> however does have rights to write to your main <i>.htaccess</i>. It will work too - probably. But to minimize risk of conflict with rules from other plugins, I recommended you to adjust the file permissions to allow us to write to a <i>.htaccess</i> file in your <i>wp-content dir</i>';
     }
     echo '</p>';
 }*/

@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class SelfTest
 {
@@ -51,7 +51,7 @@ class SelfTest
 
             if (stripos($_SERVER["SERVER_SOFTWARE"], 'nginx') !== false) {
 
-                $result[] = 'You are on Nginx and the rules that WebP Express stores in the .htaccess files does not ' .
+                $result[] = 'You are on Nginx and the rules that Magic Convert stores in the .htaccess files does not ' .
                     'have any effect. '
 
             }
@@ -79,7 +79,7 @@ class SelfTest
 
     public static function processAjax()
     {
-        if (!check_ajax_referer('webpexpress-ajax-self-test-nonce', 'nonce', false)) {
+        if (!check_ajax_referer('magicconvert-ajax-self-test-nonce', 'nonce', false)) {
             wp_send_json_error('The security nonce has expired. You need to reload the settings page (press F5) and try again)');
             wp_die();
         }

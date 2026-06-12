@@ -1,15 +1,15 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
 
-function webpexpress_migrate14() {
+function magicconvert_migrate14() {
 
     // Update migrate version right away to minimize risk of running the update twice in a multithreaded environment
-    Option::updateOption('webp-express-migration-version', '14');
+    Option::updateOption('magic-convert-migration-version', '14');
 
     $config = Config::loadConfigAndFix(false);    // false means we do not need the check if quality detection is supported
     if (($config['enable-redirection-to-converter']) || ($config['redirect-to-existing-in-htaccess'])) {
@@ -17,20 +17,20 @@ function webpexpress_migrate14() {
         // We need to regenerate .htaccess files in case redirection to webp is enabled. Two reasons:
         // 1: WebP On Demand rules needs fixing (#520)
         // 2: The new escape hatch (#522), which is needed for the File Manager (#521)
-        wp_schedule_single_event(time() + 10, 'webp_express_task_regenerate_config_and_htaccess');
+        wp_schedule_single_event(time() + 10, 'magic_convert_task_regenerate_config_and_htaccess');
     } else {
         /*
         if (isset($config['alter-html']) && $config['alter-html']['enabled']) {
             // Schedule to regenate config, because we need to update autoloaded options in order to
             // autoload the new alter-html/prevent-using-webps-larger-than-original option
             // (hm, actually it defaults to true, so it should be neccessary...)
-            wp_schedule_single_event(time() + 10, 'webp_express_task_regenerate_config');
+            wp_schedule_single_event(time() + 10, 'magic_convert_task_regenerate_config');
         }*/
     }
 
     // Schedule bulk update dummy files
-    wp_schedule_single_event(time() + 30, 'webp_express_task_bulk_update_dummy_files');
+    wp_schedule_single_event(time() + 30, 'magic_convert_task_bulk_update_dummy_files');
 
 }
 
-webpexpress_migrate14();
+magicconvert_migrate14();

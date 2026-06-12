@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\ValidateException;
-use \WebPExpress\SanityCheck;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\ValidateException;
+use \MagicConvert\SanityCheck;
 
 class Validate
 {

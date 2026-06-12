@@ -2,19 +2,19 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-use \WebPExpress\CacheMover;
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\DismissableMessages;
-use \WebPExpress\HTAccess;
-use \WebPExpress\HTAccessRules;
-use \WebPExpress\Messenger;
-use \WebPExpress\PathHelper;
-use \WebPExpress\Paths;
+use \MagicConvert\CacheMover;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\DismissableMessages;
+use \MagicConvert\HTAccess;
+use \MagicConvert\HTAccessRules;
+use \MagicConvert\Messenger;
+use \MagicConvert\PathHelper;
+use \MagicConvert\Paths;
 
 // TODO: Move this code to a class
 
-check_admin_referer('webpexpress-save-settings-nonce');
+check_admin_referer('magicconvert-save-settings-nonce');
 
 DismissableMessages::dismissMessage('0.14.0/say-hello-to-vips');
 
@@ -45,7 +45,7 @@ Custom functions for sanitizing
  *
  * @return string  sanitized text, or fallback if value isn't set
  */
-function webpexpress_getSanitizedText($keyInPOST, $fallbackValue = '') {
+function magicconvert_getSanitizedText($keyInPOST, $fallbackValue = '') {
     if (!isset($_POST[$keyInPOST])) {
         return $fallbackValue;
     }
@@ -69,16 +69,16 @@ function webpexpress_getSanitizedText($keyInPOST, $fallbackValue = '') {
  *
  * @return mixed   one of the items in the set - or fallback (which is usually also one in the set)
  */
-function webpexpress_getSanitizedChooseFromSet($keyInPOST, $fallbackValue, $acceptableValues) {
-    $value = webpexpress_getSanitizedText($keyInPOST, $fallbackValue);
+function magicconvert_getSanitizedChooseFromSet($keyInPOST, $fallbackValue, $acceptableValues) {
+    $value = magicconvert_getSanitizedText($keyInPOST, $fallbackValue);
     if (in_array($value, $acceptableValues)) {
         return $value;
     }
     return $fallbackValue;
 }
 
-function webpexpress_getSanitizedCacheControlHeader($keyInPOST) {
-    $value = webpexpress_getSanitizedText($keyInPOST);
+function magicconvert_getSanitizedCacheControlHeader($keyInPOST) {
+    $value = magicconvert_getSanitizedText($keyInPOST);
 
     // Example of valid header: "public, max-age=31536000, stale-while-revalidate=604800, stale-if-error=604800"
     $value = strtolower($value);
@@ -93,8 +93,8 @@ function webpexpress_getSanitizedCacheControlHeader($keyInPOST) {
  *
  * @return int     the sanitized int value.
  */
-function webpexpress_getSanitizedInt($keyInPOST, $fallback=0) {
-    $value = webpexpress_getSanitizedText($keyInPOST, strval($fallback));
+function magicconvert_getSanitizedInt($keyInPOST, $fallback=0) {
+    $value = magicconvert_getSanitizedText($keyInPOST, strval($fallback));
 
     // strip anything after and including comma
     $value = preg_replace('#[\.\,].*#', '', $value);
@@ -116,14 +116,14 @@ function webpexpress_getSanitizedInt($keyInPOST, $fallback=0) {
  *
  * @return int  quality (0-100)
  */
-function webpexpress_getSanitizedQuality($keyInPOST, $fallback = 75) {
-    $q = webpexpress_getSanitizedInt($keyInPOST, $fallback);
+function magicconvert_getSanitizedQuality($keyInPOST, $fallback = 75) {
+    $q = magicconvert_getSanitizedInt($keyInPOST, $fallback);
     // return value between 0-100
     return max(0, min($q, 100));
 }
 
-function webpexpress_getSanitizedScope() {
-    $scopeText = webpexpress_getSanitizedText('scope');
+function magicconvert_getSanitizedScope() {
+    $scopeText = magicconvert_getSanitizedText('scope');
     if ($scopeText == '') {
         $scopeText = 'uploads';
     }
@@ -143,7 +143,7 @@ function webpexpress_getSanitizedScope() {
  *
  * @return array  Sanitized array of the whitelist json array received in $_POST
  */
-function webpexpress_getSanitizedWhitelist() {
+function magicconvert_getSanitizedWhitelist() {
     $whitelistPosted = (isset($_POST['whitelist']) ? $_POST['whitelist'] : '[]');
 
     $whitelistPosted = json_decode(wp_unslash($whitelistPosted), true);
@@ -183,7 +183,7 @@ function webpexpress_getSanitizedWhitelist() {
  *
  * @return array  Sanitized array of the converters json array received in $_POST
  */
-function webpexpress_getSanitizedConverters() {
+function magicconvert_getSanitizedConverters() {
     $convertersPosted = (isset($_POST['converters']) ? $_POST['converters'] : '[]');
     $convertersPosted = json_decode(wp_unslash($convertersPosted), true); // holy moly! Wordpress automatically adds slashes to the global POST vars- https://stackoverflow.com/questions/2496455/why-are-post-variables-getting-escaped-in-php
 
@@ -292,12 +292,12 @@ function webpexpress_getSanitizedConverters() {
  *
  * @return array  Sanitized array of the converters json array received in $_POST
  */
-function webpexpress_getSanitizedAlterHtmlHostnameAliases() {
+function magicconvert_getSanitizedAlterHtmlHostnameAliases() {
     $index = 0;
 
     $result = [];
     while (isset($_POST['alter-html-hostname-alias-' . $index])) {
-        $alias = webpexpress_getSanitizedText('alter-html-hostname-alias-' . $index, '');
+        $alias = magicconvert_getSanitizedText('alter-html-hostname-alias-' . $index, '');
         $alias = preg_replace('#^https?\\:\\/\\/#', '', $alias);
         //$alias .= 'hm';
         if ($alias != '') {
@@ -328,13 +328,13 @@ $sanitized = [
     // Operation mode
     // --------------
     // Note that "operation-mode" is actually the old mode. The new mode is posted in "change-operation-mode"
-    'operation-mode' => webpexpress_getSanitizedChooseFromSet('operation-mode', 'varied-image-responses', [
+    'operation-mode' => magicconvert_getSanitizedChooseFromSet('operation-mode', 'varied-image-responses', [
         'varied-image-responses',
         'cdn-friendly',
         'no-conversion',
         'tweaked'
     ]),
-    'change-operation-mode' => webpexpress_getSanitizedChooseFromSet('change-operation-mode', 'varied-image-responses', [
+    'change-operation-mode' => magicconvert_getSanitizedChooseFromSet('change-operation-mode', 'varied-image-responses', [
         'varied-image-responses',
         'cdn-friendly',
         'no-conversion',
@@ -344,31 +344,31 @@ $sanitized = [
 
     // General
     // --------
-    'image-types' => intval(webpexpress_getSanitizedChooseFromSet('image-types', '3', [
+    'image-types' => intval(magicconvert_getSanitizedChooseFromSet('image-types', '3', [
         '0',
         '1',
         '2',
         '3'
     ])),
-    'scope' => webpexpress_getSanitizedScope(),
-    'destination-folder' => webpexpress_getSanitizedChooseFromSet('destination-folder', 'separate', [
+    'scope' => magicconvert_getSanitizedScope(),
+    'destination-folder' => magicconvert_getSanitizedChooseFromSet('destination-folder', 'separate', [
         'separate',
         'mingled',
     ]),
-    'destination-extension' => webpexpress_getSanitizedChooseFromSet('destination-extension', 'append', [
+    'destination-extension' => magicconvert_getSanitizedChooseFromSet('destination-extension', 'append', [
         'append',
         'set',
     ]),
-    'destination-structure' => webpexpress_getSanitizedChooseFromSet('destination-structure', 'doc-root', [
+    'destination-structure' => magicconvert_getSanitizedChooseFromSet('destination-structure', 'doc-root', [
         'doc-root',
         'image-roots',
     ]),
-    'cache-control' => webpexpress_getSanitizedChooseFromSet('cache-control', 'no-header', [
+    'cache-control' => magicconvert_getSanitizedChooseFromSet('cache-control', 'no-header', [
         'no-header',
         'set',
         'custom'
     ]),
-    'cache-control-max-age' => webpexpress_getSanitizedChooseFromSet('cache-control-max-age', 'one-hour', [
+    'cache-control-max-age' => magicconvert_getSanitizedChooseFromSet('cache-control-max-age', 'one-hour', [
         'one-second',
         'one-minute',
         'one-hour',
@@ -377,11 +377,11 @@ $sanitized = [
         'one-month',
         'one-year',
     ]),
-    'cache-control-public' => webpexpress_getSanitizedChooseFromSet('cache-control-public', 'public', [
+    'cache-control-public' => magicconvert_getSanitizedChooseFromSet('cache-control-public', 'public', [
         'public',
         'private',
     ]),
-    'cache-control-custom' => webpexpress_getSanitizedCacheControlHeader('cache-control-custom'),
+    'cache-control-custom' => magicconvert_getSanitizedCacheControlHeader('cache-control-custom'),
     'prevent-using-webps-larger-than-original' => isset($_POST['prevent-using-webps-larger-than-original']),
 
 
@@ -397,50 +397,50 @@ $sanitized = [
 
     // Conversion options
     // ------------------
-    'metadata' => webpexpress_getSanitizedChooseFromSet('metadata', 'none', [
+    'metadata' => magicconvert_getSanitizedChooseFromSet('metadata', 'none', [
         'none',
         'all'
     ]),
-    'jpeg-encoding' => webpexpress_getSanitizedChooseFromSet('jpeg-encoding', 'auto', [
+    'jpeg-encoding' => magicconvert_getSanitizedChooseFromSet('jpeg-encoding', 'auto', [
         'lossy',
         'auto'
     ]),
-    'jpeg-enable-near-lossless' => webpexpress_getSanitizedChooseFromSet('jpeg-enable-near-lossless', 'on', [
+    'jpeg-enable-near-lossless' => magicconvert_getSanitizedChooseFromSet('jpeg-enable-near-lossless', 'on', [
         'on',
         'off'
     ]),
-    'quality-auto' => webpexpress_getSanitizedChooseFromSet('quality-auto', 'auto_on', [
+    'quality-auto' => magicconvert_getSanitizedChooseFromSet('quality-auto', 'auto_on', [
         'auto_on',
         'auto_off'
     ]),
-    'max-quality' => webpexpress_getSanitizedQuality('max-quality', 80),
-    'jpeg-near-lossless' => webpexpress_getSanitizedQuality('jpeg-near-lossless', 60),
-    'quality-specific' => webpexpress_getSanitizedQuality('quality-specific', 70),
-    'quality-fallback' => webpexpress_getSanitizedQuality('quality-fallback', 70),
-    'png-near-lossless' => webpexpress_getSanitizedQuality('png-near-lossless', 60),
-    'png-enable-near-lossless' => webpexpress_getSanitizedChooseFromSet('png-enable-near-lossless', 'on', [
+    'max-quality' => magicconvert_getSanitizedQuality('max-quality', 80),
+    'jpeg-near-lossless' => magicconvert_getSanitizedQuality('jpeg-near-lossless', 60),
+    'quality-specific' => magicconvert_getSanitizedQuality('quality-specific', 70),
+    'quality-fallback' => magicconvert_getSanitizedQuality('quality-fallback', 70),
+    'png-near-lossless' => magicconvert_getSanitizedQuality('png-near-lossless', 60),
+    'png-enable-near-lossless' => magicconvert_getSanitizedChooseFromSet('png-enable-near-lossless', 'on', [
         'on',
         'off'
     ]),
-    'png-quality' => webpexpress_getSanitizedQuality('png-quality', 85),
-    'png-encoding' => webpexpress_getSanitizedChooseFromSet('png-encoding', 'auto', [
+    'png-quality' => magicconvert_getSanitizedQuality('png-quality', 85),
+    'png-encoding' => magicconvert_getSanitizedChooseFromSet('png-encoding', 'auto', [
         'lossless',
         'auto'
     ]),
-    'alpha-quality' => webpexpress_getSanitizedQuality('alpha-quality', 80),
+    'alpha-quality' => magicconvert_getSanitizedQuality('alpha-quality', 80),
     'convert-on-upload' => isset($_POST['convert-on-upload']),
     'enable-logging' => isset($_POST['enable-logging']),
-    'converters' => webpexpress_getSanitizedConverters(),
+    'converters' => magicconvert_getSanitizedConverters(),
 
 
     // Serve options
     // ---------------
-    'fail' => webpexpress_getSanitizedChooseFromSet('fail', 'original', [
+    'fail' => magicconvert_getSanitizedChooseFromSet('fail', 'original', [
         'original',
         '404',
         'report'
     ]),
-    'success-response' => webpexpress_getSanitizedChooseFromSet('success-response', 'original', [
+    'success-response' => magicconvert_getSanitizedChooseFromSet('success-response', 'original', [
         'original',
         'converted',
     ]),
@@ -452,21 +452,21 @@ $sanitized = [
     'alter-html-only-for-webp-enabled-browsers' => isset($_POST['alter-html-only-for-webp-enabled-browsers']),
     'alter-html-add-picturefill-js' => isset($_POST['alter-html-add-picturefill-js']),
     'alter-html-for-webps-that-has-yet-to-exist' => isset($_POST['alter-html-for-webps-that-has-yet-to-exist']),
-    'alter-html-replacement' => webpexpress_getSanitizedChooseFromSet('alter-html-replacement', 'picture', [
+    'alter-html-replacement' => magicconvert_getSanitizedChooseFromSet('alter-html-replacement', 'picture', [
         'picture',
         'url'
     ]),
-    'alter-html-hooks' => webpexpress_getSanitizedChooseFromSet('alter-html-hooks', 'content-hooks', [
+    'alter-html-hooks' => magicconvert_getSanitizedChooseFromSet('alter-html-hooks', 'content-hooks', [
         'content-hooks',
         'ob'
     ]),
-    'alter-html-hostname-aliases' => webpexpress_getSanitizedAlterHtmlHostnameAliases(),
+    'alter-html-hostname-aliases' => magicconvert_getSanitizedAlterHtmlHostnameAliases(),
 
 
     // Web service
     // ------------
     'web-service-enabled' => isset($_POST['web-service-enabled']),
-    'whitelist' => webpexpress_getSanitizedWhitelist(),
+    'whitelist' => magicconvert_getSanitizedWhitelist(),
 
 ];
 
@@ -688,8 +688,8 @@ if ($sanitized['operation-mode'] != $sanitized['change-operation-mode']) {
 
     if ($config['operation-mode'] == 'no-conversion') {
         // No conversion probably means that there are webps in the system not generated by
-        // webp express. Schedule a task to mark those that are bigger than originals
-        wp_schedule_single_event(time() + 30, 'webp_express_task_bulk_update_dummy_files');
+        // Magic Convert. Schedule a task to mark those that are bigger than originals
+        wp_schedule_single_event(time() + 30, 'magic_convert_task_bulk_update_dummy_files');
     }
 }
 
@@ -724,7 +724,7 @@ if (!$result['saved-both-config']) {
         Messenger::addMessage(
             'error',
             'Failed saving configuration file.<br>' .
-                'Current file permissions are preventing WebP Express to save configuration to: "' . Paths::getConfigFileName() . '"'
+                'Current file permissions are preventing Magic Convert to save configuration to: "' . Paths::getConfigFileName() . '"'
         );
     } else {
         Messenger::addMessage(

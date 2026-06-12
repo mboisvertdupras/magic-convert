@@ -1,9 +1,9 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Option;
-use \WebPExpress\State;
+use \MagicConvert\Option;
+use \MagicConvert\State;
 
 /**
  *
@@ -15,7 +15,7 @@ class Actions
      *  $action:    identifier
      */
     public static function procastinate($action) {
-        Option::updateOption('webp-express-actions-pending', true, true);
+        Option::updateOption('magic-convert-actions-pending', true, true);
 
         $pendingActions = State::getState('pendingActions', []);
         $pendingActions[] = $action;
@@ -26,7 +26,7 @@ class Actions
         switch ($action) {
             case 'deactivate':
                 add_action('admin_init', function () {
-                    deactivate_plugins(plugin_basename(WEBPEXPRESS_PLUGIN));
+                    deactivate_plugins(plugin_basename(MAGIC_CONVERT_PLUGIN));
                 });
                 break;
         }
@@ -40,7 +40,7 @@ class Actions
         }
 
         State::setState('pendingActions', []);
-        Option::updateOption('webp-express-actions-pending', false, true);
+        Option::updateOption('magic-convert-actions-pending', false, true);
 
     }
 }

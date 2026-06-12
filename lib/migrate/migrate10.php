@@ -1,11 +1,11 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
 
-function webpexpress_migrate10() {
+function magicconvert_migrate10() {
 
     $config = Config::loadConfigAndFix(false);  // false, because we do not need to test if quality detection is working
 
@@ -52,17 +52,17 @@ function webpexpress_migrate10() {
     if ($result['saved-both-config']) {
         Messenger::addMessage(
             'info',
-            'Successfully migrated <i>WebP Express</i> options for 0.14.9.'
+            'Successfully migrated <i>Magic Convert</i> options for 0.14.9.'
         );
-        Option::updateOption('webp-express-migration-version', '10');
+        Option::updateOption('magic-convert-migration-version', '10');
 
     } else {
         Messenger::addMessage(
             'error',
-            'Failed migrating webp express options to 0.14.9. Probably you need to grant write permissions in your wp-content folder.'
+            'Failed migrating Magic Convert options to 0.14.9. Probably you need to grant write permissions in your wp-content folder.'
         );
     }
 
 }
 
-webpexpress_migrate10();
+magicconvert_migrate10();

@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Option;
+use \MagicConvert\Option;
 
 /**
  *   Store state in db
@@ -17,7 +17,7 @@ class State
 
     public static function getStateObj() {
         // TODO: cache
-        $json = Option::getOption('webp-express-state', '[]');
+        $json = Option::getOption('magic-convert-state', '[]');
         return json_decode($json, true);
     }
 
@@ -40,6 +40,6 @@ class State
         $json = json_encode($currentStateObj, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK);
 
         // Store in db. No autoloading.
-        Option::updateOption('webp-express-state', $json, false);
+        Option::updateOption('magic-convert-state', $json, false);
     }
 }

@@ -1,15 +1,15 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\ConvertHelperIndependent;
-use \WebPExpress\Paths;
+use \MagicConvert\ConvertHelperIndependent;
+use \MagicConvert\Paths;
 
 class ConvertLog
 {
     public static function processAjaxViewLog()
     {
-        if (!check_ajax_referer('webpexpress-ajax-view-log-nonce', 'nonce', false)) {
+        if (!check_ajax_referer('magicconvert-ajax-view-log-nonce', 'nonce', false)) {
             wp_send_json_error('The security nonce has expired. You need to reload the settings page (press F5) and try again)');
             wp_die();
         }

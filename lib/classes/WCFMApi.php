@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 use \WebPConvert\Convert\Converters\Stack;
 use \WebPConvert\WebPConvert;
@@ -13,7 +13,7 @@ use \ImageMimeTypeGuesser\ImageMimeTypeGuesser;
 class WCFMApi
 {
     private static function doProcessRequest() {
-      if (!check_ajax_referer('webpexpress-wcfm-nonce', 'nonce', false)) {
+      if (!check_ajax_referer('magicconvert-wcfm-nonce', 'nonce', false)) {
           throw new \Exception('The security nonce has expired. You need to reload (press F5) and try again)');
       }
       Validate::postHasKey('command');
@@ -496,7 +496,7 @@ class WCFMApi
           //'root' => Paths::getUploadDirAbs(),
           'ext' => $config['destination-extension'],
           'destination-folder' => $config['destination-folder'],  /* hm, "destination-folder" is a bad name... */
-          'webExpressContentDirAbs' => Paths::getWebPExpressContentDirAbs(),
+          'webExpressContentDirAbs' => Paths::getMagicConvertContentDirAbs(),
           'uploadDirAbs' => Paths::getUploadDirAbs(),
           'useDocRootForStructuringCacheDir' => (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
           'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds($config['scope'])),   // (Paths::getImageRootsDef()

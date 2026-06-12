@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\State;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\State;
 use \WebPConvert\Converters\Ewww;
 
 /**

@@ -1,7 +1,7 @@
 <div id="wpc" style="display:none;">
     <div class="wpc converter-options">
-      <h3>Remote WebP Express</h3>
-      Use a WebP Express installed on another Wordpress site to convert. Remote WepP Express is based
+      <h3>Remote Magic Convert</h3>
+      Use a Magic Convert installed on another Wordpress site to convert. Remote WepP Express is based
       on <a href="https://github.com/rosell-dk/webp-convert-cloud-service" target="blank">WPC</a>,
       and you can use it to connect to WPC as well.
 
@@ -25,7 +25,7 @@
     <div id="wpc_api_version_div">
         <label for="wpc_api_version">
             Api version
-            <?php echo helpIcon('Select 1, if connecting to a remote webp-express. Api 0 was never used with this plugin, and should only be used to connect to webp-convert-cloud-service v.0.1 instances'); ?>
+            <?php echo helpIcon('Select 1, if connecting to a remote magic-convert. Api 0 was never used with this plugin, and should only be used to connect to webp-convert-cloud-service v.0.1 instances'); ?>
         </label>
         <select id="wpc_api_version" onchange="wpcApiVersionChanged()">
             <option value="0">0</option>
@@ -38,7 +38,7 @@
               URL
               <?php echo helpIcon('The endpoint of the web service. Copy it from the remote setup.'); ?>
           </label>
-          <input type="text" id="wpc_api_url" placeholder="Url to your Remote WebP Express" autocomplete="off">
+          <input type="text" id="wpc_api_url" placeholder="Url to your Remote Magic Convert" autocomplete="off">
       </div>
 
       <div id="wpc_secret_div">
@@ -83,6 +83,6 @@
       <p>
         <b>Psst. The IP of your website is: <?php echo $_SERVER['SERVER_ADDR']; ?>.</b>
     </p>
-    <?php webp_express_printUpdateButtons() ?>
+    <?php magic_convert_printUpdateButtons() ?>
     </div>
 </div>

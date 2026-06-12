@@ -1,17 +1,17 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\AlterHtmlInit;
-use \WebPExpress\Paths;
+use \MagicConvert\AlterHtmlInit;
+use \MagicConvert\Paths;
 
 /**
  * Class AlterHtmlImageUrls - convert image urls to webp
  * Based this code on code from the Cache Enabler plugin
  */
 
-use \WebPExpress\AlterHtmlHelper;
-//use \WebPExpress\ImageUrlsReplacer;
+use \MagicConvert\AlterHtmlHelper;
+//use \MagicConvert\ImageUrlsReplacer;
 use DOMUtilForWebP\ImageUrlReplacer;
 
 class AlterHtmlImageUrls extends ImageUrlReplacer

@@ -12,7 +12,7 @@
             </label>
             <select id="png_encoding_select" name="png-encoding">
                 <?php
-                webpexpress_selectBoxOptions($config['png-encoding'], [
+                magicconvert_selectBoxOptions($config['png-encoding'], [
                     'lossless' => 'Lossless',
                     'auto' => 'Auto',
                 ]);
@@ -24,7 +24,7 @@
                 'because the converted file is a PNG.</p>' .
                 '<p>There is no "lossy" option in the combobox, because converting all PNGs to lossy would probably be a bad idea. ' .
                 'However, in many cases you get better compression with lossy. So this is what the "auto" option is for. ' .
-                'With "Auto", WebP Express will try converting to both encodings ' .
+                'With "Auto", Magic Convert will try converting to both encodings ' .
                 'and select one that resulted in the smallest file.</p>' .
                 '<p>Note that Gd and Ewww neither supports "Lossless" or "Auto". ' .
                 'Gd can only produce lossy, and will simply do that. ' .
@@ -66,7 +66,7 @@
             </label>
             <select id="png_enable_near_lossless" name="png-enable-near-lossless">
                 <?php
-                webpexpress_selectBoxOptions($config['png-enable-near-lossless'] ? 'on' : 'off', [
+                magicconvert_selectBoxOptions($config['png-enable-near-lossless'] ? 'on' : 'off', [
                     'on' => 'Apply preprocessing',
                     'off' => '100% lossless',
                 ]);

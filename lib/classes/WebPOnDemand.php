@@ -1,22 +1,22 @@
 <?php
 /*
 This class is used by wod/webp-on-demand.php, which does not do a Wordpress bootstrap, but does register an autoloader for
-the WebPExpress classes.
+the MagicConvert classes.
 
 Calling Wordpress functions will FAIL. Make sure not to do that in either this class or the helpers.
 */
 //error_reporting(E_ALL);
 //ini_set('display_errors', 1);
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\ConvertHelperIndependent;
-use \WebPExpress\Sanitize;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
-use \WebPExpress\ValidateException;
-use \WebPExpress\Validate;
-use \WebPExpress\WodConfigLoader;
+use \MagicConvert\ConvertHelperIndependent;
+use \MagicConvert\Sanitize;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
+use \MagicConvert\ValidateException;
+use \MagicConvert\Validate;
+use \MagicConvert\WodConfigLoader;
 use WebPConvert\Loggers\EchoLogger;
 
 class WebPOnDemand extends WodConfigLoader
@@ -157,7 +157,7 @@ class WebPOnDemand extends WodConfigLoader
         //echo '<pre>' . print_r($wodOptions, true) . '</pre>'; exit;
 
 
-        // Validate that WebPExpress was configured to redirect to this conversion script
+        // Validate that MagicConvert was configured to redirect to this conversion script
         // (but do not require that for Nginx)
         // ------------------------------------------------------------------------------
         self::$checking = 'settings';

@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 /**
  * Initialize config file migration on admin load (CVE-2025-11379 fix)
@@ -31,6 +31,6 @@ class ConfigMigrationInit
     public static function runMigrationCheck()
     {
         // Use the optimized migration function that includes caching
-        \WebPExpress\Config::checkAndMigrateConfigIfNeeded();
+        \MagicConvert\Config::checkAndMigrateConfigIfNeeded();
     }
 }

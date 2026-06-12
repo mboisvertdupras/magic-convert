@@ -4,10 +4,10 @@ require __DIR__ . '/../vendor/autoload.php';
 use \WebPConvertCloudService\WebPConvertCloudService;
 
 include_once __DIR__ . '../../lib/classes/Config.php';
-use \WebPExpress\Config;
+use \MagicConvert\Config;
 
 include_once __DIR__ . '../../lib/classes/Paths.php';
-use \WebPExpress\Paths;
+use \MagicConvert\Paths;
 
 include_once __DIR__ . '/../lib/classes/Config.php';
 

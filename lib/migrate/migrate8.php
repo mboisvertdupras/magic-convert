@@ -1,13 +1,13 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
 
-function webpexpress_migrate8() {
+function magicconvert_migrate8() {
 
     $config = Config::loadConfigAndFix(false);  // false, because we do not need to test if quality detection is working
     $converters = $config['converters'];
@@ -33,7 +33,7 @@ function webpexpress_migrate8() {
 
                     Messenger::addMessage(
                         'info',
-                        'Service notice from WebP Express:<br>' .
+                        'Service notice from Magic Convert:<br>' .
                             'You have been using <i>Gd</i> to convert PNGs. ' .
                             'However, due to a bug, in some cases transparency was lost in the webp. ' .
                             'It is recommended that you delete and reconvert all PNGs. ' .
@@ -45,7 +45,7 @@ function webpexpress_migrate8() {
 
                     Messenger::addMessage(
                         'info',
-                        'Service notice from WebP Express:<br>' .
+                        'Service notice from Magic Convert:<br>' .
                         'You have configured <i>Gd</i> to skip converting PNGs. ' .
                             'However, the <i>Gd</i> conversion method has been fixed and is doing ok now!'
                     );
@@ -56,10 +56,10 @@ function webpexpress_migrate8() {
         }
     }
 
-    if (WEBPEXPRESS_MIGRATION_VERSION == '8') {
+    if (MAGIC_CONVERT_MIGRATION_VERSION == '8') {
         Messenger::addMessage(
             'info',
-            'New in WebP Express 0.13.0:' .
+            'New in Magic Convert 0.13.0:' .
                 '<ul style="list-style-type:disc; list-style-position: inside">' .
                 '<li>Bulk Conversion</li>' .
                 '<li>New option to automatically convert images upon upload</li>' .
@@ -70,7 +70,7 @@ function webpexpress_migrate8() {
 
     }
 
-    Option::updateOption('webp-express-migration-version', '8');
+    Option::updateOption('magic-convert-migration-version', '8');
 
     // Find out if Gd is the first active and working converter.
     // We check wod options, because it has already filtered out the disabled converters.
@@ -95,4 +95,4 @@ function webpexpress_migrate8() {
 
 }
 
-webpexpress_migrate8();
+magicconvert_migrate8();

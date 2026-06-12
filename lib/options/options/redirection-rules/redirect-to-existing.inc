@@ -24,7 +24,7 @@
             echo ($config['redirect-to-existing-in-htaccess'] ? 'checked="checked"' : '')
         ?> >
 
-        <button style="margin-left: 30px;" onclick="WebPExpress.SelfTest.openPopup('redirectToExisting')" class="button button-secondary" type="button">
+        <button style="margin-left: 30px;" onclick="MagicConvert.SelfTest.openPopup('redirectToExisting')" class="button button-secondary" type="button">
             Live test
         </button>
 

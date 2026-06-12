@@ -1,7 +1,7 @@
 <?php
-use \WebPExpress\DismissableMessages;
-use \WebPExpress\State;
-use \WebPExpress\TestRun;
+use \MagicConvert\DismissableMessages;
+use \MagicConvert\State;
+use \MagicConvert\TestRun;
 
 $convertersSupportingEncodingAuto = ['cwebp', 'vips', 'imagick', 'imagemagick', 'gmagick', 'graphicsmagick'];
 
@@ -13,7 +13,7 @@ $firstActiveAndWorkingConverterId = (isset($workingAndActiveConverterIds[0]) ? $
 if (in_array($firstActiveAndWorkingConverterId, $convertersSupportingEncodingAuto)) {
     DismissableMessages::printDismissableMessage(
         'info',
-        '<p>WebP Express 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
+        '<p>Magic Convert 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
             'it can automatically try both lossy and lossless and select the smallest. You can play around with the ' .
             'new options when your click "test" next to a converter.</p>' .
             '<p>Once satisfied, dont forget to ' .
@@ -27,7 +27,7 @@ if (in_array($firstActiveAndWorkingConverterId, $convertersSupportingEncodingAut
             if (in_array($workingId, $convertersSupportingEncodingAuto)) {
                 DismissableMessages::printDismissableMessage(
                     'info',
-                    '<p>WebP Express 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
+                    '<p>Magic Convert 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
                         'it can automatically try both lossy and lossless and select the smallest. You can play around with the ' .
                         'new options when your click "test" next to a converter.</p>' .
                         '<p>Once satisfied, dont forget to wipe your existing converted files (there is a "Delete converted files" ' .

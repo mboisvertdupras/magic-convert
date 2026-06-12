@@ -1,22 +1,22 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\HTAccess;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
+use \MagicConvert\Config;
+use \MagicConvert\HTAccess;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
 
 // On successful migration:
-// Option::updateOption('webp-express-migration-version', '1', true);
+// Option::updateOption('magic-convert-migration-version', '1', true);
 
-function webp_express_migrate1_createFolders()
+function magic_convert_migrate1_createFolders()
 {
     if (!Paths::createContentDirIfMissing()) {
         Messenger::printMessage(
             'error',
-            'For migration to 0.5.0, WebP Express needs to create a directory "webp-express" under your wp-content folder, but does not have permission to do so.<br>' .
+            'For migration to 0.5.0, Magic Convert needs to create a directory "magic-convert" under your wp-content folder, but does not have permission to do so.<br>' .
                 'Please create the folder manually, or change the file permissions of your wp-content folder.'
         );
         return false;
@@ -24,7 +24,7 @@ function webp_express_migrate1_createFolders()
         if (!Paths::createConfigDirIfMissing()) {
             Messenger::printMessage(
                 'error',
-                'For migration to 0.5.0, WebP Express needs to create a directory "webp-express/config" under your wp-content folder, but does not have permission to do so.<br>' .
+                'For migration to 0.5.0, Magic Convert needs to create a directory "magic-convert/config" under your wp-content folder, but does not have permission to do so.<br>' .
                     'Please create the folder manually, or change the file permissions.'
             );
             return false;
@@ -34,7 +34,7 @@ function webp_express_migrate1_createFolders()
         if (!Paths::createCacheDirIfMissing()) {
             Messenger::printMessage(
                 'error',
-                'For migration to 0.5.0, WebP Express needs to create a directory "webp-express/webp-images" under your wp-content folder, but does not have permission to do so.<br>' .
+                'For migration to 0.5.0, Magic Convert needs to create a directory "magic-convert/webp-images" under your wp-content folder, but does not have permission to do so.<br>' .
                     'Please create the folder manually, or change the file permissions.'
             );
             return false;
@@ -43,13 +43,13 @@ function webp_express_migrate1_createFolders()
     return true;
 }
 
-function webp_express_migrate1_createDummyConfigFiles()
+function magic_convert_migrate1_createDummyConfigFiles()
 {
     // TODO...
     return true;
 }
 
-function webpexpress_migrate1_migrateOptions()
+function magicconvert_migrate1_migrateOptions()
 {
     $converters = json_decode(Option::getOption('webp_express_converters', '[]'), true);
     foreach ($converters as &$converter) {
@@ -88,7 +88,7 @@ function webpexpress_migrate1_migrateOptions()
 
             Messenger::addMessage(
                 'success',
-                'WebP Express has successfully migrated its configuration to 0.5.0'
+                'Magic Convert has successfully migrated its configuration to 0.5.0'
             );
 
             //Config::saveConfigurationAndHTAccessFilesWithMessages($config, 'migrate');
@@ -109,13 +109,13 @@ function webpexpress_migrate1_migrateOptions()
             if ($mainResult != 'failed') {
                 Messenger::addMessage(
                     'success',
-                    'WebP Express has successfully migrated its configuration and updated the rewrite rules to 0.5.0'
+                    'Magic Convert has successfully migrated its configuration and updated the rewrite rules to 0.5.0'
                 );
             } else {
                 Messenger::addMessage(
                     'warning',
-                    'WebP Express has successfully migrated its configuration.' .
-                    'However, WebP Express could not update the rewrite rules<br>' .
+                    'Magic Convert has successfully migrated its configuration.' .
+                    'However, Magic Convert could not update the rewrite rules<br>' .
                         'You need to change some permissions. Head to the ' .
                         '<a href="' . Paths::getSettingsUrl() . '">settings page</a> ' .
                         'and try to save the settings there (it will provide more information about the problem)'
@@ -125,7 +125,7 @@ function webpexpress_migrate1_migrateOptions()
         } else {
             Messenger::addMessage(
                 'error',
-                'For migration to 0.5.0, WebP Express failed saving options file. ' .
+                'For migration to 0.5.0, Magic Convert failed saving options file. ' .
                     'You must grant us write access to your wp-config folder.<br>' .
                     'Tried to save to: "' . Paths::getWodOptionsFileName() . '"' .
                     'Fix the file permissions and reload<br>'
@@ -135,7 +135,7 @@ function webpexpress_migrate1_migrateOptions()
     } else {
         Messenger::addMessage(
             'error',
-            'For migration to 0.5.0, WebP Express failed saving configuration file.<br>' .
+            'For migration to 0.5.0, Magic Convert failed saving configuration file.<br>' .
                 'You must grant us write access to your wp-config folder.<br>' .
                 'Tried to save to: "' . Paths::getConfigFileName() . '"' .
                 'Fix the file permissions and reload<br>'
@@ -148,7 +148,10 @@ function webpexpress_migrate1_migrateOptions()
     return true;
 }
 
-function webpexpress_migrate1_deleteOldOptions() {
+function magicconvert_migrate1_deleteOldOptions() {
+    // These are legacy options persisted by WebP Express (the upstream plugin this fork
+    // migrates from). They are read above and removed here once migration is complete, so
+    // they must reference the upstream key names rather than the rebranded fork names.
     $optionsToDelete = [
         'webp_express_max_quality',
         'webp_express_image_types_to_convert',
@@ -172,13 +175,13 @@ function webpexpress_migrate1_deleteOldOptions() {
 }
 
 /* helper. Remove dir recursively. No warnings - fails silently */
-function webpexpress_migrate1_rrmdir($dir) {
+function magicconvert_migrate1_rrmdir($dir) {
    if (@is_dir($dir)) {
      $objects = @scandir($dir);
      foreach ($objects as $object) {
        if ($object != "." && $object != "..") {
          if (@is_dir($dir."/".$object))
-           webpexpress_migrate1_rrmdir($dir."/".$object);
+           magicconvert_migrate1_rrmdir($dir."/".$object);
          else
            @unlink($dir."/".$object);
        }
@@ -187,18 +190,18 @@ function webpexpress_migrate1_rrmdir($dir) {
    }
 }
 
-function webpexpress_migrate1_deleteOldWebPImages() {
+function magicconvert_migrate1_deleteOldWebPImages() {
     $upload_dir = wp_upload_dir();
-    $destinationRoot = trailingslashit($upload_dir['basedir']) . 'webp-express';
-    webpexpress_migrate1_rrmdir($destinationRoot);
+    $destinationRoot = trailingslashit($upload_dir['basedir']) . 'magic-convert';
+    magicconvert_migrate1_rrmdir($destinationRoot);
 }
 
-if (webp_express_migrate1_createFolders()) {
-    if (webp_express_migrate1_createDummyConfigFiles()) {
-        if (webpexpress_migrate1_migrateOptions()) {
-            webpexpress_migrate1_deleteOldOptions();
-            webpexpress_migrate1_deleteOldWebPImages();
-            Option::updateOption('webp-express-migration-version', '1');
+if (magic_convert_migrate1_createFolders()) {
+    if (magic_convert_migrate1_createDummyConfigFiles()) {
+        if (magicconvert_migrate1_migrateOptions()) {
+            magicconvert_migrate1_deleteOldOptions();
+            magicconvert_migrate1_deleteOldWebPImages();
+            Option::updateOption('magic-convert-migration-version', '1');
         }
     }
 }

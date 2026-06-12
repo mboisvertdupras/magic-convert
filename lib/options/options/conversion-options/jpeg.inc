@@ -33,7 +33,7 @@ png
             </label>
             <select id="jpeg_encoding_select" name="jpeg-encoding">
                 <?php
-                webpexpress_selectBoxOptions($config['jpeg-encoding'], [
+                magicconvert_selectBoxOptions($config['jpeg-encoding'], [
                     'lossy' => 'Lossy',
                     'auto' => 'Auto',
                 ]);
@@ -41,13 +41,13 @@ png
             </select>
             <?php echo helpIcon(
                 '<p>The WebP format supports two types of encoding: lossy and lossless.</p>' .
-                '<p>If you select "Auto", WebP Express will try converting to both encodings ' .
+                '<p>If you select "Auto", Magic Convert will try converting to both encodings ' .
                 'and select one that resulted in the smallest file.</p>' .
                 '<p>Note that Gd and Ewww does not support the "Auto" feature. ' .
                 'Gd can only produce lossy, and will simply do that. ' .
                 'Ewww can not be configured to use a certain encoding, but automatically chooses lossless encoding for PNGs and lossy for JPEGs.' .
                 '</p>' .
-                //'<p>Also note that Remote WebP Express (if the WebP Express you are ' .
+                //'<p>Also note that Remote Magic Convert (if the Magic Convert you are ' .
                 //'connecting to are using one of these, and you are using version 0.14+)' .
                 '<p>You can read more about the option <a target="_blank" href="https://github.com/rosell-dk/webp-convert/blob/master/docs/v2.0/converting/introduction-for-converting.md#auto-selecting-between-losslesslossy-encoding">here</a></p>'
             );?>
@@ -61,7 +61,7 @@ png
                 <option value="auto_off" <?php echo (!$config['quality-auto'] ? 'selected' : ''); ?>>Fixed quality</option>
             </select>
             <?php echo helpIcon(
-                    '<p>If you select the "Same as the jpeg" option, WebP Express will try to determine the quality of ' .
+                    '<p>If you select the "Same as the jpeg" option, Magic Convert will try to determine the quality of ' .
                     'the jpeg and use that for the webp - unless the quality is higher than the limit entered, in which ' .
                     'case the limit is used.</p>' .
                     '<p>Ouality detection requires imagick, imagemagick or gmagick (not neccessarily compiled with webp). ' .
@@ -73,7 +73,7 @@ png
                         ((extension_loaded('imagick') && class_exists('\\Imagick')) ?
                             'You have imagick, but you need a newer version (You need PECL >= 2.2.2). ' : ''
                         ) .
-                        'However, you can still have it by using the <i>Remote WebP Express</i> conversion method (the request for ' .
+                        'However, you can still have it by using the <i>Remote Magic Convert</i> conversion method (the request for ' .
                         'using same quality as the jpeg, as well as the <i>limit</i> and <i>fallback</i> settings will be forwarded to the remote)' .
                         '</p>'
                     )
@@ -84,7 +84,7 @@ png
                     echo helpIcon('All converted images will be encoded with this quality');
                 } else {
                     echo helpIcon('All converted images will be encoded with this quality. ' .
-                        'For Remote WebP Express and Imagick, you however have the option to use override this, and use ' .
+                        'For Remote Magic Convert and Imagick, you however have the option to use override this, and use ' .
                         '"auto". With some setup, you can get quality detection working and you will then be able to set ' .
                         'quality to "auto" generally. For that you either need to get the imagick extension running ' .
                         '(PECL >= 2.2.2) or exec() rights and either imagick or gmagick installed.'
@@ -131,7 +131,7 @@ png
             </label>
             <select id="jpeg_enable_near_lossless" name="jpeg-enable-near-lossless">
                 <?php
-                webpexpress_selectBoxOptions($config['jpeg-enable-near-lossless'] ? 'on' : 'off', [
+                magicconvert_selectBoxOptions($config['jpeg-enable-near-lossless'] ? 'on' : 'off', [
                     'on' => 'Apply preprocessing',
                     'off' => '100% lossless',
                 ]);

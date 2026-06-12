@@ -1,7 +1,7 @@
 <?php
 
-namespace WebPExpress;
-use \WebPExpress\Option;
+namespace MagicConvert;
+use \MagicConvert\Option;
 
 
 class SelfTestRedirectToWebPRealizer extends SelfTestRedirectAbstract
@@ -36,9 +36,9 @@ class SelfTestRedirectToWebPRealizer extends SelfTestRedirectAbstract
         // have logic for finding destination url from source url.
 
         //$sourceUrl = Paths::getUploadUrl() . '/' . $sourceFileName;
-        $sourceUrl = Paths::getUrlById($rootId) . '/webp-express-test-images/' . $sourceFileName;
+        $sourceUrl = Paths::getUrlById($rootId) . '/magic-convert-test-images/' . $sourceFileName;
 
-        AlterHtmlHelper::$options = json_decode(Option::getOption('webp-express-alter-html-options', null), true);
+        AlterHtmlHelper::$options = json_decode(Option::getOption('magic-convert-alter-html-options', null), true);
         AlterHtmlHelper::$options['only-for-webps-that-exists'] = false;
 
         // TODO: Check that AlterHtmlHelper::$options['scope'] is not empty
@@ -63,7 +63,7 @@ class SelfTestRedirectToWebPRealizer extends SelfTestRedirectAbstract
             $log[] = 'parsed url:' . print_r(parse_url(Paths::getUrlById($rootId)), true);
             $log[] = 'scope:' . print_r(AlterHtmlHelper::$options['scope'], true);
             $log[] = 'cached options:' . print_r(AlterHtmlHelper::$options, true);
-            $log[] = 'cached options: ' . print_r(Option::getOption('webp-express-alter-html-options', 'not there!'), true);
+            $log[] = 'cached options: ' . print_r(Option::getOption('magic-convert-alter-html-options', 'not there!'), true);
         }
 
 

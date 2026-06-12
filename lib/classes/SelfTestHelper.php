@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Paths;
+use \MagicConvert\Paths;
 
 class SelfTestHelper
 {
@@ -28,7 +28,7 @@ class SelfTestHelper
 
     public static function deleteTestImagesInFolder($rootId)
     {
-        $testDir = Paths::getAbsDirById($rootId) . '/webp-express-test-images';
+        $testDir = Paths::getAbsDirById($rootId) . '/magic-convert-test-images';
         self::deleteDir($testDir);
     }
 
@@ -44,7 +44,7 @@ class SelfTestHelper
             $rootId
         );
 
-        $testDir = $cacheDirForRoot . '/webp-express-test-images';
+        $testDir = $cacheDirForRoot . '/magic-convert-test-images';
         self::deleteDir($testDir);
     }
 
@@ -93,12 +93,12 @@ class SelfTestHelper
                 $fileNameToCopy = 'test.png';
                 break;
         }
-        $testSource = Paths::getPluginDirAbs() . '/webp-express/test/' . $fileNameToCopy;
+        $testSource = Paths::getPluginDirAbs() . '/magic-convert/test/' . $fileNameToCopy;
         $filenameOfDestination = self::randomDigitsAndLetters(6) . '.' . strtoupper($imageType);
         //$filenameOfDestination = self::randomDigitsAndLetters(6) . '.' . $imageType;
-        $log[] = 'Copying ' . strtoupper($imageType) . ' to ' . $rootId . ' folder (*webp-express-test-images/' . $filenameOfDestination . '*)';
+        $log[] = 'Copying ' . strtoupper($imageType) . ' to ' . $rootId . ' folder (*magic-convert-test-images/' . $filenameOfDestination . '*)';
 
-        $destDir = Paths::getAbsDirById($rootId) . '/webp-express-test-images';
+        $destDir = Paths::getAbsDirById($rootId) . '/magic-convert-test-images';
         $destination = $destDir . '/' . $filenameOfDestination;
 
         if (!@file_exists($destDir)) {
@@ -130,7 +130,7 @@ class SelfTestHelper
     public static function copyDummyWebPToCacheFolder($rootId, $destinationFolder, $destinationExtension, $destinationStructure, $sourceFileName, $imageType = 'jpeg')
     {
         $log = [];
-        $dummyWebP = Paths::getPluginDirAbs() . '/webp-express/test/test.jpg.webp';
+        $dummyWebP = Paths::getPluginDirAbs() . '/magic-convert/test/test.jpg.webp';
 
         $log[] = 'Copying dummy webp to the cache root for ' . $rootId;
         $destDir = Paths::getCacheDirForImageRoot($destinationFolder, $destinationStructure, $rootId);
@@ -141,7 +141,7 @@ class SelfTestHelper
                 return [$log, false, ''];
             }
         }
-        $destDir .= '/webp-express-test-images';
+        $destDir .= '/magic-convert-test-images';
         if (!file_exists($destDir)) {
             if (!mkdir($destDir, 0755, false)) {
                 $log[] = 'Failed creating the folder for the test images:';
@@ -368,7 +368,7 @@ class SelfTestHelper
         $headersFlat = self::flattenHeaders($headers);
         //
         foreach ($headersFlat as $i => list($headerName, $headerValue)) {
-            if ($headerName == 'x-webp-express-error') {
+            if ($headerName == 'x-magic-convert-error') {
                 $headerValue = '**' . $headerValue . '**{: .error}';
             }
             $log[] = '- ' . $headerName . ': ' . $headerValue;
@@ -458,7 +458,7 @@ class SelfTestHelper
     public static function configInfo($config)
     {
         $log = [];
-        $log[] = '#### WebP Express configuration info:';
+        $log[] = '#### Magic Convert configuration info:';
         $log[] = '- Destination folder: ' . $config['destination-folder'];
         $log[] = '- Destination extension: ' . $config['destination-extension'];
         $log[] = '- Destination structure: ' . $config['destination-structure'];
@@ -474,9 +474,9 @@ class SelfTestHelper
     {
         $log = [];
         //$log[] = '*.htaccess info:*';
-        //$log[] = '- Image roots with WebP Express rules: ' . implode(', ', HTAccess::getRootsWithWebPExpressRulesIn());
-        $log[] = '#### .htaccess files that WebP Express have placed rules in the following files:';
-        $rootIds = HTAccess::getRootsWithWebPExpressRulesIn();
+        //$log[] = '- Image roots with Magic Convert rules: ' . implode(', ', HTAccess::getRootsWithMagicConvertRulesIn());
+        $log[] = '#### .htaccess files that Magic Convert have placed rules in the following files:';
+        $rootIds = HTAccess::getRootsWithMagicConvertRulesIn();
         foreach ($rootIds as $imageRootId) {
             $log[] = '- ' . Paths::getAbsDirById($imageRootId) . '/.htaccess';
         }
@@ -498,7 +498,7 @@ class SelfTestHelper
         if (!HTAccess::haveWeRulesInThisHTAccess($file)) {
             $log[] = '**NONE!**{: .warn}';
         } else {
-            $weRules = HTAccess::extractWebPExpressRulesFromHTAccess($file);
+            $weRules = HTAccess::extractMagicConvertRulesFromHTAccess($file);
             // remove unindented comments
             //$weRules = preg_replace('/^\#\s[^\n\r]*[\n\r]+/ms', '', $weRules);
 
@@ -538,10 +538,10 @@ class SelfTestHelper
         $capTests = $config['base-htaccess-on-these-capability-tests'];
         $log = [];
         $log[] = '#### Live tests of .htaccess capabilities / system configuration:';
-        $log[] = 'Unless noted otherwise, the tests are run in *wp-content/webp-express/htaccess-capability-tester*. ';
-        $log[] = 'WebPExpress currently treats the results as they neccessarily applies to all scopes (upload, themes, etc), ';
+        $log[] = 'Unless noted otherwise, the tests are run in *wp-content/magic-convert/htaccess-capability-tester*. ';
+        $log[] = 'MagicConvert currently treats the results as they neccessarily applies to all scopes (upload, themes, etc), ';
         $log[] = 'but note that a server might be configured to have mod_rewrite disallowed in some folders and allowed in others.';
-        /*$log[] = 'Exactly what you can do in a *.htaccess* depends on the server setup. WebP Express ' .
+        /*$log[] = 'Exactly what you can do in a *.htaccess* depends on the server setup. Magic Convert ' .
             'makes some live tests to verify if a certain feature in fact works. This is done by creating ' .
             'test files (*.htaccess* files and php files) in a dir inside the content dir and running these. ' .
             'These test results are used when creating the rewrite rules. Here are the results:';*/
@@ -553,8 +553,8 @@ class SelfTestHelper
         $log[] = '- mod_headers working (header set): ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::modHeaderWorking());
         //$log[] = '- passing variables from *.htaccess* to PHP script through environment variable working?: ' . self::trueFalseNullString($capTests['passThroughEnvWorking']);
         $log[] = '- passing variables from *.htaccess* to PHP script through environment variable working?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::passThroughEnvWorking());
-        $log[] = '- Can run php test file in plugins/webp-express/wod/ ?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::canRunTestScriptInWOD());
-        $log[] = '- Can run php test file in plugins/webp-express/wod2/ ?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::canRunTestScriptInWOD2());
+        $log[] = '- Can run php test file in plugins/magic-convert/wod/ ?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::canRunTestScriptInWOD());
+        $log[] = '- Can run php test file in plugins/magic-convert/wod2/ ?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::canRunTestScriptInWOD2());
         $log[] = '- Directives for granting access like its done in wod/.htaccess allowed?: ' . self::trueFalseNullString(HTAccessCapabilityTestRunner::grantAllAllowed());
         /*$log[] = '- pass variable from *.htaccess* to script through header working?: ' .
             self::trueFalseNullString($capTests['passThroughHeaderWorking']);*/
@@ -575,8 +575,8 @@ class SelfTestHelper
 
             $log[] = 'I cannot check if your document root is in fact symlinked (as document root isnt resolvable). ' .
                 'But if it is, there you have it. The line beginning with "RewriteCond %{REQUEST_FILENAME}"" points to your resolved root, ' .
-                'but it should point to your symlinked root. WebP Express cannot do that for you because it cannot discover what the symlink is. ' .
-                'Try changing the line manually. When it works, you can move the rules outside the WebP Express block so they dont get ' .
+                'but it should point to your symlinked root. Magic Convert cannot do that for you because it cannot discover what the symlink is. ' .
+                'Try changing the line manually. When it works, you can move the rules outside the Magic Convert block so they dont get ' .
                 'overwritten. OR you can change your server configuration (document root / open_basedir restrictions)';
         }
 
@@ -586,9 +586,9 @@ class SelfTestHelper
         if (strpos($headers['server'], 'nginx') === 0) {
 
             // Nginx
-            $log[] = 'Notice that you are on Nginx and the rules that WebP Express stores in the *.htaccess* files probably does not ' .
+            $log[] = 'Notice that you are on Nginx and the rules that Magic Convert stores in the *.htaccess* files probably does not ' .
                 'have any effect. ';
-            $log[] = 'Please read the "I am on Nginx" section in the FAQ (https://wordpress.org/plugins/webp-express/)';
+            $log[] = 'Please read the "I am on Nginx" section in the FAQ (https://wordpress.org/plugins/magic-convert/)';
             $log[] = 'And did you remember to restart the nginx service after updating the configuration?';
 
             $log[] = 'PS: If you cannot get the redirect to work, you can simply rely on Alter HTML as described in the FAQ.';
@@ -613,8 +613,8 @@ class SelfTestHelper
             } elseif (PlatformInfo::definitelyGotApacheModule('mod_rewrite')) {
                 $log[] = 'However, "mod_write" *is* enabled on your server. This seems to indicate that ' .
                     '*.htaccess* files has been disabled for configuration on your server. ' .
-                    'In that case, you need to copy the WebP Express rules from the *.htaccess* files into your virtual host configuration files. ' .
-                    '(WebP Express generates multiple *.htaccess* files. Look in the upload folder, the wp-content folder, etc).';
+                    'In that case, you need to copy the Magic Convert rules from the *.htaccess* files into your virtual host configuration files. ' .
+                    '(Magic Convert generates multiple *.htaccess* files. Look in the upload folder, the wp-content folder, etc).';
                 $log[] = 'It could however alse simply be that your server simply needs some time. ' .
                     'Some servers caches the *.htaccess* rules for a bit. In that case, simply give it a few minutes and try again.';
             } else {
@@ -629,8 +629,8 @@ class SelfTestHelper
             } elseif (PlatformInfo::definitelyGotApacheModule('mod_rewrite')) {
                 $log[] = '"mod_write" is enabled on your server, so rewriting ought to work. ' .
                     'However, it could be that your server setup has disabled *.htaccess* files for configuration. ' .
-                    'In that case, you need to copy the WebP Express rules from the *.htaccess* files into your virtual host configuration files. ' .
-                    '(WebP Express generates multiple *.htaccess* files. Look in the upload folder, the wp-content folder, etc). ';
+                    'In that case, you need to copy the Magic Convert rules from the *.htaccess* files into your virtual host configuration files. ' .
+                    '(Magic Convert generates multiple *.htaccess* files. Look in the upload folder, the wp-content folder, etc). ';
             } else {
                 $log[] = 'It seems something is wrong with the *.htaccess* rules. ';
                 $log[] = 'Or perhaps the server has cached the configuration a while. Some servers ' .
@@ -663,10 +663,10 @@ class SelfTestHelper
         $canRunTestScriptInWod2 = HTAccessCapabilityTestRunner::canRunTestScriptInWOD2();
         $canRunInAnyWod = ($canRunTestScriptInWod || $canRunTestScriptInWod2);
 
-        $responsePingPhp = wp_remote_get(Paths::getPluginsUrl() . '/webp-express/wod/ping.php', ['timeout' => 7]);
+        $responsePingPhp = wp_remote_get(Paths::getPluginsUrl() . '/magic-convert/wod/ping.php', ['timeout' => 7]);
         $pingPhpResponseCode = wp_remote_retrieve_response_code($responsePingPhp);
 
-        $responsePingText = wp_remote_get(Paths::getPluginsUrl() . '/webp-express/wod/ping.txt', ['timeout' => 7]);
+        $responsePingText = wp_remote_get(Paths::getPluginsUrl() . '/magic-convert/wod/ping.txt', ['timeout' => 7]);
         $pingTextResponseCode = wp_remote_retrieve_response_code($responsePingText);
 
         if ($responseCode == 500) {
@@ -697,7 +697,7 @@ class SelfTestHelper
                     $log[] = '**As the test script works, it would seem that the explanation for the 500 internal server ' .
                         'error is that the PHP script (webp-on-demand.php) crashes. ' .
                         'You can help me by enabling debugging and post the error on the support forum on Wordpress ' .
-                        '(https://wordpress.org/support/plugin/webp-express/), or create an issue on github ' .
+                        '(https://wordpress.org/support/plugin/magic-convert/), or create an issue on github ' .
                         '(https://github.com/rosell-dk/webp-express/issues)**';
                     $log[] = '';
                 }
@@ -708,24 +708,24 @@ class SelfTestHelper
                 if ($canRunTestScriptInWod2) {
                     if ($responseCode == 500) {
                         if ($pingTextResponseCode == '500') {
-                            $log[] = 'The problem appears to be that the *.htaccess* placed in *plugins/webp-express/wod/.htaccess*' .
+                            $log[] = 'The problem appears to be that the *.htaccess* placed in *plugins/magic-convert/wod/.htaccess*' .
                                 ' contains auth directives ("Allow" and "Request") and your server is set up to go fatal about it. ' .
                                 'Luckily, it seems that running scripts in the "wod2" folder works. ' .
                                 '**What you need to do is simply to click the "Save settings and force new .htacess rules"' .
-                                ' button. WebP Express wil then change the .htaccess rules to point to the "wod2" folder**';
+                                ' button. Magic Convert wil then change the .htaccess rules to point to the "wod2" folder**';
                         } else {
                             $log[] = 'The problem appears to be running PHP scripts in the "wod". ' .
                                 'Luckily, it seems that running scripts in the "wod2" folder works ' .
                                 '(it has probably something to do with the *.htaccess* file placed in "wod"). ' .
                                 '**What you need to do is simply to click the "Save settings and force new .htacess rules"' .
-                                ' button. WebP Express wil then change the .htaccess rules to point to the "wod2" folder**';
+                                ' button. Magic Convert wil then change the .htaccess rules to point to the "wod2" folder**';
                         }
                     } elseif ($responseCode == 403) {
                         $log[] = 'The problem appears to be running PHP scripts in the "wod". ' .
                             'Luckily, it seems that running scripts in the "wod2" folder works ' .
                             '(it could perhaps have something to do with the *.htaccess* file placed in "wod", ' .
                             'although it ought not result in a 403). **What you need to do is simply to click the "Save settings and force new .htacess rules"' .
-                            ' button. WebP Express wil then change the .htaccess rules to point to the "wod2" folder**';
+                            ' button. Magic Convert wil then change the .htaccess rules to point to the "wod2" folder**';
                     }
 
                     return $log;
@@ -734,7 +734,7 @@ class SelfTestHelper
         }
 
         $log[] = 'Requesting simple test script "wod2/ping.php". Result: ' . ($canRunTestScriptInWod2 ? 'ok' : 'failed');
-        $responsePingText2 = wp_remote_get(Paths::getPluginsUrl() . '/webp-express/wod2/ping.txt', ['timeout' => 7]);
+        $responsePingText2 = wp_remote_get(Paths::getPluginsUrl() . '/magic-convert/wod2/ping.txt', ['timeout' => 7]);
         $pingTextResponseCode2 = wp_remote_retrieve_response_code($responsePingText2);
         $log[] = 'Requesting simple test file "wod2/ping.txt". ' .
             'Result: ' . ($pingTextResponseCode == '200' ? 'ok' : 'failed (response code: ' . $pingTextResponseCode2 . ')');
@@ -746,7 +746,7 @@ class SelfTestHelper
                     $log[] = '**As the test script works, it would seem that the explanation for the 500 internal server ' .
                         'error is that the PHP script (webp-on-demand.php) crashes. ' .
                         'You can help me by enabling debugging and post the error on the support forum on Wordpress ' .
-                        '(https://wordpress.org/support/plugin/webp-express/), or create an issue on github ' .
+                        '(https://wordpress.org/support/plugin/magic-convert/), or create an issue on github ' .
                         '(https://github.com/rosell-dk/webp-express/issues)**';
                     $log[] = '';
                 }
@@ -756,14 +756,14 @@ class SelfTestHelper
                     $log[] = 'The problem appears to be running PHP scripts in the "wod2" folder. ' .
                         'Luckily, it seems that running scripts in the "wod" folder works ' .
                         '**What you need to do is simply to click the "Save settings and force new .htacess rules"' .
-                        ' button. WebP Express wil then change the .htaccess rules to point to the "wod" folder**';
+                        ' button. Magic Convert wil then change the .htaccess rules to point to the "wod" folder**';
                     $log[] = '';
                 } else {
                     if ($responseCode == 500) {
 
                         if ($pingTextResponseCode2 == '500') {
                             $log[] = 'All our requests results in 500 Internal Error. Even ' .
-                                'the request to plugins/webp-express/wod2/ping.txt. ' .
+                                'the request to plugins/magic-convert/wod2/ping.txt. ' .
                                 'Surprising!';
                         } else {
                             $log[] = 'The internal server error happens for php files, but not txt files. ' .

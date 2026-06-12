@@ -1,12 +1,12 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Convert;
-use \WebPExpress\Mime;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
+use \MagicConvert\Config;
+use \MagicConvert\Convert;
+use \MagicConvert\Mime;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
 
 class HandleUploadHooks
 {
@@ -56,7 +56,7 @@ class HandleUploadHooks
 
     /**
      *  hook: handle_upload
-     *  $filename is ie "/var/www/webp-express-tests/we0/wordpress/uploads-moved/image4-10-150x150.jpg"
+     *  $filename is ie "/var/www/magic-convert-tests/we0/wordpress/uploads-moved/image4-10-150x150.jpg"
      */
     public static function handleUpload($filearray, $overrides = false, $ignore = false)
     {
@@ -73,7 +73,7 @@ class HandleUploadHooks
 
     /**
      *  hook: image_make_intermediate_size
-     *  $filename is ie "/var/www/webp-express-tests/we0/wordpress/uploads-moved/image4-10-150x150.jpg"
+     *  $filename is ie "/var/www/magic-convert-tests/we0/wordpress/uploads-moved/image4-10-150x150.jpg"
      */
     public static function handleMakeIntermediateSize($filename)
     {

@@ -1,5 +1,5 @@
 <?php
-namespace WebPExpress;
+namespace MagicConvert;
 ?>
 <tr>
     <th scope="row">Alter HTML?</span><?php echo helpIcon(
@@ -67,8 +67,8 @@ namespace WebPExpress;
                                 <span style="font-size:10px">
                                     Note: <i>Cache Enabler</i> also has HTML altering, but their implementation has <a target="_blank" href="https://github.com/keycdn/cache-enabler/issues/51">limitations</a>.
                                     It for example doesn't replace background images in inline styles and it does not look for all common lazy load attributes. It also has some problems in edge cases.
-                                    For this reason, I recommend activating HTML altering in WebP Express, even when <i>Cache Enabler</i> is used.
-                                    By doing that, both plugins will have a go at it (WebP Express comes first).
+                                    For this reason, I recommend activating HTML altering in Magic Convert, even when <i>Cache Enabler</i> is used.
+                                    By doing that, both plugins will have a go at it (Magic Convert comes first).
                                     At least it will take care of the limitations in <i>Cache Enabler</i>.
                                     It does however not cure the edge cases where Cache Enabler replaces things it should not, or <a href="https://wordpress.org/support/topic/why-optimus-with-cache-enabler/">crashes</a>
                                 </span>
@@ -96,7 +96,7 @@ namespace WebPExpress;
                 <label>What to replace:</label>
                 <ul style="margin-left: 20px; margin-top: 5px"><li>
                 <?php
-                webpexpress_radioButton(
+                magicconvert_radioButton(
                   'alter-html-replacement',
                   'picture',
                   'Replace &lt;img&gt; tags with &lt;picture&gt; tags, adding the webp to srcset.',
@@ -116,7 +116,7 @@ namespace WebPExpress;
                 </li>
                 <li><div id="alter_html_picture_options_div" style="margin-left:18px; margin-bottom: 13px;">
                     <?php
-                    webpexpress_checkbox(
+                    magicconvert_checkbox(
                         'alter-html-add-picturefill-js',
                         $config['alter-html']['alter-html-add-picturefill-js'],  // PS: the function takes care of the escaping
                         'Dynamically load picturefill.js on older browsers',
@@ -129,7 +129,7 @@ namespace WebPExpress;
                 </div></li>
                 <li>
                 <?php
-                webpexpress_radioButton(
+                magicconvert_radioButton(
                   'alter-html-replacement',
                   'url',
                   'Replace image URLs',
@@ -151,7 +151,7 @@ namespace WebPExpress;
                 </li>
                 <li><div id="alter_html_url_options_div" style="margin-left:18px; margin-bottom: 13px;">
                     <?php
-                    webpexpress_checkbox(
+                    magicconvert_checkbox(
                         'alter-html-only-for-webp-enabled-browsers',
                         $config['alter-html']['only-for-webp-enabled-browsers'] == true,
                         'Only do the replacements in webp enabled browsers',
@@ -167,7 +167,7 @@ namespace WebPExpress;
             <?php
             if ($config['operation-mode'] != 'no-conversion') {
                 echo '<div><div style="margin-left: 11px">';
-                webpexpress_checkbox(
+                magicconvert_checkbox(
                     'alter-html-for-webps-that-has-yet-to-exist',
                     (!$config['alter-html']['only-for-webps-that-exists']),
                     'Reference webps that haven\'t been converted yet',
@@ -180,7 +180,7 @@ namespace WebPExpress;
             ?>
             <div style="margin-top: 20px">
                 <label>How to replace: <?php echo helpIcon(
-                    '<p>WebP Express can either trigger the HTML altering by hooking into ' .
+                    '<p>Magic Convert can either trigger the HTML altering by hooking into ' .
                     'standard content filtering hooks, or it can do it on the whole page. ' .
                     'Usually, you should select the first option, as it is lighter to ' .
                     'do string manipulation on selected content than on the whole page. ' .
@@ -198,7 +198,7 @@ namespace WebPExpress;
                     'no-margin-left set-margin-right');
                 ?></label>
                 <?php
-                webpexpress_radioButtons('alter-html-hooks', $config['alter-html']['hooks'], [
+                magicconvert_radioButtons('alter-html-hooks', $config['alter-html']['hooks'], [
                     'content-hooks' => 'Use content filtering hooks (the_content, the_excerpt, etc)',
                     'ob' => 'The complete page (using output buffering)</em>',
                 ], [
@@ -212,9 +212,9 @@ namespace WebPExpress;
                     (Multisite::isMultisite() ? '' : ' ("' . Paths::getHostNameOfUrl(Paths::getHomeUrl()) . '")') .
                     ', you should specify that hostname here. ' .
                     'This ensures that image URLs pointing to that hostname also gets replaced.</p>' .
-                    '<p>PS: If you wonder why your images URLs to your CDN gets processed by WebP Express even though you ' .
+                    '<p>PS: If you wonder why your images URLs to your CDN gets processed by Magic Convert even though you ' .
                     'have not entered anything here, the answer is probably that you are using a plugin that changes ' .
-                    'your URLs to point to the CDN and that WebP Express gets to do the replacement before your plugin. ' .
+                    'your URLs to point to the CDN and that Magic Convert gets to do the replacement before your plugin. ' .
                     'Do not rely on this. A future update to your plugin could change that order.</p>'
                 );
                 ?></label>

@@ -2,8 +2,8 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-use \WebPExpress\Paths;
-use \WebPExpress\Config;
+use \MagicConvert\Paths;
+use \MagicConvert\Config;
 
 // Note: $ver is added to querystring. However, when it is is critical that no-one gets the cached version,
 // a change of filename is neccessary, as there is a plugin that strips version strings out there...!
@@ -12,8 +12,8 @@ use \WebPExpress\Config;
 $ver = '3';  // note: Minimum 1.
 $jsDir = 'js';
 
-if (!function_exists('webp_express_add_inline_script')) {
-    function webp_express_add_inline_script($id, $script, $position) {
+if (!function_exists('magic_convert_add_inline_script')) {
+    function magic_convert_add_inline_script($id, $script, $position) {
         if (function_exists('wp_add_inline_script')) {
             // wp_add_inline_script is available from Wordpress 4.5
             wp_add_inline_script($id, $script, $position);
@@ -35,8 +35,8 @@ wp_enqueue_script('escapehtml');
 $config = Config::getConfigForOptionsPage();
 
 // selftest
-wp_register_script('webpexpress_selftest', plugins_url($jsDir . '/self-test.js', __FILE__), ['escapehtml'], $ver);
-wp_enqueue_script('webpexpress_selftest');
+wp_register_script('magicconvert_selftest', plugins_url($jsDir . '/self-test.js', __FILE__), ['escapehtml'], $ver);
+wp_enqueue_script('magicconvert_selftest');
 
 // Add converter, bulk convert and whitelist script, EXCEPT for "no conversion" mode
 if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conversion'))) {
@@ -55,14 +55,14 @@ if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conv
     wp_register_script('converters', plugins_url($jsDir . '/converters.js', __FILE__), ['sortable', 'daspopup', 'escapehtml'], $ver);
 
     // PS: no escaping/sanitizing needed as json_encode always produces something safe
-    webp_express_add_inline_script(
+    magic_convert_add_inline_script(
         'converters',
-        'window.webpExpressPaths = ' . json_encode(Paths::getUrlsAndPathsForTheJavascript()) . ';',
+        'window.magicConvertPaths = ' . json_encode(Paths::getUrlsAndPathsForTheJavascript()) . ';',
         'before'
     );
 
     // PS: no escaping/sanitizing needed as json_encode always produces something safe
-    webp_express_add_inline_script(
+    magic_convert_add_inline_script(
         'converters',
         'window.converters = ' . json_encode($config['converters']) . ';',
         'before'
@@ -74,7 +74,7 @@ if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conv
     wp_register_script('whitelist', plugins_url($jsDir . '/whitelist.js', __FILE__), ['daspopup', 'escapehtml'], $ver);
 
     // PS: no escaping/sanitizing needed as json_encode always produces something safe
-    webp_express_add_inline_script('whitelist', 'window.whitelist = ' . json_encode($config['web-service']['whitelist']) . ';', 'before');
+    magic_convert_add_inline_script('whitelist', 'window.whitelist = ' . json_encode($config['web-service']['whitelist']) . ';', 'before');
     wp_enqueue_script('whitelist');
 
     // bulk convert
@@ -87,7 +87,7 @@ if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conv
 
     /*
     AlterHTMLHelper::getWebPUrlInImageRoot(
-        Paths::getPluginUrl() . '/webp-express',    // source url
+        Paths::getPluginUrl() . '/magic-convert',    // source url
         $baseId,
         Paths::getPluginUrl(),                    // base url
         Paths::getPluginDirAbs()                    // base dir
@@ -95,7 +95,7 @@ if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conv
 
     getRelUrlPath()*/
 
-    webp_express_add_inline_script('testconvert', 'window.canDisplayWebp = ' . ($canDisplayWebp ? 'true' : 'false') . ';', 'before');
+    magic_convert_add_inline_script('testconvert', 'window.canDisplayWebp = ' . ($canDisplayWebp ? 'true' : 'false') . ';', 'before');
     wp_enqueue_script('testconvert');
 
     wp_register_script('image-comparison-slider', plugins_url($jsDir . '/image-comparison-slider.js', __FILE__), [], $ver);
@@ -120,26 +120,26 @@ wp_register_script( 'page', plugins_url($jsDir . '/page.js', __FILE__), [], $ver
 // TODO: Add all vars needed to this array (whitelist, converters, etc)
 $javascriptVars = [
     'ajax-nonces' => [
-        'convert' => wp_create_nonce('webpexpress-ajax-convert-nonce'),
-        'list-unconverted-files' => wp_create_nonce('webpexpress-ajax-list-unconverted-files-nonce'),
-        'purge-cache' => wp_create_nonce('webpexpress-ajax-purge-cache-nonce'),
-        'purge-log' => wp_create_nonce('webpexpress-ajax-purge-log-nonce'),
-        'view-log' => wp_create_nonce('webpexpress-ajax-view-log-nonce'),
-        'self-test' => wp_create_nonce('webpexpress-ajax-self-test-nonce'),
+        'convert' => wp_create_nonce('magicconvert-ajax-convert-nonce'),
+        'list-unconverted-files' => wp_create_nonce('magicconvert-ajax-list-unconverted-files-nonce'),
+        'purge-cache' => wp_create_nonce('magicconvert-ajax-purge-cache-nonce'),
+        'purge-log' => wp_create_nonce('magicconvert-ajax-purge-log-nonce'),
+        'view-log' => wp_create_nonce('magicconvert-ajax-view-log-nonce'),
+        'self-test' => wp_create_nonce('magicconvert-ajax-self-test-nonce'),
     ],
     'can-use-doc-root-for-structuring' => Paths::canUseDocRootForRelPaths()
 ];
-webp_express_add_inline_script(
+magic_convert_add_inline_script(
     'page',
-    'window.webpExpress = ' . json_encode($javascriptVars, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK),
+    'window.magicConvert = ' . json_encode($javascriptVars, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK),
     'before'
 );
 wp_enqueue_script('page');
 
 
 // Register styles
-wp_register_style('webp-express-options-page-css', plugins_url('css/webp-express-options-page.css', __FILE__), null, $ver);
-wp_enqueue_style('webp-express-options-page-css');
+wp_register_style('magic-convert-options-page-css', plugins_url('css/magic-convert-options-page.css', __FILE__), null, $ver);
+wp_enqueue_style('magic-convert-options-page-css');
 
 wp_register_style('test-convert-css', plugins_url('css/test-convert.css', __FILE__), null, $ver);
 wp_enqueue_style('test-convert-css');

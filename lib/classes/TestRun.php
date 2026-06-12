@@ -1,16 +1,16 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\Paths;
-use \WebPExpress\FileHelper;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\Paths;
+use \MagicConvert\FileHelper;
 
 use \WebPConvert\Convert\ConverterFactory;
 use \WebPConvert\Convert\Helpers\JpegQualityDetector;
 
-include_once WEBPEXPRESS_PLUGIN_DIR . '/vendor/autoload.php';
+include_once MAGIC_CONVERT_PLUGIN_DIR . '/vendor/autoload.php';
 
 /**
  *
@@ -58,10 +58,10 @@ class TestRun
         if (isset(self::$converterStatus)) {
             return self::$converterStatus;
         }
-        $source = Paths::getWebPExpressPluginDirAbs() . '/test/small-q61.jpg';
-        $destination = Paths::getUploadDirAbs() . '/webp-express-test-conversion.webp';
+        $source = Paths::getMagicConvertPluginDirAbs() . '/test/small-q61.jpg';
+        $destination = Paths::getUploadDirAbs() . '/magic-convert-test-conversion.webp';
         if (!FileHelper::canCreateFile($destination)) {
-            $destination = Paths::getContentDirAbs() . '/webp-express-test-conversion.webp';
+            $destination = Paths::getContentDirAbs() . '/magic-convert-test-conversion.webp';
         }
         if (!FileHelper::canCreateFile($destination)) {
             self::$converterStatus = false;     // // cache the result
@@ -86,7 +86,7 @@ class TestRun
         $options['converters'] = ConvertersHelper::normalize($options['webp-convert']['convert']['converters']);
 
         $previousErrorHandler = set_error_handler(
-            array('\WebPExpress\TestRun', "warningHandler"),
+            array('\MagicConvert\TestRun', "warningHandler"),
             E_WARNING | E_USER_WARNING | E_NOTICE | E_USER_NOTICE
         );
 
@@ -143,7 +143,7 @@ class TestRun
             return self::$localQualityDetectionWorking;
         } else {
             $q = JpegQualityDetector::detectQualityOfJpg(
-                Paths::getWebPExpressPluginDirAbs() . '/test/small-q61.jpg'
+                Paths::getMagicConvertPluginDirAbs() . '/test/small-q61.jpg'
             );
             self::$localQualityDetectionWorking = ($q === 61);
             return self::$localQualityDetectionWorking;

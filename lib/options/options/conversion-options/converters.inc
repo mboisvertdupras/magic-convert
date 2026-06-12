@@ -16,7 +16,7 @@
             <div id="tc_content"></div>
         </div>
         <?php
-            function webp_express_printUpdateButtons() {
+            function magic_convert_printUpdateButtons() {
             ?>
                 <button onclick="updateConverterOptionsAndSave()" class="button button-primary" type="button">Update and save settings</button>
                 <button onclick="updateConverterOptions()" class="button button-secondary" type="button">Update, but do not save yet</button>

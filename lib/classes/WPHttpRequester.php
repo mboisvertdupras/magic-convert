@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 use \HtaccessCapabilityTester\HttpRequesterInterface;
 use \HtaccessCapabilityTester\HttpResponse;

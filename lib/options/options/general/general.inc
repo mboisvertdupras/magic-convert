@@ -1,5 +1,5 @@
 <fieldset class="block">
-    <button onclick="WebPExpress.SelfTest.openPopup('allInfo')" class="button button-secondary" type="button" style="position: absolute; right: 15px; top:15px">
+    <button onclick="MagicConvert.SelfTest.openPopup('allInfo')" class="button button-secondary" type="button" style="position: absolute; right: 15px; top:15px">
         System info
     </button>
     <h3>General</h3>

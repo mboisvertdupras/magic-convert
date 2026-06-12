@@ -2,16 +2,16 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\FileHelper;
-use \WebPExpress\HTAccess;
-use \WebPExpress\Messenger;
-use \WebPExpress\Multisite;
-use \WebPExpress\Paths;
-use \WebPExpress\PlatformInfo;
-use \WebPExpress\State;
-use \WebPExpress\TestRun;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\FileHelper;
+use \MagicConvert\HTAccess;
+use \MagicConvert\Messenger;
+use \MagicConvert\Multisite;
+use \MagicConvert\Paths;
+use \MagicConvert\PlatformInfo;
+use \MagicConvert\State;
+use \MagicConvert\TestRun;
 
 if (!current_user_can('manage_options')) {
     wp_die('You do not have sufficient permissions to access this page.');
@@ -19,13 +19,13 @@ if (!current_user_can('manage_options')) {
 
 ?>
 <div class="wrap">
-    <h2>WebP Express Settings<?php echo Multisite::isNetworkActivated() ? ' (network)' : ''; ?></h2>
+    <h2>Magic Convert Settings<?php echo Multisite::isNetworkActivated() ? ' (network)' : ''; ?></h2>
 
 <?php
 
-function webpexpress_converterName($converterId) {
+function magicconvert_converterName($converterId) {
     if ($converterId == 'wpc') {
-        return 'Remote WebP Express';
+        return 'Remote Magic Convert';
     }
     return $converterId;
 }
@@ -65,12 +65,12 @@ State::setState('workingAndActiveConverterIds', ConvertersHelper::getWorkingAndA
 
 //State::setState('last-ewww-optimize-attempt', 0);
 //State::setState('last-ewww-optimize', 0);
-\WebPExpress\KeepEwwwSubscriptionAlive::keepAliveIfItIsTime($config);
+\MagicConvert\KeepEwwwSubscriptionAlive::keepAliveIfItIsTime($config);
 
 if (!$testResult) {
     Messenger::printMessage(
         'error',
-        'WebP Express cannot save a test conversion, because it does not have write ' .
+        'Magic Convert cannot save a test conversion, because it does not have write ' .
         'access to your upload folder, nor your wp-content folder. Please provide!'
     );
 }
@@ -89,7 +89,7 @@ foreach (Paths::getHTAccessDirs() as $dir) {
 
 //echo 'Working converters:' . print_r($workingConverters, true) . '<br>';
 // Generate a custom nonce value.
-$webpexpressSaveSettingsNonce = wp_create_nonce('webpexpress-save-settings-nonce');
+$magicconvertSaveSettingsNonce = wp_create_nonce('magicconvert-save-settings-nonce');
 ?>
 
 <?php
@@ -99,10 +99,10 @@ $webpexpressSaveSettingsNonce = wp_create_nonce('webpexpress-save-settings-nonce
 //$actionUrl = Multisite::isNetworkActivated() ? network_admin_url( 'admin-post.php' ) : admin_url( 'admin-post.php' );
 $actionUrl = admin_url('admin-post.php');
 
-echo '<form id="webpexpress_settings" action="' . esc_url($actionUrl) . '" method="post" >';
+echo '<form id="magicconvert_settings" action="' . esc_url($actionUrl) . '" method="post" >';
 ?>
-    <input type="hidden" name="action" value="webpexpress_settings_submit">
-    <input type="hidden" name="_wpnonce" value="<?php echo $webpexpressSaveSettingsNonce ?>" />
+    <input type="hidden" name="action" value="magicconvert_settings_submit">
+    <input type="hidden" name="_wpnonce" value="<?php echo $magicconvertSaveSettingsNonce ?>" />
 
     <fieldset class="block buttons">
         <table>
@@ -136,7 +136,7 @@ function helpIcon($text, $customClass = '') {
     return '<div class="help ' . $customClass . '">?<div class="popup ' . $className . '">' . $text . '</div></div>';
 }
 
-function webpexpress_selectBoxOptions($selected, $options) {
+function magicconvert_selectBoxOptions($selected, $options) {
     foreach ($options as $optionValue => $text) {
         echo '<option value="' . esc_attr($optionValue) . '"' . ($optionValue == $selected ? ' selected' : '') . '>';
         echo esc_html($text);
@@ -144,7 +144,7 @@ function webpexpress_selectBoxOptions($selected, $options) {
     }
 }
 
-function webpexpress_radioButton($optionName, $optionValue, $label, $selectedValue, $helpText = null) {
+function magicconvert_radioButton($optionName, $optionValue, $label, $selectedValue, $helpText = null) {
     $id = esc_attr(str_replace('-', '_', $optionName . '_' . $optionValue));
     echo '<input type="radio" id="' . $id . '"';
     if ($optionValue == $selectedValue) {
@@ -159,17 +159,17 @@ function webpexpress_radioButton($optionName, $optionValue, $label, $selectedVal
     echo '</label>';
 }
 
-function webpexpress_radioButtons($optionName, $selected, $options, $helpTexts = [], $style='margin-left: 20px; margin-top: 5px') {
+function magicconvert_radioButtons($optionName, $selected, $options, $helpTexts = [], $style='margin-left: 20px; margin-top: 5px') {
     echo '<ul style="' . $style . '">';
     foreach ($options as $optionValue => $label) {
         echo '<li>';
-        webpexpress_radioButton($optionName, $optionValue, $label, $selected, isset($helpTexts[$optionValue]) ? $helpTexts[$optionValue] : null);
+        magicconvert_radioButton($optionName, $optionValue, $label, $selected, isset($helpTexts[$optionValue]) ? $helpTexts[$optionValue] : null);
         echo '</li>';
     }
     echo '</ul>';
 }
 
-function webpexpress_checkbox($optionName, $checked, $label, $helpText = '') {
+function magicconvert_checkbox($optionName, $checked, $label, $helpText = '') {
     $id = esc_attr(str_replace('-', '_', $optionName));
     echo '<div style="margin:10px 0 0 10px;">';
     echo '<input value="true" type="checkbox" style="margin-right: 10px" ';

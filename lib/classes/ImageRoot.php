@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\PathHelper;
+use \MagicConvert\PathHelper;
 
 class ImageRoot
 {
@@ -38,13 +38,13 @@ class ImageRoot
             if (!isset($def['rel-path'])) {
                 throw new \Exception(
                     'Image root definition in config file is must either have a "rel-path" or "abs-path" property defined. ' .
-                    'Probably your system setup has changed. Please re-save WebP Express options and regenerate .htaccess'
+                    'Probably your system setup has changed. Please re-save Magic Convert options and regenerate .htaccess'
                 );
             } else {
                 throw new \Exception(
                     'Image root definition in config file is defined by "rel-path". However, DOCUMENT_ROOT is unavailable so we ' .
                     'cannot use that (as the rel-path is relative to that. ' .
-                    'Probably your system setup has changed. Please re-save WebP Express options and regenerate .htaccess'
+                    'Probably your system setup has changed. Please re-save Magic Convert options and regenerate .htaccess'
                 );
             }
         }

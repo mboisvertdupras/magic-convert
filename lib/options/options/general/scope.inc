@@ -1,8 +1,8 @@
 <tr>
     <th scope="row">Scope<?php
         echo helpIcon(
-            '<p>This setting determines which folders WebP Express is operational in. ' .
-            'If for example "Uploads only" is selected, WebP Express will only convert the upload images and only put ' .
+            '<p>This setting determines which folders Magic Convert is operational in. ' .
+            'If for example "Uploads only" is selected, Magic Convert will only convert the upload images and only put ' .
             'an <i>.htaccess</i> file in the <i>uploads</i> folder (if needed). Also, <i>Alter HTML</i> will limit itself to that area.' .
             '</p>' .
             '<p>The "All content" setting will work on <i>uploads</i>, <i>themes</i>, <i>plugins</i> - anything in the "wp-content" ' .
@@ -13,7 +13,7 @@
     <td>
         <select name="scope" id="scope">
             <?php
-            /*webpexpress_selectBoxOptions($config['destination-structure'], [
+            /*magicconvert_selectBoxOptions($config['destination-structure'], [
                 'doc-root' => 'Document root',
                 'image-roots' => 'Image roots',
             ]);

@@ -6,14 +6,14 @@ Btw:
 Seems someone else got similar idea:
 http://christian.roy.name/blog/detecting-modrewrite-using-php
 */
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\Paths;
+use \MagicConvert\FileHelper;
+use \MagicConvert\Paths;
 
 use \HtaccessCapabilityTester\HtaccessCapabilityTester;
 
-include_once WEBPEXPRESS_PLUGIN_DIR . '/vendor/autoload.php';
+include_once MAGIC_CONVERT_PLUGIN_DIR . '/vendor/autoload.php';
 
 class HTAccessCapabilityTestRunner
 {
@@ -41,35 +41,35 @@ class HTAccessCapabilityTestRunner
     {
         switch ($testName) {
             case 'canRunTestScriptInWOD':
-                $url = Paths::getWebPExpressPluginUrl() . '/wod/ping.php';
+                $url = Paths::getMagicConvertPluginUrl() . '/wod/ping.php';
                 return self::canRunPingPongTestScript($url);
 
             case 'canRunTestScriptInWOD2':
-                $url = Paths::getWebPExpressPluginUrl() . '/wod2/ping.php';
+                $url = Paths::getMagicConvertPluginUrl() . '/wod2/ping.php';
                 return self::canRunPingPongTestScript($url);
 
             case 'htaccessEnabled':
-                return self::runTestInWebPExpressContentDir('htaccessEnabled');
+                return self::runTestInMagicConvertContentDir('htaccessEnabled');
 
             case 'modHeadersLoaded':
-                return self::runTestInWebPExpressContentDir('modHeadersLoaded');
+                return self::runTestInMagicConvertContentDir('modHeadersLoaded');
 
             case 'modHeaderWorking':
-                return self::runTestInWebPExpressContentDir('headerSetWorks');
+                return self::runTestInMagicConvertContentDir('headerSetWorks');
 
             case 'modRewriteWorking':
-                return self::runTestInWebPExpressContentDir('rewriteWorks');
+                return self::runTestInMagicConvertContentDir('rewriteWorks');
 
             case 'passThroughEnvWorking':
-                return self::runTestInWebPExpressContentDir('passingInfoFromRewriteToScriptThroughEnvWorks');
+                return self::runTestInMagicConvertContentDir('passingInfoFromRewriteToScriptThroughEnvWorks');
 
             case 'passThroughHeaderWorking':
                 // pretend it fails because .htaccess rules aren't currently generated correctly
                 return false;
-                return self::runTestInWebPExpressContentDir('passingInfoFromRewriteToScriptThroughRequestHeaderWorks');
+                return self::runTestInMagicConvertContentDir('passingInfoFromRewriteToScriptThroughRequestHeaderWorks');
 
             case 'grantAllAllowed':
-                return self::runTestInWebPExpressContentDir('grantAllCrashTester');
+                return self::runTestInMagicConvertContentDir('grantAllCrashTester');
         }
     }
 
@@ -88,10 +88,10 @@ class HTAccessCapabilityTestRunner
      *  Run one of the htaccess capability tests.
      *  Three possible outcomes: true, false or null (null if request fails)
      */
-    private static function runTestInWebPExpressContentDir($testName)
+    private static function runTestInMagicConvertContentDir($testName)
     {
-        $baseDir = Paths::getWebPExpressContentDirAbs() . '/htaccess-capability-tests';
-        $baseUrl = Paths::getContentUrl() . '/webp-express/htaccess-capability-tests';
+        $baseDir = Paths::getMagicConvertContentDirAbs() . '/htaccess-capability-tests';
+        $baseUrl = Paths::getContentUrl() . '/magic-convert/htaccess-capability-tests';
 
         $hct = new HtaccessCapabilityTester($baseDir, $baseUrl);
         $hct->setHttpRequester(new WPHttpRequester());

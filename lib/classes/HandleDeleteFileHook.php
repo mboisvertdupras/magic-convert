@@ -1,9 +1,9 @@
 <?php
 
-namespace WebPExpress;
-use \WebPExpress\Convert;
-use \WebPExpress\Mime;
-use \WebPExpress\SanityCheck;
+namespace MagicConvert;
+use \MagicConvert\Convert;
+use \MagicConvert\Mime;
+use \MagicConvert\SanityCheck;
 
 class HandleDeleteFileHook
 {
@@ -30,7 +30,7 @@ class HandleDeleteFileHook
                 if (@unlink($destination)) {
                     Convert::updateBiggerThanOriginalMark($filename, $destination, $config);
                 } else {
-                    error_log('WebP Express failed deleting webp:' . $destination);
+                    error_log('Magic Convert failed deleting webp:' . $destination);
                 }
             }
         } catch (SanityException $e) {

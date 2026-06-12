@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\PathHelper;
-use \WebPExpress\Paths;
+use \MagicConvert\FileHelper;
+use \MagicConvert\PathHelper;
+use \MagicConvert\Paths;
 
 class CacheMover
 {

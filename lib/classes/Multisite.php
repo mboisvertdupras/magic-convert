@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class Multisite
 {
@@ -25,7 +25,7 @@ class Multisite
         if (!function_exists( 'is_plugin_active_for_network')) {
             require_once(ABSPATH . '/wp-admin/includes/plugin.php');
         }
-        return is_plugin_active_for_network('webp-express/webp-express.php');
+        return is_plugin_active_for_network('magic-convert/magic-convert.php');
     }
 
     public static function isMultisite()

@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class PathHelper
 {
@@ -302,7 +302,7 @@ class PathHelper
         // If that is the case, then surely, the complete filepath is also within the dir.
         // Note however that it might be that the closest existing folder is not within the dir, while the
         // file would be (if it existed)
-        // For WebP Express, we are pretty sure that the dirs we are checking against (uploads folder,
+        // For Magic Convert, we are pretty sure that the dirs we are checking against (uploads folder,
         // wp-content, plugins folder) exists. So getting the closest existing folder should be sufficient.
         // but could it be that these are outside open_basedir on some setups? Perhaps on a few systems.
         if (self::pathExistsAndIsResolvable($dirPath)) {

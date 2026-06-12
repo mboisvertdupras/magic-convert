@@ -4,7 +4,7 @@
 This class is made to not be dependent on Wordpress functions and must be kept like that.
 It is used by webp-on-demand.php, which does not register an auto loader. It is also used for bulk conversion.
 */
-namespace WebPExpress;
+namespace MagicConvert;
 
 class Destination
 {
@@ -12,7 +12,7 @@ class Destination
     /**
      *
      * @return boolean  Whether or not the destination corresponding to a given source should be stored in the same folder
-     *                  or the separate folder (in wp-content/webp-express)
+     *                  or the separate folder (in wp-content/magic-convert)
      */
     private static function storeMingledOrNot($source, $mingled, $uploadDirAbs)
     {
@@ -55,7 +55,7 @@ class Destination
      *
      * The imageRoots are tried in order.
      * This means that ie "uploads" is preferred over "wp-content" even though the source resides in both (when uploads is inside wp-content)
-     * So destination is ie [..]/wp-content/webp-express/uploads/[..]", rather than same but with "wp-content"
+     * So destination is ie [..]/wp-content/magic-convert/uploads/[..]", rather than same but with "wp-content"
      *
      * @param  string   $source                       Path to source file
      * @param  string   $webExpressContentDirAbs
@@ -131,7 +131,7 @@ class Destination
                         throw new \Exception(
                             'Can not calculate destination using "doc-root" structure as document root is not available. $_SERVER["DOCUMENT_ROOT"] is empty. ' .
                             'This is probably a misconfiguration on the server. ' .
-                            'However, WebP Express can function without using documument root. If you resave options and regenerate the .htaccess files, it should ' .
+                            'However, Magic Convert can function without using documument root. If you resave options and regenerate the .htaccess files, it should ' .
                             'automatically start to structure the webp files in subfolders that are relative the image root folders rather than document-root.'
                         );
                     }
@@ -140,7 +140,7 @@ class Destination
                         throw new \Exception(
                             'Can not calculate destination using "doc-root" structure as document root cannot be resolved for symlinks using "realpath". The ' .
                             'reason for that is probably that open_basedir protection has been set up and that document root is outside outside that open_basedir. ' .
-                            'WebP Express can function in that setting, however you will need to resave options and regenerate the .htaccess files. It should then ' .
+                            'Magic Convert can function in that setting, however you will need to resave options and regenerate the .htaccess files. It should then ' .
                             'automatically stop to structure the webp files as relative to document root and instead structure them as relative to image root folders.'
                         );
                     }

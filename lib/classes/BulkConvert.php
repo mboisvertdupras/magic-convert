@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 //use \Onnov\DetectEncoding\EncodingDetector;
 
@@ -13,7 +13,7 @@ class BulkConvert
             //'root' => Paths::getUploadDirAbs(),
             'ext' => $config['destination-extension'],
             'destination-folder' => $config['destination-folder'],  /* hm, "destination-folder" is a bad name... */
-            'webExpressContentDirAbs' => Paths::getWebPExpressContentDirAbs(),
+            'webExpressContentDirAbs' => Paths::getMagicConvertContentDirAbs(),
             'uploadDirAbs' => Paths::getUploadDirAbs(),
             'useDocRootForStructuringCacheDir' => (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
             'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds($config['scope'])),   // (Paths::getImageRootsDef()
@@ -285,7 +285,7 @@ class BulkConvert
             $source,
             $options['destination-folder'],
             $options['destination-extension'],
-            Paths::getWebPExpressContentDirAbs(),
+            Paths::getMagicConvertContentDirAbs(),
             Paths::getUploadDirAbs()
         );
         $result = ConvertHelperIndependent::convert($source, $destination, $options);
@@ -301,7 +301,7 @@ class BulkConvert
 
     public static function processAjaxListUnconvertedFiles()
     {
-        if (!check_ajax_referer('webpexpress-ajax-list-unconverted-files-nonce', 'nonce', false)) {
+        if (!check_ajax_referer('magicconvert-ajax-list-unconverted-files-nonce', 'nonce', false)) {
             wp_send_json_error('The security nonce has expired. You need to reload the settings page (press F5) and try again)');
             wp_die();
         }

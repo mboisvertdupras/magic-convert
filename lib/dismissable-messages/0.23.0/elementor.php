@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 $elementorActivated = in_array('elementor/elementor.php', get_option('active_plugins', []));
 $showMessage = false;

@@ -44,7 +44,7 @@ $cacheControlPublic = $config['cache-control-public'];
         <div id="cache_control_set_div" style="display:inline-block;">
             <select id="cache_control_public" name="cache-control-public">
                 <?php
-                webpexpress_selectBoxOptions(($cacheControlPublic ? 'public' : 'private'), [
+                magicconvert_selectBoxOptions(($cacheControlPublic ? 'public' : 'private'), [
                     'public' => 'Public',
                     'private' => 'Private',
                 ]);
@@ -63,7 +63,7 @@ $cacheControlPublic = $config['cache-control-public'];
             </select>
             <select id="cache_control_max_age" name="cache-control-max-age">
                 <?php
-                webpexpress_selectBoxOptions($cacheControlMaxAge, [
+                magicconvert_selectBoxOptions($cacheControlMaxAge, [
                     'one-second' => 'One second',
                     'one-minute' => 'One minute',
                     'one-hour' => 'One hour',

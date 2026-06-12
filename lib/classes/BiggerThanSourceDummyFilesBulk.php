@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 
 class BiggerThanSourceDummyFilesBulk
@@ -20,7 +20,7 @@ class BiggerThanSourceDummyFilesBulk
         self::$settings = [
             'ext' => $config['destination-extension'],
             'destination-folder' => $config['destination-folder'],  /* hm, "destination-folder" is a bad name... */
-            'webExpressContentDirAbs' => Paths::getWebPExpressContentDirAbs(),
+            'webExpressContentDirAbs' => Paths::getMagicConvertContentDirAbs(),
             'uploadDirAbs' => Paths::getUploadDirAbs(),
             'useDocRootForStructuringCacheDir' => (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
             //'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds($config['scope'])),   // (Paths::getImageRootsDef()

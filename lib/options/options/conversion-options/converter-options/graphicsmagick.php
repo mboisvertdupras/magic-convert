@@ -27,6 +27,6 @@
       <button onclick="updateConverterOptions()" class="button button-primary" type="button">Update</button>
   -->
       <!-- <a href="javascript: tb_remove();">close</a> -->
-      <?php webp_express_printUpdateButtons() ?>
+      <?php magic_convert_printUpdateButtons() ?>
     </div>
 </div>

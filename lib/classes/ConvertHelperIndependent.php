@@ -4,23 +4,23 @@
 This class is made to not be dependent on Wordpress functions and must be kept like that.
 It is used by webp-on-demand.php. It is also used for bulk conversion.
 */
-namespace WebPExpress;
+namespace MagicConvert;
 
 use \WebPConvert\WebPConvert;
 use \WebPConvert\Convert\ConverterFactory;
 use \WebPConvert\Exceptions\WebPConvertException;
 use \WebPConvert\Loggers\BufferLogger;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
+use \MagicConvert\FileHelper;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
 
 class ConvertHelperIndependent
 {
 
     /**
      *
-     * @return boolean  Whether or not the destination corresponding to a given source should be stored in the same folder or the separate (in wp-content/webp-express)
+     * @return boolean  Whether or not the destination corresponding to a given source should be stored in the same folder or the separate (in wp-content/magic-convert)
      */
     private static function storeMingledOrNot($source, $destinationFolder, $uploadDirAbs)
     {
@@ -154,7 +154,7 @@ class ConvertHelperIndependent
                         throw new \Exception(
                             'Can not calculate destination using "doc-root" structure as document root is not available. $_SERVER["DOCUMENT_ROOT"] is empty. ' .
                             'This is probably a misconfiguration on the server. ' .
-                            'However, WebP Express can function without using documument root. If you resave options and regenerate the .htaccess files, it should ' .
+                            'However, Magic Convert can function without using documument root. If you resave options and regenerate the .htaccess files, it should ' .
                             'automatically start to structure the webp files in subfolders that are relative the image root folders rather than document-root.'
                         );
                     }
@@ -163,7 +163,7 @@ class ConvertHelperIndependent
                         throw new \Exception(
                             'Can not calculate destination using "doc-root" structure as document root cannot be resolved for symlinks using "realpath". The ' .
                             'reason for that is probably that open_basedir protection has been set up and that document root is outside outside that open_basedir. ' .
-                            'WebP Express can function in that setting, however you will need to resave options and regenerate the .htaccess files. It should then ' .
+                            'Magic Convert can function in that setting, however you will need to resave options and regenerate the .htaccess files. It should then ' .
                             'automatically stop to structure the webp files as relative to document root and instead structure them as relative to image root folders.'
                         );
                     }
@@ -266,7 +266,7 @@ class ConvertHelperIndependent
                 if (strpos($destination, $imageRoot . '/') === 0) {
 
                     // "Eat" the left part off the $destination parameter. $destination is for example:
-                    // "/var/www/webp-express-tests/we0/wp-content-moved/webp-express/webp-images/doc-root/wordpress/uploads-moved/2018/12/tegning5-300x265.jpg.webp"
+                    // "/var/www/magic-convert-tests/we0/wp-content-moved/magic-convert/webp-images/doc-root/wordpress/uploads-moved/2018/12/tegning5-300x265.jpg.webp"
                     // We also eat the slash (+1)
                     $sourceRel = substr($destination, strlen($imageRoot) + 1);
 
@@ -323,16 +323,16 @@ class ConvertHelperIndependent
                 // Mission: To find source corresponding to destination (separate) - using the "image-roots" structure.
 
                 // How can we do that?
-                // We got the destination (unresolved) - ie '/website-symlinked/wp-content/webp-express/webp-images/uploads/2018/07/hello.jpg.webp'
+                // We got the destination (unresolved) - ie '/website-symlinked/wp-content/magic-convert/webp-images/uploads/2018/07/hello.jpg.webp'
                 // If we were lazy and unprecise, we could simply:
-                // - search for "webp-express/webp-images/"
+                // - search for "magic-convert/webp-images/"
                 // - strip anything before that - result: 'uploads/2018/07/hello.jpg.webp'
                 // - the first path component is the root id.
                 // - the rest of the path is the relative path to the source - if we strip the ".webp" ending
 
                 // So, are we lazy? - what is the alternative?
-                // - Get closest existing resolved folder of destination (ie "/var/www/website/wp-content-moved/webp-express/webp-images/wp-content")
-                // - Check if that folder is below the cache root (resolved) (cache root is the "wp-content" image root + 'webp-express/webp-images')
+                // - Get closest existing resolved folder of destination (ie "/var/www/website/wp-content-moved/magic-convert/webp-images/wp-content")
+                // - Check if that folder is below the cache root (resolved) (cache root is the "wp-content" image root + 'magic-convert/webp-images')
                 // - Create dir for destination (if missing)
                 // - We can now resolve destination. With cache root also being resolved, we can get the relative dir.
                 //   ie 'uploads/2018/07/hello.jpg.webp'.
@@ -570,8 +570,8 @@ APACHE
 
         $text = preg_replace('#' . preg_quote($_SERVER["DOCUMENT_ROOT"]) . '#', '[doc-root]', $text);
 
-        // TODO: Put version number somewhere else. Ie \WebPExpress\VersionNumber::version
-        $text = 'WebP Express 0.25.14. ' . $msgTop . ', ' . date("Y-m-d H:i:s") . "\n\r\n\r" . $text;
+        // TODO: Put version number somewhere else. Ie \MagicConvert\VersionNumber::version
+        $text = 'Magic Convert 0.25.14. ' . $msgTop . ', ' . date("Y-m-d H:i:s") . "\n\r\n\r" . $text;
 
         $logFile = self::getLogFilename($source, $logDir);
 
@@ -711,7 +711,7 @@ APACHE
         } catch (SanityException $e) {
             $msg = $e->getMessage();
             echo $msg;
-            header('X-WebP-Express-Error: ' . $msg, true);
+            header('X-Magic-Convert-Error: ' . $msg, true);
             // TODO: error_log() ?
             exit;
         }

@@ -61,7 +61,7 @@
             ?>
         </tbody>
     </table>
-    <div id="webpexpress_test_redirection_popup" style="display:none;">
-        <div id="webpexpress_test_redirection_content"></div>
+    <div id="magicconvert_test_redirection_popup" style="display:none;">
+        <div id="magicconvert_test_redirection_content"></div>
     </div>
 </fieldset>

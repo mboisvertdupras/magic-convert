@@ -1,3 +1,8 @@
+= 0.1.0 =
+* Forked from WebP Express 0.25.14; rebranded to Magic Convert.
+
+The entries below are the historical WebP Express changelog, preserved for reference.
+
 = 0.25.9 =
 (released 7 April 2024)
 * Bugfix: Fixed ewww conversion method after ewww API change

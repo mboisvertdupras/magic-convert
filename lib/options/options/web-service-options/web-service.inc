@@ -1,6 +1,6 @@
 <?php
 include_once __DIR__ . '/../../../classes/Paths.php';
-use \WebPExpress\Paths;
+use \MagicConvert\Paths;
 
 //$whitelist = $config['web-service']['whitelist'];
 //echo '<script>window.whitelist = ' . json_encode($whitelist) . '</script>';

@@ -1,5 +1,5 @@
 <?php
-namespace WebPExpress;
+namespace MagicConvert;
 
 if (!defined('ABSPATH')) {
     exit;

@@ -62,6 +62,6 @@
           <a target="_blank" href="https://developers.google.com/speed/webp/docs/cwebp">the docs</a>
       </div>
       <br>
-      <?php webp_express_printUpdateButtons() ?>
+      <?php magic_convert_printUpdateButtons() ?>
     </div>
 </div>

@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class HTAccessRules
 {
@@ -187,10 +187,10 @@ class HTAccessRules
     private static function infoRules()
     {
 
-        return "# The rules below have been dynamically created by WebP Express in accordance with the plugin settings\n" .
-            "# DO NOT EDIT MANUALLY (unless you are prepared that your changes might be overridden by WebP Express)" . "\n" .
+        return "# The rules below have been dynamically created by Magic Convert in accordance with the plugin settings\n" .
+            "# DO NOT EDIT MANUALLY (unless you are prepared that your changes might be overridden by Magic Convert)" . "\n" .
             "# The following parameters have been in play to produce the rules:\n" .
-            "#\n# WebP Express options:\n" .
+            "#\n# Magic Convert options:\n" .
             "# - Operation mode: " . self::$config['operation-mode'] . "\n" .
             "# - Redirection to existing webp: " .
                 (self::$config['redirect-to-existing-in-htaccess'] ? 'enabled' : 'disabled') . "\n" .
@@ -396,9 +396,9 @@ class HTAccessRules
                 $cacheDirForThisRoot = PathHelper::fixAbsPathToUseUnresolvedDocRoot($cacheDirForThisRoot);
                 $cacheDirForThisRoot = PathHelper::backslashesToForwardSlashes($cacheDirForThisRoot); #512
                 $rules .= "  RewriteCond " . $cacheDirForThisRoot . "/%2%3.webp -f\n";
-                //RewriteCond /var/www/webp-express-tests/we0/wp-content-moved/webp-express/webp-images/uploads/%2%3.webp -f
+                //RewriteCond /var/www/magic-convert-tests/we0/wp-content-moved/magic-convert/webp-images/uploads/%2%3.webp -f
 
-                $urlPath = '/' . Paths::getContentUrlPath() . "/webp-express/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
+                $urlPath = '/' . Paths::getContentUrlPath() . "/magic-convert/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
                 //$rules .= "  RewriteCond %1" . (self::$appendWebP ? "%2" : "") . "\.webp -f\n";
                 $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ " . $urlPath .
                     " [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
@@ -424,7 +424,7 @@ class HTAccessRules
         # WebP Realizer: Redirect non-existing webp images to converter when a corresponding jpeg/png is found
         RewriteCond %{REQUEST_FILENAME} !-f
         RewriteCond %{DOCUMENT_ROOT}/wordpress/uploads-moved/$1 -f
-        RewriteRule ^(.*)\.(webp)$ /plugins-moved/webp-express/wod/webp-realizer.php?wp-content=wp-content-moved [NC,L]
+        RewriteRule ^(.*)\.(webp)$ /plugins-moved/magic-convert/wod/webp-realizer.php?wp-content=wp-content-moved [NC,L]
         */
 
         $rules = '';
@@ -441,7 +441,7 @@ class HTAccessRules
             Generate something like this:
 
             RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteRule ^/?(.+)\.(webp)$ /plugins-moved/webp-express/wod/webp-realizer.php [E=DESTINATIONREL:wp-content-moved/$0,E=WPCONTENT:wp-content-moved,NC,L]
+            RewriteRule ^/?(.+)\.(webp)$ /plugins-moved/magic-convert/wod/webp-realizer.php [E=DESTINATIONREL:wp-content-moved/$0,E=WPCONTENT:wp-content-moved,NC,L]
             */
             $rules .= "  RewriteCond %{REQUEST_FILENAME} !-f\n";
             $params = [];
@@ -474,7 +474,7 @@ class HTAccessRules
             /*
             Generate something like this:
             RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteRule (?i).*(\.jpe?g|\.png)\.webp$ /plugins-moved/webp-express/wod/webp-realizer.php [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=WE_DESTINATION_REL_HTACCESS:$0,E=WE_HTACCESS_ID:cache,NC,L]
+            RewriteRule (?i).*(\.jpe?g|\.png)\.webp$ /plugins-moved/magic-convert/wod/webp-realizer.php [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=WE_DESTINATION_REL_HTACCESS:$0,E=WE_HTACCESS_ID:cache,NC,L]
             */
             // Add condition for making sure the webp does not already exist
             $rules .= "  RewriteCond %{REQUEST_FILENAME} !-f\n";
@@ -484,7 +484,7 @@ class HTAccessRules
 
             if (!self::$passThroughEnvVarDefinitelyUnavailable) {
                 //$flags[] = 'E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:' . Paths::getContentDirRelToPluginDir();
-                $flags[] = 'E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:' . Paths::getContentDirRelToWebPExpressPluginDir();
+                $flags[] = 'E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:' . Paths::getContentDirRelToMagicConvertPluginDir();
                 $flags[] = 'E=WE_DESTINATION_REL_HTACCESS:$0';
                 $flags[] = 'E=WE_HTACCESS_ID:' . self::$htaccessDir;    // this will btw either be "uploads" or "cache"
                 $flags[] = 'E=HASH:' . $configHash;
@@ -494,7 +494,7 @@ class HTAccessRules
 
             if (!self::$passThroughEnvVarDefinitelyAvailable) {
                 //$params[] = 'xwp-content-rel-to-plugin-dir=x' . Paths::getContentDirRelToPluginDir();
-                $params[] = 'xwp-content-rel-to-we-plugin-dir=x' . Paths::getContentDirRelToWebPExpressPluginDir();
+                $params[] = 'xwp-content-rel-to-we-plugin-dir=x' . Paths::getContentDirRelToMagicConvertPluginDir();
                 $params[] = 'xdestination-rel-htaccess=x$0';
                 $params[] = 'htaccess-id=' . self::$htaccessDir;
                 $params[] = "hash=" . $configHash;
@@ -515,7 +515,7 @@ class HTAccessRules
             /*
             Generate something like this:
             RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteRule (?i).*\.webp$ /plugins-moved/webp-express/wod/webp-realizer.php [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=WE_DESTINATION_REL_IMAGE_ROOT:$0,E=WE_IMAGE_ROOT_ID:wp-content,NC,L]
+            RewriteRule (?i).*\.webp$ /plugins-moved/magic-convert/wod/webp-realizer.php [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=WE_DESTINATION_REL_IMAGE_ROOT:$0,E=WE_IMAGE_ROOT_ID:wp-content,NC,L]
             */
 /*
             // Add condition for making sure the webp does not already exist
@@ -556,8 +556,8 @@ class HTAccessRules
             Generate something like this:
 
             RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteCond %{REQUEST_FILENAME} (?i)(/var/www/webp-express-tests/we0/wordpress/uploads-moved/)(.*)(\.jpe?g|\.png)(\.webp)$
-            RewriteRule (?i).*\.webp$ /plugins-moved/webp-express/wod/webp-realizer.php?root-id=uploads&xdest-rel-to-root-id=x%2%3%4 [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=REQFN:%{REQUEST_FILENAME},NC,L]
+            RewriteCond %{REQUEST_FILENAME} (?i)(/var/www/magic-convert-tests/we0/wordpress/uploads-moved/)(.*)(\.jpe?g|\.png)(\.webp)$
+            RewriteRule (?i).*\.webp$ /plugins-moved/magic-convert/wod/webp-realizer.php?root-id=uploads&xdest-rel-to-root-id=x%2%3%4 [E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:../wp-content-moved,E=REQFN:%{REQUEST_FILENAME},NC,L]
 
             */
             /*
@@ -643,7 +643,7 @@ class HTAccessRules
 
             RewriteCond %{HTTP_ACCEPT} image/webp
             RewriteCond %{REQUEST_FILENAME} -f
-            RewriteRule ^/?(.+)\.(jpe?g|png)$ /plugins-moved/webp-express/wod/webp-on-demand.php [NC,L,E=REQFN:%{REQUEST_FILENAME},E=WPCONTENT:wp-content-moved]
+            RewriteRule ^/?(.+)\.(jpe?g|png)$ /plugins-moved/magic-convert/wod/webp-on-demand.php [NC,L,E=REQFN:%{REQUEST_FILENAME},E=WPCONTENT:wp-content-moved]
             */
 
             $params = [];
@@ -677,7 +677,7 @@ class HTAccessRules
             Create something like this:
             RewriteCond %{REQUEST_FILENAME} -f
             RewriteCond %{REQUEST_FILENAME} (?i)(.*)(\.jpe?g|\.png)$
-            RewriteRule (?i).*$ /wordpress/wp-content/plugins/webp-express/wod/webp-on-demand.php [E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:../..,E=WE_SOURCE_REL_HTACCESS:$0,E=WE_HTACCESS_ID:uploads,NC,L]
+            RewriteRule (?i).*$ /wordpress/wp-content/plugins/magic-convert/wod/webp-on-demand.php [E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:../..,E=WE_SOURCE_REL_HTACCESS:$0,E=WE_HTACCESS_ID:uploads,NC,L]
             */
 
             // Making sure the source exists
@@ -688,7 +688,7 @@ class HTAccessRules
 
             if (!self::$passThroughEnvVarDefinitelyUnavailable) {
                 //$flags[] = 'E=WE_WP_CONTENT_REL_TO_PLUGIN_DIR:' . Paths::getContentDirRelToPluginDir();
-                $flags[] = 'E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:' . Paths::getContentDirRelToWebPExpressPluginDir();
+                $flags[] = 'E=WE_WP_CONTENT_REL_TO_WE_PLUGIN_DIR:' . Paths::getContentDirRelToMagicConvertPluginDir();
                 $flags[] = 'E=WE_SOURCE_REL_HTACCESS:$0';
                 $flags[] = 'E=WE_HTACCESS_ID:' . self::$htaccessDir;
                 $flags[] = 'E=HASH:' . $configHash;  // this will btw be one of the image roots. It will not be "cache"
@@ -698,7 +698,7 @@ class HTAccessRules
 
             if (!self::$passThroughEnvVarDefinitelyAvailable) {
                 //$params[] = 'xwp-content-rel-to-plugin-dir=x' . Paths::getContentDirRelToPluginDir();
-                $params[] = 'xwp-content-rel-to-we-plugin-dir=x' . Paths::getContentDirRelToWebPExpressPluginDir();
+                $params[] = 'xwp-content-rel-to-we-plugin-dir=x' . Paths::getContentDirRelToMagicConvertPluginDir();
                 $params[] = 'xsource-rel-htaccess=x$0';
                 $params[] = 'htaccess-id=' . self::$htaccessDir;
                 $params[] = "hash=" . $configHash;
@@ -733,8 +733,8 @@ class HTAccessRules
 
             # Redirect to existing converted image in cache-dir (if browser supports webp)
             RewriteCond %{HTTP_ACCEPT} image/webp
-            RewriteCond %{REQUEST_FILENAME} (?i)(/var/www/webp-express-tests/we0/wp-content-moved/)(.*)(\.jpe?g|\.png)$
-            RewriteRule (?i)(.*)(\.jpe?g|\.png)$ /plugins-moved/webp-express/wod/webp-on-demand.php?root-id=wp-content&xsource-rel-to-root-id=%2%3
+            RewriteCond %{REQUEST_FILENAME} (?i)(/var/www/magic-convert-tests/we0/wp-content-moved/)(.*)(\.jpe?g|\.png)$
+            RewriteRule (?i)(.*)(\.jpe?g|\.png)$ /plugins-moved/magic-convert/wod/webp-on-demand.php?root-id=wp-content&xsource-rel-to-root-id=%2%3
 
             PS: Actually, the whole REQUEST_FILENAME could be passed in querystring by adding "&req-fn=%0" to above.
             */
@@ -787,7 +787,7 @@ class HTAccessRules
 
             //$urlPath = '/' . Paths::getUrlPathById('plugins') . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
             //            $urlPath = '/' . Paths::getUrlPathById(self::$htaccessDir) . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
-            //$urlPath = '/' . Paths::getContentUrlPath() . "/webp-express/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
+            //$urlPath = '/' . Paths::getContentUrlPath() . "/magic-convert/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
             //$rules .= "  RewriteCond %1" . (self::$appendWebP ? "%2" : "") . "\.webp -f\n";
             //$rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ " . $urlPath ." [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
             */
@@ -801,7 +801,7 @@ class HTAccessRules
 
         /*
         $rules .= "  RewriteCond %{REQUEST_FILENAME} (?i)(" . self::$htaccessDirAbs . "/)(.*)(" . self::$fileExtIncludingDot . ")$\n";
-        $urlPath = '/' . Paths::getContentUrlPath() . "/webp-express/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
+        $urlPath = '/' . Paths::getContentUrlPath() . "/magic-convert/webp-images/" . self::$htaccessDir . "/%2" . (self::$appendWebP ? "%3" : "") . "\.webp";
         //$rules .= "  RewriteCond %1" . (self::$appendWebP ? "%2" : "") . "\.webp -f\n";
         $rules .= "  RewriteRule (?i)(.*)(" . self::$fileExtIncludingDot . ")$ " . $urlPath .
             " [T=image/webp,E=EXISTING:1," . (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '') . "L]\n\n";
@@ -886,8 +886,8 @@ class HTAccessRules
         $capTests = self::$config['base-htaccess-on-these-capability-tests'];
 
         self::$docRootString = '%{DOCUMENT_ROOT}';
-        if (defined('WEBPEXPRESS_DOCUMENT_ROOT_IN_HTACCESS')) {
-            self::$docRootString = constant('WEBPEXPRESS_DOCUMENT_ROOT_IN_HTACCESS');
+        if (defined('MAGIC_CONVERT_DOCUMENT_ROOT_IN_HTACCESS')) {
+            self::$docRootString = constant('MAGIC_CONVERT_DOCUMENT_ROOT_IN_HTACCESS');
         };
 
         self::$modHeaderDefinitelyUnavailable = ($capTests['modHeaderWorking'] === false);
@@ -952,11 +952,11 @@ class HTAccessRules
         $rules[] = "";
 
         if (self::$config['redirect-to-existing-in-htaccess']) {
-            $rules[] = "    # Set X-WebP-Express header for diagnose purposes";
+            $rules[] = "    # Set X-Magic-Convert header for diagnose purposes";
                 //"  SetEnvIf REDIRECT_WOD 1 WOD=1\n\n" .
                 //"  # Set the debug header\n" .
-                $rules[] = "    Header set \"X-WebP-Express\" \"Redirected directly to existing webp\" env=EXISTING";
-                //"  Header set \"X-WebP-Express\" \"Redirected to image converter\" env=WOD\n" .
+                $rules[] = "    Header set \"X-Magic-Convert\" \"Redirected directly to existing webp\" env=EXISTING";
+                //"  Header set \"X-Magic-Convert\" \"Redirected to image converter\" env=WOD\n" .
         }
         $rules[] = "  </IfModule>";
         $rules[] = "</IfModule>";
@@ -1019,12 +1019,12 @@ class HTAccessRules
             (!self::$config['redirect-to-existing-in-htaccess']) &&
             (!self::$config['enable-redirection-to-webp-realizer'])
         ) {
-            return '# WebP Express does not need to write any rules (it has not been set up to redirect to converter, nor' .
+            return '# Magic Convert does not need to write any rules (it has not been set up to redirect to converter, nor' .
                 ' to existing webp, and the "convert non-existing webp-files upon request" option has not been enabled)';
         }*/
 
         if (self::$imageTypes == 0) {
-            return '# WebP Express disabled (no image types has been choosen to be converted/redirected)';
+            return '# Magic Convert disabled (no image types has been choosen to be converted/redirected)';
         }
 
         self::$setAddVaryEnvInRedirect = self::$config['redirect-to-existing-in-htaccess'];

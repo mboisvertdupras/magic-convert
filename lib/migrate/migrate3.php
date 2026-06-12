@@ -1,31 +1,31 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
-use \WebPExpress\PathHelper;
+use \MagicConvert\FileHelper;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
+use \MagicConvert\PathHelper;
 
-if ( ! function_exists('webp_express_glob_recursive'))
+if ( ! function_exists('magic_convert_glob_recursive'))
 {
     // Does not support flag GLOB_BRACE
 
-    function webp_express_glob_recursive($pattern, $flags = 0)
+    function magic_convert_glob_recursive($pattern, $flags = 0)
     {
         $files = glob($pattern, $flags);
 
         foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir)
         {
-            $files = array_merge($files, webp_express_glob_recursive($dir.'/'.basename($pattern), $flags));
+            $files = array_merge($files, magic_convert_glob_recursive($dir.'/'.basename($pattern), $flags));
         }
 
         return $files;
     }
 }
 
-function webpexpress_migrate3() {
+function magicconvert_migrate3() {
 
     $dirs = glob(PathHelper::canonicalize(Paths::getCacheDirAbs()) . '/doc-root*');
 
@@ -40,7 +40,7 @@ function webpexpress_migrate3() {
             continue;
         }
 
-        $files = webp_express_glob_recursive($dir . '/*.webp');
+        $files = magic_convert_glob_recursive($dir . '/*.webp');
         foreach ($files as $file) {
             $atLeastOneFileMustBeMoved = true;
             $newName = preg_replace('/\/doc-root(.*)$/', '/doc-root/$1', $file);
@@ -74,7 +74,7 @@ function webpexpress_migrate3() {
                     'A minor bug caused the cache directory structure to be wrong on your system ' .
                     '(<a href="https://github.com/rosell-dk/webp-express/issues/96" target="_blank">issue #96</a>). ' .
                     'The bug has been fixed, but unfortunately the file permissions does not allow WebP Convert to clean up the file structure. ' .
-                    'To clean up manually, delete all folders in your wp-content/webp-express/webp-images folder beginning with "doc-root" (but not the "doc-root" folder itself)'
+                    'To clean up manually, delete all folders in your wp-content/magic-convert/webp-images folder beginning with "doc-root" (but not the "doc-root" folder itself)'
                 );
             }
         }
@@ -83,10 +83,10 @@ function webpexpress_migrate3() {
     // Show "Whats new" message.
     // We test the version, because we do not want a whole lot of "whats new" messages
     // to show when updating many versions in one go. Just the recent, please.
-    if (WEBPEXPRESS_MIGRATION_VERSION == '3') {
+    if (MAGIC_CONVERT_MIGRATION_VERSION == '3') {
         Messenger::addMessage(
             'info',
-            '<i>New in WebP Express 0.8.0:</i>' .
+            '<i>New in Magic Convert 0.8.0:</i>' .
             '<ul style="list-style-type:disc;margin-left:20px">' .
             '<li>New conversion method, which calls imagick binary directly</li>' .
             '<li>Made sure not to trigger LFI warning i Wordfence (to activate, click the force .htaccess button)</li>' .
@@ -111,9 +111,9 @@ function webpexpress_migrate3() {
     }
 
 
-    // PSST: When creating new migration files, remember to update WEBPEXPRESS_MIGRATION_VERSION in admin.php
-    Option::updateOption('webp-express-migration-version', '3');
+    // PSST: When creating new migration files, remember to update MAGIC_CONVERT_MIGRATION_VERSION in admin.php
+    Option::updateOption('magic-convert-migration-version', '3');
 
 }
 
-webpexpress_migrate3();
+magicconvert_migrate3();

@@ -18,6 +18,6 @@
           <input type="text" id="ewww_api_key_2" placeholder="In case the first one expires...">
       </div>
       <br>
-      <?php webp_express_printUpdateButtons() ?>
+      <?php magic_convert_printUpdateButtons() ?>
     </div>
 </div>

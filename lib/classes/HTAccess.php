@@ -1,19 +1,19 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\FileHelper;
-use \WebPExpress\HTAccessRules;
-use \WebPExpress\Paths;
-use \WebPExpress\State;
+use \MagicConvert\Config;
+use \MagicConvert\FileHelper;
+use \MagicConvert\HTAccessRules;
+use \MagicConvert\Paths;
+use \MagicConvert\State;
 
 class HTAccess
 {
 
     public static function inlineInstructions($instructions, $marker)
     {
-        if ($marker == 'WebP Express') {
+        if ($marker == 'Magic Convert') {
             return [];
         } else {
            return $instructions;
@@ -59,18 +59,18 @@ class HTAccess
     /**
      * @return  string|false  Rules, or false if no rules found or file does not exist.
      */
-    public static function extractWebPExpressRulesFromHTAccess($filename) {
+    public static function extractMagicConvertRulesFromHTAccess($filename) {
         if (FileHelper::fileExists($filename)) {
             $content = FileHelper::loadFile($filename);
             if ($content === false) {
                 return false;
             }
 
-            $pos1 = strpos($content, '# BEGIN WebP Express');
+            $pos1 = strpos($content, '# BEGIN Magic Convert');
             if ($pos1 === false) {
                 return false;
             }
-            $pos2 = strrpos($content, '# END WebP Express');
+            $pos2 = strrpos($content, '# END Magic Convert');
             if ($pos2 === false) {
                 return false;
             }
@@ -92,7 +92,7 @@ class HTAccess
             if ($content === false) {
                 return null;
             }
-            $weRules = (self::extractWebPExpressRulesFromHTAccess($filename));
+            $weRules = (self::extractMagicConvertRulesFromHTAccess($filename));
             if ($weRules === false) {
                 return false;
             }
@@ -121,7 +121,7 @@ class HTAccess
         }
     }
 
-    public static function getRootsWithWebPExpressRulesIn()
+    public static function getRootsWithMagicConvertRulesIn()
     {
         $allIds = Paths::getImageRootIds();
         $allIds[] = 'cache';
@@ -169,9 +169,9 @@ class HTAccess
         // Convert to array, because string version has bugs in Wordpress 4.3
         $rules = explode("\n", $rules);
 
-        add_filter('insert_with_markers_inline_instructions', array('\WebPExpress\HTAccess', 'inlineInstructions'), 10, 2);
+        add_filter('insert_with_markers_inline_instructions', array('\MagicConvert\HTAccess', 'inlineInstructions'), 10, 2);
 
-        $success = insert_with_markers($filename, 'WebP Express', $rules);
+        $success = insert_with_markers($filename, 'Magic Convert', $rules);
 
         // Revert file or dir permissions
         if (!is_null($existingFilePermission)) {
@@ -259,12 +259,12 @@ class HTAccess
         if (isset($_SERVER['HTTP_ACCEPT']) && (strpos($_SERVER['HTTP_ACCEPT'], 'image/webp') !== false )) {
             if ($config['operation-mode'] != 'no-conversion') {
                 if ($config['image-types'] != 0) {
-                    $webpExpressRoot = Paths::getWebPExpressPluginUrlPath();
+                    $magicConvertRoot = Paths::getMagicConvertPluginUrlPath();
                     $links = '';
                     if ($config['enable-redirection-to-converter']) {
                         $links = '<br>';
-                        $links .= '<a href="/' . $webpExpressRoot . '/test/test.jpg?debug&time=' . time() . '" target="_blank">Convert test image (show debug)</a><br>';
-                        $links .= '<a href="/' . $webpExpressRoot . '/test/test.jpg?' . time() . '" target="_blank">Convert test image</a><br>';
+                        $links .= '<a href="/' . $magicConvertRoot . '/test/test.jpg?debug&time=' . time() . '" target="_blank">Convert test image (show debug)</a><br>';
+                        $links .= '<a href="/' . $magicConvertRoot . '/test/test.jpg?' . time() . '" target="_blank">Convert test image</a><br>';
                     }
                     // TODO: webp-realizer test links (to missing webp)
                     if ($config['enable-redirection-to-webp-realizer']) {
@@ -418,7 +418,7 @@ class HTAccess
             foreach ($failedWrites as $rootId) {
                 $msg .= '<i>' . Paths::getAbsDirById($rootId) . '/.htaccess</i> (' . $rootId . ')<br>';
             }
-            $msg .= 'You need to change the file permissions to allow WebP Express to save the rules.';
+            $msg .= 'You need to change the file permissions to allow Magic Convert to save the rules.';
             Messenger::addMessage('error', $msg);
         } else {
             if (count($failedDeactivations) > 0) {
@@ -426,7 +426,7 @@ class HTAccess
                 foreach ($failedDeactivations as $rootId) {
                     $msg .= '<i>' . Paths::getAbsDirById($rootId) . '/.htaccess</i> (' . $rootId . ')<br>';
                 }
-                $msg .= 'You need to change the file permissions to allow WebP Express to remove the rules or ' .
+                $msg .= 'You need to change the file permissions to allow Magic Convert to remove the rules or ' .
                     'remove them manually';
                 Messenger::addMessage('error', $msg);
             }

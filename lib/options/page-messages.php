@@ -2,17 +2,17 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-use \WebPExpress\HTAccessCapabilityTestRunner;
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\DismissableMessages;
-use \WebPExpress\FileHelper;
-use \WebPExpress\HTAccess;
-use \WebPExpress\HTAccessRules;
-use \WebPExpress\Messenger;
-use \WebPExpress\Paths;
-use \WebPExpress\PlatformInfo;
-use \WebPExpress\State;
+use \MagicConvert\HTAccessCapabilityTestRunner;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\DismissableMessages;
+use \MagicConvert\FileHelper;
+use \MagicConvert\HTAccess;
+use \MagicConvert\HTAccessRules;
+use \MagicConvert\Messenger;
+use \MagicConvert\Paths;
+use \MagicConvert\PlatformInfo;
+use \MagicConvert\State;
 
 
 
@@ -98,7 +98,7 @@ if (($config['operation-mode'] == 'cdn-friendly') && !$config['alter-html']['ena
             Messenger::printMessage(
                 'info',
                     'You should consider enabling Alter HTML. This is not necessary, as you have <i>Cache Enabler</i> enabled, which alters HTML. ' .
-                    'However, it is a good idea because currently <i>Cache Enabler</i> does not replace as many URLs as WebP Express (ie ' .
+                    'However, it is a good idea because currently <i>Cache Enabler</i> does not replace as many URLs as Magic Convert (ie ' .
                     'background images in inline styles)'
             );
         }
@@ -175,15 +175,15 @@ if (Config::isConfigFileThereAndOk() ) { // && PlatformInfo::definitelyGotModEnv
 if (!Paths::createContentDirIfMissing()) {
     Messenger::printMessage(
         'error',
-        'WebP Express needs to create a directory "webp-express" under your wp-content folder, but does not have permission to do so.<br>' .
+        'Magic Convert needs to create a directory "magic-convert" under your wp-content folder, but does not have permission to do so.<br>' .
             'Please create the folder manually, or change the file permissions of your wp-content folder (failed to create this folder: ' .
-            esc_html(Paths::getWebPExpressContentDirAbs()) . ')'
+            esc_html(Paths::getMagicConvertContentDirAbs()) . ')'
     );
 } else {
     if (!Paths::createConfigDirIfMissing()) {
         Messenger::printMessage(
             'error',
-            'WebP Express needs to create a directory "webp-express/config" under your wp-content folder, but does not have permission to do so.<br>' .
+            'Magic Convert needs to create a directory "magic-convert/config" under your wp-content folder, but does not have permission to do so.<br>' .
                 'Please create the folder manually, or change the file permissions.'
         );
     }
@@ -191,7 +191,7 @@ if (!Paths::createContentDirIfMissing()) {
     if (!Paths::createCacheDirIfMissing()) {
         Messenger::printMessage(
             'error',
-            'WebP Express needs to create a directory "webp-express/webp-images" under your wp-content folder, but does not have permission to do so.<br>' .
+            'Magic Convert needs to create a directory "magic-convert/webp-images" under your wp-content folder, but does not have permission to do so.<br>' .
                 'Please create the folder manually, or change the file permissions.'
         );
     }
@@ -264,8 +264,8 @@ if (Config::isConfigFileThere()) {
                     ' off and rely on "Convert on upload" and "Bulk Convert" to get the images converted.</p>' .
                     '<p>If you are going to try to solve the problem, you need at least one of the following pages ' .
                     'to display "pong": ' .
-                    '<a href="' . Paths::getWebPExpressPluginUrl() . '/wod/ping.php" target="_blank">wod-test</a>' .
-                    ' or <a href="' . Paths::getWebPExpressPluginUrl() . '/wod2/ping.php" target="_blank">wod2-test</a>' .
+                    '<a href="' . Paths::getMagicConvertPluginUrl() . '/wod/ping.php" target="_blank">wod-test</a>' .
+                    ' or <a href="' . Paths::getMagicConvertPluginUrl() . '/wod2/ping.php" target="_blank">wod2-test</a>' .
                     '. The problem will typically be found in the server configuration or a security plugin. ' .
                     'If one of the links results in a 403 Permission denied, look out for "deny" and "denied" in ' .
                     'httpd.conf, /etc/apache/sites-enabled/your-site.conf and in parent .htaccess files.' .
@@ -345,10 +345,10 @@ $haveRulesInContentDir = HTAccess::haveWeRulesInThisHTAccessBestGuess(Paths::get
 if ($haveRulesInIndexDir && $haveRulesInContentDir) {
     // TODO: Use new method for determining if htaccess contains rules.
     // (either haveWeRulesInThisHTAccessBestGuess($filename) or haveWeRulesInThisHTAccess($filename))
-    if (!HTAccess::saveHTAccessRulesToFile(Paths::getIndexDirAbs() . '/.htaccess', '# WebP Express has placed its rules in your wp-content dir. Go there.', false)) {
+    if (!HTAccess::saveHTAccessRulesToFile(Paths::getIndexDirAbs() . '/.htaccess', '# Magic Convert has placed its rules in your wp-content dir. Go there.', false)) {
         Messenger::printMessage(
             'warning',
-            'Warning: WebP Express have rules in both your wp-content folder and in your Wordpress folder.<br>' .
+            'Warning: Magic Convert have rules in both your wp-content folder and in your Wordpress folder.<br>' .
                 'Please remove those in the <i>.htaccess</i> in your Wordress folder manually, or let us handle it, by granting us write access'
         );
     }
@@ -356,7 +356,7 @@ if ($haveRulesInIndexDir && $haveRulesInContentDir) {
 
 $ht = FileHelper::loadFile(Paths::getIndexDirAbs() . '/.htaccess');
 if ($ht !== false) {
-    $posWe = strpos($ht, '# BEGIN WebP Express');
+    $posWe = strpos($ht, '# BEGIN Magic Convert');
     $posWo = strpos($ht, '# BEGIN WordPress');
     if (($posWe !== false) && ($posWo !== false) && ($posWe > $posWo)) {
 
@@ -366,7 +366,7 @@ if ($ht !== false) {
                 'warning',
                 'Problem detected. ' .
                     'In order for the "Convert non-existing webp-files upon request" functionality to work, you need to either:<br>' .
-                    '- Move the WebP Express rules above the Wordpress rules in the .htaccess file located in your root dir<br>' .
+                    '- Move the Magic Convert rules above the Wordpress rules in the .htaccess file located in your root dir<br>' .
                     '- Grant the webserver permission to your wp-content dir, so it can create its rules there instead.'
             );
         }

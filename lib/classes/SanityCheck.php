@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\PathHelper;
-use \WebPExpress\Sanitize;
-use \WebPExpress\SanityException;
+use \MagicConvert\PathHelper;
+use \MagicConvert\Sanitize;
+use \MagicConvert\SanityException;
 
 class SanityCheck
 {
@@ -254,16 +254,16 @@ class SanityCheck
         return self::filePathWithinOneOfTheseRoots($input, $validPaths, $errorMsg);
     }
 
-    public static function destinationPath($input, $errorMsg = 'The destination path is outside allowed roots. The webps may only be stored in the upload folder and in the folder that WebP Express stores converted images in')
+    public static function destinationPath($input, $errorMsg = 'The destination path is outside allowed roots. The webps may only be stored in the upload folder and in the folder that Magic Convert stores converted images in')
     {
         self::absPath($input);
 
-        // Webp Express only store converted images in upload folder and in its "webp-images" folder
+        // Magic Convert only store converted images in upload folder and in its "webp-images" folder
         // Check that destination path is within one of these.
         $validPaths = [
-            '/var/www/webp-express-tests/we1'
+            '/var/www/magic-convert-tests/we1'
             //Paths::getUploadDirAbs(),
-            //Paths::getWebPExpressContentDirRel() . '/webp-images'
+            //Paths::getMagicConvertContentDirRel() . '/webp-images'
         ];
         return self::filePathWithinOneOfTheseRoots($input, $validPaths, $errorMsg);
     }*/

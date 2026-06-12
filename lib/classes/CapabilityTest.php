@@ -6,42 +6,42 @@ Btw:
 Seems someone else got similar idea:
 http://christian.roy.name/blog/detecting-modrewrite-using-php
 */
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\Paths;
+use \MagicConvert\FileHelper;
+use \MagicConvert\Paths;
 
 class CapabilityTest
 {
 
     public static function copyCapabilityTestsToWpContent()
     {
-        return FileHelper::cpdir(Paths::getWebPExpressPluginDirAbs() . '/htaccess-capability-tests', Paths::getWebPExpressContentDirAbs() . '/htaccess-capability-tests');
+        return FileHelper::cpdir(Paths::getMagicConvertPluginDirAbs() . '/htaccess-capability-tests', Paths::getMagicConvertContentDirAbs() . '/htaccess-capability-tests');
     }
 
 
     /**
-     *  Run one of the tests in wp-content/webp-express/capability-tests
+     *  Run one of the tests in wp-content/magic-convert/capability-tests
      *  Three possible outcomes: true, false or null (null if request fails)
      */
     public static function runTest($testDir)
     {
         //echo 'running test:' . $testDir . '<br>';
-        if (!@file_exists(Paths::getWebPExpressPluginDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
+        if (!@file_exists(Paths::getMagicConvertPluginDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
             // test does not even exist
             //echo 'test does not exist: ' . $testDir . '<br>';
             return null;
         }
 
-        if (!@file_exists(Paths::getWebPExpressContentDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
+        if (!@file_exists(Paths::getMagicConvertContentDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
             self::copyCapabilityTestsToWpContent();
         }
 
         // If copy failed, we can use the test in plugin path
-        if (!@file_exists(Paths::getWebPExpressContentDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
-            $testUrl = Paths::getContentUrl() . '/' . 'webp-express/htaccess-capability-tests/' . $testDir . '/test.php';
+        if (!@file_exists(Paths::getMagicConvertContentDirAbs() . '/htaccess-capability-tests/' . $testDir)) {
+            $testUrl = Paths::getContentUrl() . '/' . 'magic-convert/htaccess-capability-tests/' . $testDir . '/test.php';
         } else {
-            $testUrl = Paths::getWebPExpressPluginUrl() . '/' . 'htaccess-capability-tests/' . $testDir . '/test.php';
+            $testUrl = Paths::getMagicConvertPluginUrl() . '/' . 'htaccess-capability-tests/' . $testDir . '/test.php';
         }
 
         //echo 'test url: ' . $testUrl . '<br>';

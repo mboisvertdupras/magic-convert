@@ -1,16 +1,16 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
 
-function webpexpress_migrate17() {
+function magicconvert_migrate17() {
 
     // Update migrate version right away to minimize risk of running the update twice in a multithreaded environment
-    Option::updateOption('webp-express-migration-version', '17');
+    Option::updateOption('magic-convert-migration-version', '17');
 
     if (PlatformInfo::isNginx()) {
         $configMigrateSuccess = Config::checkAndMigrateConfigIfNeeded();
@@ -23,4 +23,4 @@ function webpexpress_migrate17() {
     }
 }
 
-webpexpress_migrate17();
+magicconvert_migrate17();

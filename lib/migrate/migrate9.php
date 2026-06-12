@@ -1,19 +1,19 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\DismissableMessages;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
-use \WebPExpress\Paths;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\DismissableMessages;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\Paths;
 
 /**
  * Move a converter to the top
  * @return  boolean
  */
-function webpexpress_migrate9_moveConverterToTop(&$config, $converterId) {
+function magicconvert_migrate9_moveConverterToTop(&$config, $converterId) {
 
     if (!isset($config['converters'])) {
         return false;
@@ -44,7 +44,7 @@ function webpexpress_migrate9_moveConverterToTop(&$config, $converterId) {
     return false;
 }
 
-function webpexpress_migrate9() {
+function magicconvert_migrate9() {
 
     $config = Config::loadConfigAndFix(false);  // false, because we do not need to test if quality detection is working
     $converters = &$config['converters'];
@@ -107,14 +107,14 @@ function webpexpress_migrate9() {
 
         // If it aint cwebp, move vips to the top!
         if ($firstActiveAndWorkingConverterId != 'cwebp') {
-            $vips = webpexpress_migrate9_moveConverterToTop($config, 'vips');
+            $vips = magicconvert_migrate9_moveConverterToTop($config, 'vips');
         }
 
 /*
         if ($config['image-types'] == 1) {
             Messenger::addStickyMessage(
                 'info',
-                'WebP Express 0.14 handles PNG to WebP conversions quite well. Perhaps it is time to enable PNGs? ' .
+                'Magic Convert 0.14 handles PNG to WebP conversions quite well. Perhaps it is time to enable PNGs? ' .
                     'Go to the <a href="' . Paths::getSettingsUrl() . '">options</a> page to change the "Image types to work on" option.',
                 2,
                 'Got it!'
@@ -133,7 +133,7 @@ function webpexpress_migrate9() {
         if (in_array($firstActiveAndWorkingConverterId, $convertersSupportingEncodingAuto)) {
             Messenger::addStickyMessage(
                 'info',
-                'WebP Express 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
+                'Magic Convert 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
                     'it can automatically try both lossy and lossless and select the smallest. You can play around with the ' .
                     'new options when your click "test" next to a converter. Once satisfied, dont forget to ' .
                     'wipe your existing converted files (there is a "Delete converted files" button for that on the ' .
@@ -150,7 +150,7 @@ function webpexpress_migrate9() {
                     if (in_array($workingId, $convertersSupportingEncodingAuto)) {
                         Messenger::addStickyMessage(
                             'info',
-                            'WebP Express 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
+                            'Magic Convert 0.14 has new options for the conversions. Especially, it can now produce lossless webps, and ' .
                                 'it can automatically try both lossy and lossless and select the smallest. You can play around with the ' .
                                 'new options when your click "test" next to a converter. Once satisfied, dont forget to ' .
                                 'wipe your existing converted files (there is a "Delete converted files" button for that on the ' .
@@ -188,17 +188,17 @@ function webpexpress_migrate9() {
     if ($result['saved-both-config']) {
         Messenger::addMessage(
             'info',
-            'Successfully migrated <i>WebP Express</i> options for 0.14. '
+            'Successfully migrated <i>Magic Convert</i> options for 0.14. '
         );
-        Option::updateOption('webp-express-migration-version', '9');
+        Option::updateOption('magic-convert-migration-version', '9');
 
     } else {
         Messenger::addMessage(
             'error',
-            'Failed migrating webp express options to 0.14+. Probably you need to grant write permissions in your wp-content folder.'
+            'Failed migrating Magic Convert options to 0.14+. Probably you need to grant write permissions in your wp-content folder.'
         );
     }
 
 }
 
-webpexpress_migrate9();
+magicconvert_migrate9();

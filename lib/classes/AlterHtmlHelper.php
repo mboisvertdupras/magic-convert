@@ -1,13 +1,13 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 //use AlterHtmlInit;
-use \WebPExpress\Config;
-use \WebPExpress\Paths;
-use \WebPExpress\PathHelper;
-use \WebPExpress\Multisite;
-use \WebPExpress\Option;
+use \MagicConvert\Config;
+use \MagicConvert\Paths;
+use \MagicConvert\PathHelper;
+use \MagicConvert\Multisite;
+use \MagicConvert\Option;
 
 class AlterHtmlHelper
 {
@@ -31,7 +31,7 @@ class AlterHtmlHelper
 
     public static function checkSrc($src)
     {
-        self::$options = \WebPExpress\AlterHtmlInit::self::$options();
+        self::$options = \MagicConvert\AlterHtmlInit::self::$options();
 
 
         if (self::$options['destination-folder'] == 'mingled') {
@@ -42,7 +42,7 @@ class AlterHtmlHelper
 
     public static function getOptions() {
       if (!isset(self::$options)) {
-          self::$options = json_decode(Option::getOption('webp-express-alter-html-options', null), true);
+          self::$options = json_decode(Option::getOption('magic-convert-alter-html-options', null), true);
           if (!isset(self::$options['prevent-using-webps-larger-than-original'])) {
               self::$options['prevent-using-webps-larger-than-original'] = true;
           }
@@ -54,7 +54,7 @@ class AlterHtmlHelper
               self::$options['scope'] = $config['scope'];
 
               Option::updateOption(
-                  'webp-express-alter-html-options',
+                  'magic-convert-alter-html-options',
                   json_encode(self::$options, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK),
                   true
               );
@@ -140,10 +140,10 @@ class AlterHtmlHelper
         $uploadDir = wp_upload_dir();
         /* ie:
 
-            [path] => /var/www/webp-express-tests/we0/wordpress/uploads-moved
+            [path] => /var/www/magic-convert-tests/we0/wordpress/uploads-moved
             [url] => http://we0/wordpress/uploads-moved
             [subdir] =>
-            [basedir] => /var/www/webp-express-tests/we0/wordpress/uploads-moved
+            [basedir] => /var/www/magic-convert-tests/we0/wordpress/uploads-moved
             [baseurl] => http://we0/wordpress/uploads-moved
             [error] =>
         */

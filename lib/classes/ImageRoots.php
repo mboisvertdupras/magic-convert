@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\ImageRoot;
+use \MagicConvert\ImageRoot;
 
 class ImageRoots
 {
@@ -28,7 +28,7 @@ class ImageRoots
     /**
      * Get image root by id.
      *
-     * @return  \WebPExpress\ImageRoot  An image root object
+     * @return  \MagicConvert\ImageRoot  An image root object
      */
     public function byId($id)
     {

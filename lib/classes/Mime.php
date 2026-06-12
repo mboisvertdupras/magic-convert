@@ -1,9 +1,9 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Convert;
+use \MagicConvert\Config;
+use \MagicConvert\Convert;
 
 class Mime
 {

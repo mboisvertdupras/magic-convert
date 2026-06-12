@@ -1,8 +1,8 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Multisite;
+use \MagicConvert\Multisite;
 
 class Option
 {

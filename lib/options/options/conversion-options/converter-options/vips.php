@@ -22,7 +22,7 @@
           </label>
           <select id="vips_preset">
               <?php
-              webpexpress_selectBoxOptions('default', [
+              magicconvert_selectBoxOptions('default', [
                   'none' => 'Do not use a preset',
                   'default' => 'Default',
                   'photo' => 'Photo',
@@ -37,6 +37,6 @@
       </div>
 
       <br>
-      <?php webp_express_printUpdateButtons() ?>
+      <?php magic_convert_printUpdateButtons() ?>
     </div>
 </div>

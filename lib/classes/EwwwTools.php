@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 // This class does NOT, and MAY NOT rely on Wordpress functions (it is used in WebPOnDemand)
 class EwwwTools

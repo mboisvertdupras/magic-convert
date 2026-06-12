@@ -4,7 +4,7 @@
 This class is made to not be dependent on Wordpress functions and must be kept like that.
 It is used by webp-on-demand.php. It is also used for bulk conversion.
 */
-namespace WebPExpress;
+namespace MagicConvert;
 
 
 class BiggerThanSource

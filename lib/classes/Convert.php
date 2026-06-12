@@ -1,17 +1,17 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 use \WebPConvert\Convert\Converters\Ewww;
 
-use \WebPExpress\ConvertHelperIndependent;
-use \WebPExpress\Config;
-use \WebPExpress\ConvertersHelper;
-use \WebPExpress\ImageRoots;
-use \WebPExpress\SanityCheck;
-use \WebPExpress\SanityException;
-use \WebPExpress\Validate;
-use \WebPExpress\ValidateException;
+use \MagicConvert\ConvertHelperIndependent;
+use \MagicConvert\Config;
+use \MagicConvert\ConvertersHelper;
+use \MagicConvert\ImageRoots;
+use \MagicConvert\SanityCheck;
+use \MagicConvert\SanityException;
+use \MagicConvert\Validate;
+use \MagicConvert\ValidateException;
 
 class Convert
 {
@@ -25,7 +25,7 @@ class Convert
             $source,
             $config['destination-folder'],
             $config['destination-extension'],
-            Paths::getWebPExpressContentDirAbs(),
+            Paths::getMagicConvertContentDirAbs(),
             Paths::getUploadDirAbs(),
             (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
             new ImageRoots(Paths::getImageRootsDef())
@@ -43,7 +43,7 @@ class Convert
         BiggerThanSourceDummyFiles::updateStatus(
             $source,
             $destination,
-            Paths::getWebPExpressContentDirAbs(),
+            Paths::getMagicConvertContentDirAbs(),
             new ImageRoots(Paths::getImageRootsDef()),
             $config['destination-folder'],
             $config['destination-extension']
@@ -103,7 +103,7 @@ class Convert
             // -------------------------------
             $checking = 'conversion log dir';
             if (isset($config['enable-logging']) && $config['enable-logging']) {
-                $logDir = SanityCheck::absPath(Paths::getWebPExpressContentDirAbs() . '/log');
+                $logDir = SanityCheck::absPath(Paths::getMagicConvertContentDirAbs() . '/log');
             } else {
                 $logDir = null;
             }
@@ -194,7 +194,7 @@ class Convert
             $config['destination-folder'],
             $config['destination-extension'],
             $config['destination-structure'],
-            Paths::getWebPExpressContentDirAbs(),
+            Paths::getMagicConvertContentDirAbs(),
             new ImageRoots(Paths::getImageRootsDef())
         );
     }
@@ -202,7 +202,7 @@ class Convert
     public static function processAjaxConvertFile()
     {
 
-        if (!check_ajax_referer('webpexpress-ajax-convert-nonce', 'nonce', false)) {
+        if (!check_ajax_referer('magicconvert-ajax-convert-nonce', 'nonce', false)) {
         //if (true) {
             //wp_send_json_error('The security nonce has expired. You need to reload the settings page (press F5) and try again)');
             //wp_die();
@@ -305,10 +305,10 @@ class Convert
             $result = self::convertFile($filename);
         }
 
-        $nonceTick = wp_verify_nonce($_REQUEST['nonce'], 'webpexpress-ajax-convert-nonce');
+        $nonceTick = wp_verify_nonce($_REQUEST['nonce'], 'magicconvert-ajax-convert-nonce');
         if ($nonceTick == 2) {
-            $result['new-convert-nonce'] = wp_create_nonce('webpexpress-ajax-convert-nonce');
-            //  wp_create_nonce('webpexpress-ajax-convert-nonce')
+            $result['new-convert-nonce'] = wp_create_nonce('magicconvert-ajax-convert-nonce');
+            //  wp_create_nonce('magicconvert-ajax-convert-nonce')
         }
 
         $result['nonce-tick'] = $nonceTick;

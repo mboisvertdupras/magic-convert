@@ -1,4 +1,4 @@
-/*input[name=webp_express_converters] {
+/*input[name=magic_convert_converters] {
     display: none;
     width: 100%;
 }*/
@@ -10,12 +10,12 @@
 }
 
 /* Classes used in our pseudo markdown. */
-.webpexpress.md h1 {
+.magicconvert.md h1 {
     margin: 1em 0 1em;
     font-size: 2em;
     font-weight: normal;
 }
-.webpexpress.md h2 {
+.magicconvert.md h2 {
     margin: 1em 0 0.5em;
     font-size: 1.6em;
     font-weight: normal;
@@ -24,31 +24,31 @@
     padding: 10px 0;
     background-color: #ccc;
 }
-.webpexpress.md h3 {
+.magicconvert.md h3 {
     margin: 1em 0 0.5em;
     font-size: 1.4em;
     font-weight: normal;
 }
-.webpexpress.md h4 {
+.magicconvert.md h4 {
     font-size: 1.0em;
     margin: 1em 0 0.5em;
     /*font-weight: 500;*/
     font-weight: normal;
     font-style: italic;
 }
-.webpexpress.md .warn {
+.magicconvert.md .warn {
     background-color: yellow;
 }
-.webpexpress.md .ok {
+.magicconvert.md .ok {
     color: green;
 }
-.webpexpress.md .error {
+.magicconvert.md .error {
     color: red;
 }
 
 
 
-/* remove the padding on the row with the hidden "webp_express_converters" setting.
+/* remove the padding on the row with the hidden "magic_convert_converters" setting.
   it is the last row, we happen to know... */
   /*
 .form-table tr:last-of-type > * {
@@ -56,12 +56,12 @@
 }*/
 
 @media (min-width: 782px) {
-    #webpexpress_settings .form-table > tbody > tr > th {
+    #magicconvert_settings .form-table > tbody > tr > th {
         padding-top: 5px;
         padding-bottom: 5px;
         width: 200px;
     }
-    #webpexpress_settings .form-table > tbody > tr > td {
+    #magicconvert_settings .form-table > tbody > tr > td {
         padding-top: 1px;
         padding-bottom: 5px;
     }
@@ -476,7 +476,7 @@ input + .help {
 }
 */
 
-#webpexpress_settings .block {
+#magicconvert_settings .block {
     position: relative;
     margin: 0 auto 0.5rem;
     padding: 0 1rem;
@@ -485,7 +485,7 @@ input + .help {
     box-shadow: 0 0 0 1px rgba(200,215,225,0.25), 0 1px 2px #e9eff3;
 }
 
-#webpexpress_settings .block.buttons {
+#magicconvert_settings .block.buttons {
     padding: 10px;
     position: sticky;
     top: 30px;
@@ -493,17 +493,17 @@ input + .help {
 }
 
 @media (min-width: 768px) {
-    #webpexpress_settings .block {
+    #magicconvert_settings .block {
         padding: 10px 1.5rem 20px;
     }
 }
 
-#webpexpress_settings .block.buttons p.submit {
+#magicconvert_settings .block.buttons p.submit {
     margin: 0;
     padding: 0;
 }
 
-#webpexpress_settings .block.buttons table {
+#magicconvert_settings .block.buttons table {
     float: right;
 }
 

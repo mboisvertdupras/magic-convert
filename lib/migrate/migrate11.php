@@ -1,18 +1,18 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
 
-function webpexpress_migrate11() {
+function magicconvert_migrate11() {
 
     $config = Config::loadConfigAndFix(false);  // false, because we do not need to test if quality detection is working
 
     // There is a new option: "scope"
     // We want to set it to match current setup as closely as possible.
 
-    $rootsWithRulesIn = HTAccess::getRootsWithWebPExpressRulesIn();
+    $rootsWithRulesIn = HTAccess::getRootsWithMagicConvertRulesIn();
 
     if (in_array('index', $rootsWithRulesIn)) {
         $scope = ['index', 'plugins', 'themes', 'uploads', 'wp-content'];
@@ -33,8 +33,8 @@ function webpexpress_migrate11() {
     if (count($scope2) == 0) {
         Messenger::addMessage(
             'warning',
-            'WebP Express cannot update the .htaccess rules that it needs to. ' .
-                'Please go to WebP Express settings and click "Save settings and force new .htaccess rules".'
+            'Magic Convert cannot update the .htaccess rules that it needs to. ' .
+                'Please go to Magic Convert settings and click "Save settings and force new .htaccess rules".'
         );
         $scope2 = ['themes', 'uploads'];
     }
@@ -61,17 +61,17 @@ function webpexpress_migrate11() {
     if ($result['saved-both-config']) {
         Messenger::addMessage(
             'info',
-            'Successfully migrated <i>WebP Express</i> options for 0.15.0.'
+            'Successfully migrated <i>Magic Convert</i> options for 0.15.0.'
         );
-        Option::updateOption('webp-express-migration-version', '11');
+        Option::updateOption('magic-convert-migration-version', '11');
 
     } else {
         Messenger::addMessage(
             'error',
-            'Failed migrating webp express options to 0.15.0. Probably you need to grant write permissions in your wp-content folder.'
+            'Failed migrating Magic Convert options to 0.15.0. Probably you need to grant write permissions in your wp-content folder.'
         );
     }
 
 }
 
-webpexpress_migrate11();
+magicconvert_migrate11();

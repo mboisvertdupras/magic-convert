@@ -1,13 +1,13 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\CacheMover;
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\Option;
+use \MagicConvert\CacheMover;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\Option;
 
-function webpexpress_migrate5() {
+function magicconvert_migrate5() {
 
     // Regenerate configuration file and wod-options.json.
 
@@ -32,19 +32,19 @@ function webpexpress_migrate5() {
 
         Messenger::addMessage(
             'info',
-            'Successfully migrated <i>WebP Express</i> options for 0.11+'
+            'Successfully migrated <i>Magic Convert</i> options for 0.11+'
         );
 
-        // PSST: When creating new migration files, remember to update WEBPEXPRESS_MIGRATION_VERSION in admin.php
-        Option::updateOption('webp-express-migration-version', '5');
+        // PSST: When creating new migration files, remember to update MAGIC_CONVERT_MIGRATION_VERSION in admin.php
+        Option::updateOption('magic-convert-migration-version', '5');
 
     } else {
         Messenger::addMessage(
             'error',
-            'Failed migrating WebP Express options to 0.11+. Probably you need to grant write permissions in your wp-content folder.'
+            'Failed migrating Magic Convert options to 0.11+. Probably you need to grant write permissions in your wp-content folder.'
         );
     }
 
 }
 
-webpexpress_migrate5();
+magicconvert_migrate5();

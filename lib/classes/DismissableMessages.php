@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Option;
-use \WebPExpress\State;
-use \WebPExpress\Messenger;
+use \MagicConvert\Option;
+use \MagicConvert\State;
+use \MagicConvert\Messenger;
 
 class DismissableMessages
 {
@@ -31,7 +31,7 @@ class DismissableMessages
         if ($gotItText != '') {
             $javascript = "jQuery(this).closest('div.notice').slideUp();";
             //$javascript = "console.log(jQuery(this).closest('div.notice'));";
-            $javascript .= "jQuery.post(ajaxurl, {'action': 'webpexpress_dismiss_message', 'id': '" . $id . "'});";
+            $javascript .= "jQuery.post(ajaxurl, {'action': 'magicconvert_dismiss_message', 'id': '" . $id . "'});";
 
             $msg .= '<button type="button" class="button button-primary" onclick="' . $javascript . '" style="display:block; margin-top:20px">' . $gotItText . '</button>';
         }

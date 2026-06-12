@@ -1,10 +1,10 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\FileHelper;
-use \WebPExpress\Multisite;
-use \WebPExpress\PathHelper;
+use \MagicConvert\FileHelper;
+use \MagicConvert\Multisite;
+use \MagicConvert\PathHelper;
 
 class Paths
 {
@@ -76,8 +76,8 @@ class Paths
     /**
      * Check if we can use document root for structuring the cache dir.
      *
-     * In order to structure the images by doc-root, WebP Express needs all images to be within document root.
-     * Does WebP Express in addition to this need to be able to resolve document root?
+     * In order to structure the images by doc-root, Magic Convert needs all images to be within document root.
+     * Does Magic Convert in addition to this need to be able to resolve document root?
      * Short answer is yes.
      * The long answer is available as a comment inside ConvertHelperIndependent::getDestination()
      *
@@ -345,9 +345,9 @@ class Paths
     {
         return PathHelper::getRelDir(self::getPluginDirAbs(), self::getContentDirAbs());
     }
-    public static function getContentDirRelToWebPExpressPluginDir()
+    public static function getContentDirRelToMagicConvertPluginDir()
     {
-        return PathHelper::getRelDir(self::getWebPExpressPluginDirAbs(), self::getContentDirAbs());
+        return PathHelper::getRelDir(self::getMagicConvertPluginDirAbs(), self::getContentDirAbs());
     }
 
 
@@ -368,22 +368,22 @@ class Paths
         return self::getContentDirAbs() . '/themes';
     }
 
-    // ------------ WebPExpress Content Dir -------------
-    // (the "webp-express" directory inside wp-content)
+    // ------------ MagicConvert Content Dir -------------
+    // (the "magic-convert" directory inside wp-content)
 
-    public static function getWebPExpressContentDirAbs()
+    public static function getMagicConvertContentDirAbs()
     {
-        return self::getContentDirAbs() . '/webp-express';
+        return self::getContentDirAbs() . '/magic-convert';
     }
 
-    public static function getWebPExpressContentDirRel()
+    public static function getMagicConvertContentDirRel()
     {
-        return PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(self::getWebPExpressContentDirAbs());
+        return PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(self::getMagicConvertContentDirAbs());
     }
 
     public static function createContentDirIfMissing()
     {
-        return self::createDirIfMissing(self::getWebPExpressContentDirAbs());
+        return self::createDirIfMissing(self::getMagicConvertContentDirAbs());
     }
 
     // ------------ Upload Dir -------------
@@ -421,7 +421,7 @@ class Paths
 
     public static function getConfigDirAbs()
     {
-        return self::getWebPExpressContentDirAbs() . '/config';
+        return self::getMagicConvertContentDirAbs() . '/config';
     }
 
     public static function getConfigDirRel()
@@ -435,7 +435,7 @@ class Paths
      */
     public static function getConfigHash()
     {
-        $hash = \WebPExpress\Option::getOption('webp-express-config-hash', false);
+        $hash = \MagicConvert\Option::getOption('magic-convert-config-hash', false);
         if (!$hash) {
             // Generate a cryptographically secure random hash
             if (function_exists('random_bytes')) {
@@ -444,7 +444,7 @@ class Paths
                 // Fallback for older PHP versions
                 $hash = md5(uniqid(mt_rand(), true) . microtime(true));
             }
-            \WebPExpress\Option::updateOption('webp-express-config-hash', $hash, true);
+            \MagicConvert\Option::updateOption('magic-convert-config-hash', $hash, true);
         }
         return $hash;
     }
@@ -552,7 +552,7 @@ APACHE
 
     public static function getCacheDirAbs()
     {
-        return self::getWebPExpressContentDirAbs() . '/webp-images';
+        return self::getMagicConvertContentDirAbs() . '/webp-images';
     }
 
     public static function getCacheDirRelToDocRoot()
@@ -585,14 +585,14 @@ APACHE
 
     public static function getLogDirAbs()
     {
-        return self::getWebPExpressContentDirAbs() . '/log';
+        return self::getMagicConvertContentDirAbs() . '/log';
     }
 
     // ------------ Bigger-than-source  dir -------------
 
     public static function getBiggerThanSourceDirAbs()
     {
-        return self::getWebPExpressContentDirAbs() . '/webp-images-bigger-than-source';
+        return self::getMagicConvertContentDirAbs() . '/webp-images-bigger-than-source';
     }
 
     // ------------ Plugin Dir (all plugins) -------------
@@ -613,11 +613,11 @@ APACHE
         return !(self::isDirInsideDir(self::getPluginDirAbs(), self::getContentDirAbs()));
     }
 
-    // ------------ WebP Express Plugin Dir -------------
+    // ------------ Magic Convert Plugin Dir -------------
 
-    public static function getWebPExpressPluginDirAbs()
+    public static function getMagicConvertPluginDirAbs()
     {
-        return self::getAbsDir(WEBPEXPRESS_PLUGIN_DIR);
+        return self::getAbsDir(MAGIC_CONVERT_PLUGIN_DIR);
     }
 
     // ------------------------------------
@@ -685,8 +685,8 @@ APACHE
         } else {
 
             // Its within these bases:
-            $destUrl = self::getUrlById('wp-content') . '/webp-express/webp-images';
-            $destPath = self::getAbsDirById('wp-content') . '/webp-express/webp-images';
+            $destUrl = self::getUrlById('wp-content') . '/magic-convert/webp-images';
+            $destPath = self::getAbsDirById('wp-content') . '/magic-convert/webp-images';
 
             if (($destinationOptions->useDocRoot) && self::canUseDocRootForStructuringCacheDir()) {
                 $relPathFromDocRootToSourceImageRoot = PathHelper::getRelPathFromDocRootToDirNoDirectoryTraversalAllowed(
@@ -792,7 +792,7 @@ APACHE
     public static function getDestinationPathCorrespondingToSource($source, $destinationOptions) {
         return Destination::getDestinationPathCorrespondingToSource(
             $source,
-            Paths::getWebPExpressContentDirAbs(),
+            Paths::getMagicConvertContentDirAbs(),
             Paths::getUploadDirAbs(),
             $destinationOptions,
             new ImageRoots(self::getImageRootsDef())
@@ -873,29 +873,29 @@ APACHE
     }
 
     /**
-     *  Get Url to WebP Express plugin (this is in fact an incomplete URL, you need to append ie '/webp-on-demand.php' to get a full URL)
+     *  Get Url to Magic Convert plugin (this is in fact an incomplete URL, you need to append ie '/webp-on-demand.php' to get a full URL)
      */
-    public static function getWebPExpressPluginUrl()
+    public static function getMagicConvertPluginUrl()
     {
-        return untrailingslashit(plugins_url('', WEBPEXPRESS_PLUGIN));
+        return untrailingslashit(plugins_url('', MAGIC_CONVERT_PLUGIN));
     }
 
-    public static function getWebPExpressPluginUrlPath()
+    public static function getMagicConvertPluginUrlPath()
     {
-        return self::getUrlPathFromUrl(self::getWebPExpressPluginUrl());
+        return self::getUrlPathFromUrl(self::getMagicConvertPluginUrl());
     }
 
     public static function getWodFolderUrlPath()
     {
         return
-            self::getWebPExpressPluginUrlPath() .
+            self::getMagicConvertPluginUrlPath() .
             '/wod';
     }
 
     public static function getWod2FolderUrlPath()
     {
         return
-            self::getWebPExpressPluginUrlPath() .
+            self::getMagicConvertPluginUrlPath() .
             '/wod2';
     }
 
@@ -929,20 +929,20 @@ APACHE
 
     public static function getWebServiceUrl()
     {
-        //return self::getWebPExpressPluginUrl() . '/wpc.php';
-        //return self::getHomeUrl() . '/webp-express-server';
-        return self::getHomeUrl() . '/webp-express-web-service';
+        //return self::getMagicConvertPluginUrl() . '/wpc.php';
+        //return self::getHomeUrl() . '/magic-convert-server';
+        return self::getHomeUrl() . '/magic-convert-web-service';
     }
 
     public static function getUrlsAndPathsForTheJavascript()
     {
         return [
             'urls' => [
-                'webpExpressRoot' => self::getWebPExpressPluginUrlPath(),
+                'magicConvertRoot' => self::getMagicConvertPluginUrlPath(),
                 'content' => self::getContentUrlPath(),
             ],
             'filePaths' => [
-                'webpExpressRoot' => self::getWebPExpressPluginDirAbs(),
+                'magicConvertRoot' => self::getMagicConvertPluginDirAbs(),
                 'destinationRoot' => self::getCacheDirAbs(),
             ]
         ];
@@ -955,9 +955,9 @@ APACHE
         }
         if (Multisite::isNetworkActivated()) {
             // network_admin_url is also defined in link-template.php.
-            return network_admin_url('settings.php?page=webp_express_settings_page');
+            return network_admin_url('settings.php?page=magic_convert_settings_page');
         } else {
-            return admin_url('options-general.php?page=webp_express_settings_page');
+            return admin_url('options-general.php?page=magic_convert_settings_page');
         }
     }
 

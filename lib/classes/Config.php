@@ -1,6 +1,6 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
 class Config
 {
@@ -55,7 +55,7 @@ class Config
      * Check and perform config file migration if needed (CVE-2025-11379 fix)
      * This is called early on admin load to ensure migration happens even if options page is never visited
      *
-     * @return boolean true if its either already migrated or it was migratede successfully or there is no need for migration (in case one starts from newer WebP Express version). false if migration fails
+     * @return boolean true if its either already migrated or it was migratede successfully or there is no need for migration (in case one starts from newer Magic Convert version). false if migration fails
      */
     public static function checkAndMigrateConfigIfNeeded()
     {
@@ -67,7 +67,7 @@ class Config
         $checked = true;
 
         // Check if migration flag is set to avoid checking filesystem on every request
-        if (Option::getOption('webp-express-config-migrated-cve-2025-11379', false)) {
+        if (Option::getOption('magic-convert-config-migrated-cve-2025-11379', false)) {
             return true;
         }
 
@@ -77,13 +77,13 @@ class Config
 
         if (file_exists($oldConfigFile) || file_exists($oldWodFile)) {
             if (self::migrateConfigFiles()) {
-                Option::updateOption('webp-express-config-migrated-cve-2025-11379', true, true);
+                Option::updateOption('magic-convert-config-migrated-cve-2025-11379', true, true);
                 return true;
             }
             return false;
         } else {
             // No old files found, mark as migrated to avoid future checks
-            Option::updateOption('webp-express-config-migrated-cve-2025-11379', true, true);
+            Option::updateOption('magic-convert-config-migrated-cve-2025-11379', true, true);
             return true;
         }
     }
@@ -393,7 +393,7 @@ class Config
                 TODO: Move it somewhere
                 if (isset($converter['working']) && ($converter['working'] != $working)) {
 
-                    // TODO: webpexpress_converterName($converterId)
+                    // TODO: magicconvert_converterName($converterId)
                     if ($working) {
                         Messenger::printMessage(
                             'info',
@@ -419,7 +419,7 @@ class Config
                         }
 
                         if (preg_match('/cloud service is not enabled/', $error)) {
-                            $error = 'The server is not enabled. Click the "Enable web service" on WebP Express settings on the site you are trying to connect to.';
+                            $error = 'The server is not enabled. Click the "Enable web service" on Magic Convert settings on the site you are trying to connect to.';
                         }
                     }
                     $converter['error'] = $error;
@@ -493,13 +493,13 @@ class Config
     {
         $config = self::fix($config, false);
 
-        Option::updateOption('webp-express-alter-html', $config['alter-html']['enabled'], true);
-        Option::updateOption('webp-express-alter-html-hooks', $config['alter-html']['hooks'], true);
-        Option::updateOption('webp-express-alter-html-replacement', $config['alter-html']['replacement'], true);
-        Option::updateOption('webp-express-alter-html-add-picturefill-js', (($config['alter-html']['replacement'] == 'picture') && (isset($config['alter-html']['alter-html-add-picturefill-js']) && $config['alter-html']['alter-html-add-picturefill-js'])), true);
+        Option::updateOption('magic-convert-alter-html', $config['alter-html']['enabled'], true);
+        Option::updateOption('magic-convert-alter-html-hooks', $config['alter-html']['hooks'], true);
+        Option::updateOption('magic-convert-alter-html-replacement', $config['alter-html']['replacement'], true);
+        Option::updateOption('magic-convert-alter-html-add-picturefill-js', (($config['alter-html']['replacement'] == 'picture') && (isset($config['alter-html']['alter-html-add-picturefill-js']) && $config['alter-html']['alter-html-add-picturefill-js'])), true);
 
 
-        //Option::updateOption('webp-express-alter-html', $config['alter-html']['enabled'], true);
+        //Option::updateOption('magic-convert-alter-html', $config['alter-html']['enabled'], true);
 
         $obj = $config['alter-html'];
         unset($obj['enabled']);
@@ -511,7 +511,7 @@ class Config
         $obj['prevent-using-webps-larger-than-original'] = $config['prevent-using-webps-larger-than-original'];
 
         Option::updateOption(
-            'webp-express-alter-html-options',
+            'magic-convert-alter-html-options',
             json_encode($obj, JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK),
             true
         );
@@ -583,7 +583,7 @@ class Config
         // Clean the converter options from junk
         foreach ($wc['converters'] as &$c) {
 
-            // In cwebp converter options (here in webp express), we have a checkbox "set size"
+            // In cwebp converter options (here in Magic Convert), we have a checkbox "set size"
             // - there is no such option in webp-convert - so remove.
             if ($c['converter'] == 'cwebp') {
                 if (isset($c['options']['set-size']) && $c['options']['set-size']) {
@@ -598,7 +598,7 @@ class Config
                 $c['options']['check-key-status-before-converting'] = false;
             }
 
-            // 'id', 'working' and 'error' attributes are used internally in webp-express,
+            // 'id', 'working' and 'error' attributes are used internally in magic-convert,
             // no need to have it in the wod configuration file.
             unset ($c['id']);
             unset($c['working']);

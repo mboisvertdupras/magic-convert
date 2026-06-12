@@ -1,17 +1,17 @@
 <?php
 
-namespace WebPExpress;
+namespace MagicConvert;
 
-use \WebPExpress\Config;
-use \WebPExpress\Messenger;
-use \WebPExpress\HTAccess;
-use \WebPExpress\Paths;
-use \WebPExpress\Option;
+use \MagicConvert\Config;
+use \MagicConvert\Messenger;
+use \MagicConvert\HTAccess;
+use \MagicConvert\Paths;
+use \MagicConvert\Option;
 
 /**
  *  Fix records - if possible
  */
-function webpexpress_migrate6_fixHtaccessRecordsForDir($dirId) {
+function magicconvert_migrate6_fixHtaccessRecordsForDir($dirId) {
     $haveRules = HTAccess::haveWeRulesInThisHTAccess(Paths::getAbsDirById($dirId) . '/.htaccess');
 
     // PS: $haveRules may be null, meaning "maybe"
@@ -23,7 +23,7 @@ function webpexpress_migrate6_fixHtaccessRecordsForDir($dirId) {
     }
 }
 
-function webpexpress_migrate6() {
+function magicconvert_migrate6() {
 
     // Regenerate .htaccess file if placed in root (so rewrites does not apply in wp-admin area)
     if (HTAccess::isInActiveHTAccessDirsArray('index')) {
@@ -59,10 +59,10 @@ function webpexpress_migrate6() {
         'uploads'
     ];
     foreach ($dirsToFix as $dirId) {
-        webpexpress_migrate6_fixHtaccessRecordsForDir($dirId);
+        magicconvert_migrate6_fixHtaccessRecordsForDir($dirId);
     }
 
-    Option::updateOption('webp-express-migration-version', '6');
+    Option::updateOption('magic-convert-migration-version', '6');
 }
 
-webpexpress_migrate6();
+magicconvert_migrate6();
