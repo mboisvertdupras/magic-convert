@@ -1001,6 +1001,18 @@ class Config
         }
 
         if (self::saveConfigurationFile($config)) {
+            // Persist the nginx rules state (fingerprint + generated-at + plugin-version) on
+            // every config save, mirroring the .htaccess regeneration flow. We store ONLY the
+            // non-secret triple — never the rule body (which embeds the config hash and must
+            // never touch disk in a web-accessible place). Phase 3.2 (UI) and 3.3 (drift
+            // detection) read this back to compare without regenerating. Wrapped defensively so
+            // a failure here can never block a config save.
+            try {
+                State::setState('nginx-rules', NginxRules::stateRecordFromPaths($config));
+            } catch (\Throwable $e) {
+                // non-fatal: nginx state is advisory only
+            }
+
             $options = self::generateWodOptionsFromConfigObj($config);
             if (self::saveWodOptionsFile($options)) {
                 if ($rewriteRulesNeedsUpdate) {
