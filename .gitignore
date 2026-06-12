@@ -4,6 +4,9 @@ composer.phar
 node_modules/
 *.log
 
+# Release artifacts produced by bin/build-zip.sh
+/dist/
+
 # PHPUnit
 .phpunit.cache/
 .phpunit.result.cache

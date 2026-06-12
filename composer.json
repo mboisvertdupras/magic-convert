@@ -16,6 +16,7 @@
         "phpunit/phpunit": "^10"
     },
     "scripts": {
+        "build": "bash bin/build-zip.sh",
         "test": "phpunit",
         "ci": [
             "@composer validate --no-check-all --strict",
