@@ -146,8 +146,15 @@ A few examples:
 `wp magic-convert flushwebp`: Remove all webp images
 `wp magic-convert flushwebp --only-png`: Remove all webp images that are conversions of PNG images
 
+#### Bulk conversion at scale
+Just run `wp magic-convert convert`. There is nothing to configure: it automatically uses several of your server's CPU cores to convert in parallel, and it skips images that are already up to date. Because a run only touches images that still need converting, it is completely safe to re-run — if a run is interrupted (you close the terminal, the server reboots, a deploy kicks in), simply run it again and it picks up exactly where it left off.
+
+If you want to be gentler on a busy or shared server, use `--procs=<n>` to override how many parallel processes are used — for example `wp magic-convert convert --procs=2`, or `wp magic-convert convert --procs=1` to convert one image at a time. This is purely optional; the default already adapts to the machine and backs off when the server is under load.
+
+Because runs are idempotent (already-converted images are skipped), you can freely split a very large library across several sessions or even several machines pointed at the same files without converting anything twice.
+
 Synopsises:
-`wp magic-convert convert [<location>] [--reconvert] [--only-png] [--only-jpeg] [--quality=<number>] [--near-lossless=<number>] [--alpha-quality=<number>] [--encoding=<auto|lossy|lossless>] [--converter=<converter>]`
+`wp magic-convert convert [<location>] [--reconvert] [--only-png] [--only-jpeg] [--quality=<number>] [--near-lossless=<number>] [--alpha-quality=<number>] [--encoding=<auto|lossy|lossless>] [--converter=<converter>] [--procs=<number>]`
 `wp magic-convert flushwebp [--only-png]`
 
 I'm considering adding commands for viewing status, viewing conversion stats, generating the .htaccess files and modifying the settings. Please let me know if you need any of these or perhaps something else.
