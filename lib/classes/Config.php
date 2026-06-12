@@ -147,6 +147,45 @@ class Config
         ];
     }
 
+    /**
+     * The ids of the output formats that are ENABLED in this config, in registry order.
+     *
+     * SINGLE SOURCE OF TRUTH for "which formats does a bulk/CLI/REST run produce?". WebP is
+     * always present (it is the baseline output and cannot be turned off); AVIF is present only
+     * when formats.avif.enabled === true. Reads defensively from $config['formats'] (which
+     * fix()/migrateToV2 guarantee) and falls back to webp-only so a malformed config never
+     * produces a broken or empty list.
+     *
+     * ZERO-CONFIG / BYTE-FOR-BYTE: with AVIF disabled (the default) this returns exactly
+     * ['webp'], so every consumer takes its existing single-format path unchanged.
+     *
+     * Pure & static (no WordPress, no filesystem) so it is trivially unit-testable.
+     *
+     * @param  array  $config
+     * @return string[]  e.g. ['webp'] or ['webp','avif'].
+     */
+    public static function enabledFormatIds($config)
+    {
+        $formats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
+        $enabled = [];
+        foreach (OutputFormat::ids() as $id) {
+            if ($id === OutputFormat::DEFAULT_ID) {
+                // WebP is the baseline output and is always enabled.
+                $enabled[] = $id;
+                continue;
+            }
+            $fmt = (isset($formats[$id]) && is_array($formats[$id])) ? $formats[$id] : [];
+            if (isset($fmt['enabled']) && ($fmt['enabled'] === true)) {
+                $enabled[] = $id;
+            }
+        }
+        // Defensive: never return an empty list (webp is always valid).
+        if (empty($enabled)) {
+            $enabled[] = OutputFormat::DEFAULT_ID;
+        }
+        return $enabled;
+    }
+
     public static function getDefaultConfig($skipQualityAuto = false) {
         if ($skipQualityAuto) {
             $qualityAuto = null;
@@ -671,6 +710,9 @@ class Config
             if ($success) {
                 State::setState('configured', true);
                 self::updateAutoloadedOptions($config);
+                // Re-arm the "AVIF enabled but inoperable" admin notice on every save, so a
+                // user who just changed settings is reminded again if AVIF still can't encode.
+                AvifNotice::resetDismissal();
             }
 
             return $success;

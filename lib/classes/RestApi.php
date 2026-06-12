@@ -7,6 +7,7 @@ use \MagicConvert\ConcurrencyAdvisor;
 use \MagicConvert\Config;
 use \MagicConvert\BulkConvert;
 use \MagicConvert\FileHelper;
+use \MagicConvert\OutputFormat;
 use \MagicConvert\Paths;
 use \MagicConvert\SanityException;
 
@@ -105,6 +106,24 @@ class RestApi
 
         $advisor = new ConcurrencyAdvisor();
 
+        // Validate the requested output format. Defaults to webp (so a client that
+        // never sends 'format' behaves exactly as before). It is rejected when it is
+        // not a known OutputFormat id OR not currently enabled in config — a disabled
+        // or unknown format must never be encoded. The validation list comes from the
+        // SAME single source of truth as the listing (Config::enabledFormatIds).
+        $config = Config::loadConfigAndFix();
+        $formatId = self::resolveRequestedFormat(
+            $request->get_param('format'),
+            Config::enabledFormatIds($config)
+        );
+        if ($formatId === null) {
+            return self::respond([
+                'success' => false,
+                'msg' => 'Invalid or disabled format',
+                'log' => '',
+            ], $advisor, 400);
+        }
+
         try {
             // Resolve {root, path} -> sanitized absolute source (same containment
             // guard the AJAX path uses). Throws SanityException on anything unsafe.
@@ -114,12 +133,14 @@ class RestApi
                 'success' => false,
                 'msg' => 'Invalid source: ' . $e->getMessage(),
                 'log' => '',
+                'format' => $formatId,
             ], $advisor, 400);
         } catch (\Exception $e) {
             return self::respond([
                 'success' => false,
                 'msg' => 'Invalid source',
                 'log' => '',
+                'format' => $formatId,
             ], $advisor, 400);
         }
 
@@ -127,7 +148,12 @@ class RestApi
         // already-fresh destinations; an explicit reconvert forces a re-encode.
         $skipIfFresh = !$reconvert;
 
-        $result = Convert::runConversion($source, null, null, $skipIfFresh);
+        $result = Convert::runConversion($source, null, null, $skipIfFresh, $formatId);
+        if (is_array($result)) {
+            // Echo the format back so the client can attribute the result to the
+            // right per-format counter / failure entry.
+            $result['format'] = $formatId;
+        }
 
         return self::respond($result, $advisor, 200);
     }
@@ -153,7 +179,8 @@ class RestApi
             self::cleanupExpiredLists($dir);
 
             $config = Config::loadConfigAndFix();
-            $flat = self::flattenList(BulkConvert::getList($config));
+            $enabledFormats = Config::enabledFormatIds($config);
+            $flat = self::flattenList(BulkConvert::getList($config), $enabledFormats);
 
             $newId = self::generateListId();
             $file = self::listFilePath($dir, $newId);
@@ -173,6 +200,8 @@ class RestApi
                 'success' => true,
                 'list_id' => $newId,
                 'total' => count($flat),
+                'formats' => $enabledFormats,
+                'format_totals' => self::formatTotals($flat, $enabledFormats),
                 'page' => 1,
                 'per_page' => $perPage,
                 'files' => array_slice($flat, $slice['offset'], $slice['length']),
@@ -204,10 +233,16 @@ class RestApi
 
         $slice = self::paginate(count($flat), $page, $perPage);
 
+        // Re-derive the enabled formats + per-format totals from the persisted list itself
+        // (no config reload needed). For a legacy single-format list this is webp-only.
+        $listFormats = self::formatsInList($flat);
+
         return new \WP_REST_Response([
             'success' => true,
             'list_id' => $listId,
             'total' => count($flat),
+            'formats' => $listFormats,
+            'format_totals' => self::formatTotals($flat, $listFormats),
             'page' => $page,
             'per_page' => $perPage,
             'files' => array_slice($flat, $slice['offset'], $slice['length']),
@@ -464,31 +499,155 @@ class RestApi
 
     /**
      * Flatten the grouped {groupName, root, files[]} structure returned by
-     * BulkConvert::getList into a single flat list of {root, path} pairs the
-     * REST/JS pool consumes directly. Pure transform; unit-tested.
+     * BulkConvert::getList into a single flat list the REST/JS pool consumes directly.
      *
-     * @param  array  $groups
-     * @return array  List of ['root' => <imageRootId>, 'path' => <relPath>].
+     * BulkConvert emits two file shapes (see BulkConvert::getListRecursively):
+     *   - WebP-only fast path: a plain path string.
+     *   - Multi-format path:   { path, formats:[...] } carrying only the still-missing formats.
+     *
+     * This normalises BOTH into { root, path, formats:[...] }, where 'formats' lists the
+     * still-missing output formats for that file. For the legacy string shape, 'formats'
+     * defaults to ['webp'] (or to $enabledFormats when explicitly webp-only), preserving the
+     * meaning of the old single-format list. Pure transform; unit-tested.
+     *
+     * @param  array          $groups
+     * @param  string[]|null  $enabledFormats  Format ids in play; used to default the formats
+     *                                          for legacy string items. Defaults to ['webp'].
+     * @return array  List of ['root' => <id>, 'path' => <relPath>, 'formats' => [<formatId>...]].
      */
-    public static function flattenList($groups)
+    public static function flattenList($groups, $enabledFormats = null)
     {
         $flat = [];
         if (!is_array($groups)) {
             return $flat;
+        }
+        if (!is_array($enabledFormats) || empty($enabledFormats)) {
+            $enabledFormats = [OutputFormat::DEFAULT_ID];
         }
         foreach ($groups as $group) {
             if (!isset($group['files']) || !is_array($group['files'])) {
                 continue;
             }
             $rootId = isset($group['groupName']) ? $group['groupName'] : '';
-            foreach ($group['files'] as $relPath) {
+            foreach ($group['files'] as $file) {
+                if (is_array($file)) {
+                    // Multi-format item: { path, formats:[...] }.
+                    $relPath = isset($file['path']) ? $file['path'] : '';
+                    $formats = (isset($file['formats']) && is_array($file['formats']) && !empty($file['formats']))
+                        ? array_values($file['formats'])
+                        : $enabledFormats;
+                } else {
+                    // Legacy string item (webp-only fast path).
+                    $relPath = $file;
+                    $formats = $enabledFormats;
+                }
                 $flat[] = [
                     'root' => $rootId,
                     'path' => $relPath,
+                    'formats' => $formats,
                 ];
             }
         }
         return $flat;
+    }
+
+    /**
+     * Per-format pending counts over a flat list (how many files still need each format).
+     *
+     * Used by the bulk UI's work-estimate / per-format progress denominators
+     * ("WebP: 1,204/3,000 · AVIF: 87/3,000"). Pure; unit-tested.
+     *
+     * @param  array     $flat            Flat list as produced by flattenList().
+     * @param  string[]  $enabledFormats  Format ids to count (keys are always present, even at 0).
+     * @return array<string,int>  formatId => count of files whose 'formats' include it.
+     */
+    public static function formatTotals($flat, $enabledFormats)
+    {
+        $totals = [];
+        foreach ($enabledFormats as $formatId) {
+            $totals[$formatId] = 0;
+        }
+        if (!is_array($flat)) {
+            return $totals;
+        }
+        foreach ($flat as $item) {
+            if (!isset($item['formats']) || !is_array($item['formats'])) {
+                continue;
+            }
+            foreach ($item['formats'] as $formatId) {
+                if (array_key_exists($formatId, $totals)) {
+                    $totals[$formatId]++;
+                }
+            }
+        }
+        return $totals;
+    }
+
+    /**
+     * The set of format ids that appear anywhere in a flat list (registry order).
+     *
+     * Lets a paged call re-derive the enabled formats from a persisted list without
+     * reloading config. Falls back to ['webp'] for an empty/legacy list. Pure; unit-tested.
+     *
+     * @param  array  $flat
+     * @return string[]
+     */
+    public static function formatsInList($flat)
+    {
+        $seen = [];
+        if (is_array($flat)) {
+            foreach ($flat as $item) {
+                if (isset($item['formats']) && is_array($item['formats'])) {
+                    foreach ($item['formats'] as $formatId) {
+                        $seen[$formatId] = true;
+                    }
+                }
+            }
+        }
+        // Return in stable registry order, intersected with what was seen.
+        $ordered = [];
+        foreach (OutputFormat::ids() as $id) {
+            if (isset($seen[$id])) {
+                $ordered[] = $id;
+            }
+        }
+        if (empty($ordered)) {
+            $ordered[] = OutputFormat::DEFAULT_ID;
+        }
+        return $ordered;
+    }
+
+    /**
+     * Validate + normalise a requested output format id from the /convert request.
+     *
+     * Returns the canonical format id when it is BOTH a known OutputFormat AND currently
+     * enabled; returns null otherwise (the caller turns null into a 400). A null/empty
+     * request defaults to webp (the baseline), so a client that never sends 'format'
+     * behaves exactly as before. Pure; unit-tested.
+     *
+     * @param  mixed     $raw             The raw 'format' request param.
+     * @param  string[]  $enabledFormats  Format ids enabled in config (the allow-list).
+     * @return string|null  The validated format id, or null when invalid/disabled.
+     */
+    public static function resolveRequestedFormat($raw, $enabledFormats)
+    {
+        // Default to webp when absent/empty.
+        if ($raw === null || $raw === '') {
+            return OutputFormat::DEFAULT_ID;
+        }
+        if (!is_string($raw) && !is_numeric($raw)) {
+            return null;
+        }
+        $id = strtolower(trim((string) $raw));
+
+        // Must be a registered output format AND currently enabled.
+        if (!in_array($id, OutputFormat::ids(), true)) {
+            return null;
+        }
+        if (!in_array($id, $enabledFormats, true)) {
+            return null;
+        }
+        return $id;
     }
 
     /**

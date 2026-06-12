@@ -22,6 +22,19 @@ class CLI extends \WP_CLI_Command
         return ($bytes < 10000) ? $bytes . " bytes" : round($bytes / 1024) . ' kb';
     }
 
+    /** Human label for a single format id (e.g. 'webp' => 'WebP'). */
+    private static function formatLabel($id) {
+        if ($id === 'webp') { return 'WebP'; }
+        if ($id === 'avif') { return 'AVIF'; }
+        return strtoupper((string) $id);
+    }
+
+    /** Join format ids into a human phrase, e.g. ['webp','avif'] => 'WebP + AVIF'. */
+    private static function formatsLabel(array $ids) {
+        $labels = array_map(['\MagicConvert\CLI', 'formatLabel'], $ids);
+        return implode(' + ', $labels);
+    }
+
     /**
      * Convert images to webp
      *
@@ -58,6 +71,11 @@ class CLI extends \WP_CLI_Command
      *
      * [--converter=<converter>]
      * : Specify the converter to use (default is to use the stack). Valid options: cwebp | vips | ewww | imagemagick | imagick | gmagick | graphicsmagick | ffmpeg | gd | wpc | ewww
+     *
+     * [--format=<format>]
+     * : Limit conversion to a single output format. Valid options: webp | avif. By default
+     *   every enabled format is converted (a file is encoded to each enabled format that still
+     *   needs it). The format must also be enabled in the settings.
      *
      * [--procs=<n>]
      * : (Power users) Override the number of parallel processes. `--procs=1`
@@ -151,6 +169,32 @@ class CLI extends \WP_CLI_Command
         }
 
         $config = array_merge($config, $override);
+
+        // ---------------------------------------------------------------------
+        // 1b. Resolve which output formats this run produces.
+        //     SINGLE SOURCE OF TRUTH: Config::enabledFormatIds() (webp always; avif when on).
+        //     An optional --format=<webp|avif> narrows it to one format; the value must be a
+        //     known format AND enabled (else we error). Parent and children resolve this
+        //     identically, so a shard converts the same formats per file as the parent would.
+        // ---------------------------------------------------------------------
+        $enabledFormats = Config::enabledFormatIds($config);
+        $activeFormats = $enabledFormats;
+        if (isset($assoc_args['format']) && $assoc_args['format'] !== '') {
+            $requested = strtolower((string) $assoc_args['format']);
+            if (!in_array($requested, OutputFormat::ids(), true)) {
+                \WP_CLI::error(
+                    '"' . $assoc_args['format'] . '" is not a valid format. ' .
+                    'Valid formats are: ' . implode(', ', OutputFormat::ids())
+                );
+            }
+            if (!in_array($requested, $enabledFormats, true)) {
+                \WP_CLI::error(
+                    'The "' . $requested . '" format is not enabled in the settings. ' .
+                    'Enabled formats: ' . implode(', ', $enabledFormats)
+                );
+            }
+            $activeFormats = [$requested];
+        }
 
         // The "settings" banner is noise when many children print it at once;
         // only the parent / a plain sequential run prints it.
@@ -257,7 +301,13 @@ class CLI extends \WP_CLI_Command
             foreach ($groups as &$group) {
                 $kept = [];
                 foreach ($group['files'] as $file) {
-                    $key = $group['groupName'] . '/' . $file;
+                    // A list item is either a plain path string (webp-only fast
+                    // path) or a { path, formats:[...] } array (multi-format). The
+                    // shard key hashes the root-relative PATH, so unwrap it first —
+                    // otherwise an array $file coerces to the literal "Array" and
+                    // every file collapses into a single shard bucket.
+                    $relPath = is_array($file) ? $file['path'] : $file;
+                    $key = $group['groupName'] . '/' . $relPath;
                     if (ShardFilter::belongs($key, $shardIndex, $shardTotal)) {
                         $kept[] = $file;
                     }
@@ -286,14 +336,14 @@ class CLI extends \WP_CLI_Command
                 // and we fall through to the inline sequential path below
                 // (GRACEFUL FALLBACK: a run must never fail merely because
                 // parallelism was impossible).
-                $exitCode = self::runParallel($procs, $totalFiles, $args, $assoc_args);
+                $exitCode = self::runParallel($procs, $totalFiles, $args, $assoc_args, $activeFormats);
                 if ($exitCode !== false) {
                     \WP_CLI::halt($exitCode);
                     return;
                 }
                 // else: fall through to inline sequential.
             } else {
-                self::announceSequential($totalFiles);
+                self::announceSequential($totalFiles, $activeFormats);
             }
         }
 
@@ -329,6 +379,12 @@ class CLI extends \WP_CLI_Command
         $webpTotalFilesize = 0;
         $convertedCount = 0;
         $failedCount = 0;
+        // Per-format tallies for the machine-readable summary + aggregate output.
+        $perFormat = [];
+        foreach ($activeFormats as $fmtId) {
+            $perFormat[$fmtId] = ['converted' => 0, 'failed' => 0, 'org_bytes' => 0, 'out_bytes' => 0];
+        }
+        $multiFormat = (count($activeFormats) > 1);
 
         foreach($groups as $group){
             if (count($group['files']) == 0) continue;
@@ -339,37 +395,62 @@ class CLI extends \WP_CLI_Command
             $files = array_reverse($group['files']);
             foreach($files as $key => $file)
             {
-                $path = trailingslashit($group['root']) . $file;
-                \WP_CLI::log($logPrefix . 'Converting: ' . $file);
+                // A list item is either a plain path string (webp-only fast path)
+                // or a { path, formats:[...] } array (multi-format path). Unwrap
+                // the path; without this an array $file coerces to "Array" and the
+                // convert path becomes "<root>/Array" (does not exist => every file
+                // fails). For the formats, honor the per-file 'formats' (only the
+                // ones still missing for THIS file) intersected with the run's
+                // active formats; the plain-string fast path has no per-file
+                // formats, so it uses the full active set.
+                $relPath = is_array($file) ? $file['path'] : $file;
+                $fileFormats = (is_array($file) && isset($file['formats']) && is_array($file['formats']))
+                    ? array_values(array_intersect($activeFormats, $file['formats']))
+                    : $activeFormats;
 
-                $result = Convert::convertFile($path, $config, $convertOptions, $converter, $skipIfFresh);
+                $path = trailingslashit($group['root']) . $relPath;
+                \WP_CLI::log($logPrefix . 'Converting: ' . $relPath);
 
-                if ($result['success']) {
-                    $convertedCount++;
-                    $orgSize = $result['filesize-original'];
-                    $webpSize = $result['filesize-webp'];
+                // A shard owns a WHOLE file: loop the formats this file still needs
+                // INSIDE the per-file iteration. The conversion core's skip-if-fresh
+                // already skips formats that are already up to date, so "every format
+                // that needs it" falls out for free.
+                foreach ($fileFormats as $fmtId) {
+                    $formatTag = $multiFormat ? ('[' . self::formatLabel($fmtId) . '] ') : '';
 
-                    $orgTotalFilesize += $orgSize;
-                    $webpTotalFilesize += $webpSize;
+                    $result = Convert::convertFile($path, $config, $convertOptions, $converter, $skipIfFresh, $fmtId);
 
-                    $percentage = ($orgSize == 0 ? 100 : round(($webpSize/$orgSize) * 100));
+                    if ($result['success']) {
+                        $convertedCount++;
+                        $orgSize = $result['filesize-original'];
+                        $outSize = $result['filesize-webp'];   // destination size (any format)
 
-                    \WP_CLI::log(
-                        \WP_CLI::colorize(
-                            $logPrefix . "%GOK%n. " .
-                            "Size: " .
-                            ($percentage<90 ? "%G" : ($percentage<100 ? "%Y" : "%R")) .
-                            $percentage .
-                            "% %nof original" .
-                            " (" . self::printableSize($orgSize) . ' => ' . self::printableSize($webpSize) .
-                            ") "
-                        )
-                    );
-                } else {
-                    $failedCount++;
-                    \WP_CLI::log(
-                        \WP_CLI::colorize($logPrefix . "%RConversion failed. " . $result['msg'] . "%n")
-                    );
+                        $orgTotalFilesize += $orgSize;
+                        $webpTotalFilesize += $outSize;
+                        $perFormat[$fmtId]['converted']++;
+                        $perFormat[$fmtId]['org_bytes'] += $orgSize;
+                        $perFormat[$fmtId]['out_bytes'] += $outSize;
+
+                        $percentage = ($orgSize == 0 ? 100 : round(($outSize/$orgSize) * 100));
+
+                        \WP_CLI::log(
+                            \WP_CLI::colorize(
+                                $logPrefix . $formatTag . "%GOK%n. " .
+                                "Size: " .
+                                ($percentage<90 ? "%G" : ($percentage<100 ? "%Y" : "%R")) .
+                                $percentage .
+                                "% %nof original" .
+                                " (" . self::printableSize($orgSize) . ' => ' . self::printableSize($outSize) .
+                                ") "
+                            )
+                        );
+                    } else {
+                        $failedCount++;
+                        $perFormat[$fmtId]['failed']++;
+                        \WP_CLI::log(
+                            \WP_CLI::colorize($logPrefix . $formatTag . "%RConversion failed. " . $result['msg'] . "%n")
+                        );
+                    }
                 }
             }
         }
@@ -379,7 +460,7 @@ class CLI extends \WP_CLI_Command
           \WP_CLI::log(
               \WP_CLI::colorize(
                   $logPrefix . "Done. " .
-                  "Size of webps: " .
+                  "Size of converted images: " .
                   ($percentage<90 ? "%G" : ($percentage<100 ? "%Y" : "%R")) .
                   $percentage .
                   "% %nof original" .
@@ -387,11 +468,26 @@ class CLI extends \WP_CLI_Command
                   ") "
               )
           );
+          // Per-format breakdown when more than one format was produced.
+          if ($multiFormat) {
+              foreach ($activeFormats as $fmtId) {
+                  $f = $perFormat[$fmtId];
+                  if ($f['converted'] === 0 && $f['failed'] === 0) { continue; }
+                  $fp = ($f['org_bytes'] == 0) ? 100 : round(($f['out_bytes'] / $f['org_bytes']) * 100);
+                  \WP_CLI::log(
+                      $logPrefix . '  ' . self::formatLabel($fmtId) . ': ' . $f['converted'] . ' converted' .
+                      ($f['failed'] > 0 ? (', ' . $f['failed'] . ' failed') : '') .
+                      ($f['org_bytes'] > 0 ? (' (' . $fp . '% of original)') : '')
+                  );
+              }
+          }
         }
 
         // A child emits a machine-readable summary line as its very last output,
         // so the parent can aggregate per-shard results without re-parsing the
-        // human log. (The parent itself never prints this.)
+        // human log. (The parent itself never prints this.) The 'formats' block
+        // carries the per-format converted/failed/byte tallies for this shard so
+        // the parent can report per-format gains in its aggregate.
         if ($isChild) {
             $summary = [
                 'shard'     => $shardIndex,
@@ -400,6 +496,7 @@ class CLI extends \WP_CLI_Command
                 'failed'    => $failedCount,
                 'org_bytes' => $orgTotalFilesize,
                 'webp_bytes'=> $webpTotalFilesize,
+                'formats'   => $perFormat,
             ];
             \WP_CLI::log(self::SUMMARY_PREFIX . json_encode($summary));
 
@@ -407,6 +504,44 @@ class CLI extends \WP_CLI_Command
                 \WP_CLI::halt(1);
             }
         }
+    }
+
+    /**
+     * Aggregate the per-shard '#MC-SUMMARY' payloads into one totals structure.
+     *
+     * Pure (array in, array out): given a list of decoded summary arrays (each as
+     * emitted above, possibly missing the 'formats' block for an old/failed shard),
+     * it sums the overall counters and merges the per-format tallies. Factored out so
+     * the per-format aggregation is unit-testable without spawning processes.
+     *
+     * @param  array<int,array>  $summaries  Decoded #MC-SUMMARY payloads.
+     * @return array{converted:int,failed:int,org_bytes:int,webp_bytes:int,formats:array<string,array>}
+     */
+    public static function aggregateSummaries(array $summaries)
+    {
+        $agg = ['converted' => 0, 'failed' => 0, 'org_bytes' => 0, 'webp_bytes' => 0, 'formats' => []];
+        foreach ($summaries as $summary) {
+            if (!is_array($summary)) {
+                continue;
+            }
+            $agg['converted']  += isset($summary['converted']) ? (int) $summary['converted'] : 0;
+            $agg['failed']     += isset($summary['failed']) ? (int) $summary['failed'] : 0;
+            $agg['org_bytes']  += isset($summary['org_bytes']) ? (int) $summary['org_bytes'] : 0;
+            $agg['webp_bytes'] += isset($summary['webp_bytes']) ? (int) $summary['webp_bytes'] : 0;
+
+            if (isset($summary['formats']) && is_array($summary['formats'])) {
+                foreach ($summary['formats'] as $fmtId => $f) {
+                    if (!isset($agg['formats'][$fmtId])) {
+                        $agg['formats'][$fmtId] = ['converted' => 0, 'failed' => 0, 'org_bytes' => 0, 'out_bytes' => 0];
+                    }
+                    $agg['formats'][$fmtId]['converted'] += isset($f['converted']) ? (int) $f['converted'] : 0;
+                    $agg['formats'][$fmtId]['failed']    += isset($f['failed']) ? (int) $f['failed'] : 0;
+                    $agg['formats'][$fmtId]['org_bytes'] += isset($f['org_bytes']) ? (int) $f['org_bytes'] : 0;
+                    $agg['formats'][$fmtId]['out_bytes'] += isset($f['out_bytes']) ? (int) $f['out_bytes'] : 0;
+                }
+            }
+        }
+        return $agg;
     }
 
     /**
@@ -458,15 +593,16 @@ class CLI extends \WP_CLI_Command
         return min($recommended, $totalFiles);
     }
 
-    /** Print the one-line "running sequentially" explanation. */
-    private static function announceSequential($totalFiles)
+    /** Print the one-line "running sequentially" explanation (mentions the formats). */
+    private static function announceSequential($totalFiles, $activeFormats = ['webp'])
     {
         if ($totalFiles <= 0) {
             return;
         }
         $reason = ($totalFiles < self::PARALLEL_MIN_FILES) ? 'small batch' : 'single core available';
         \WP_CLI::log(
-            'Converting ' . number_format($totalFiles) . ' files sequentially (' . $reason . ')...'
+            'Converting ' . number_format($totalFiles) . ' files to ' . self::formatsLabel($activeFormats) .
+            ' sequentially (' . $reason . ')...'
         );
         \WP_CLI::log('');
     }
@@ -491,7 +627,7 @@ class CLI extends \WP_CLI_Command
      *  @return int|false  Exit code (0 ok, non-zero if a child failed), or false
      *                     to signal "could not parallelize, fall back".
      */
-    private static function runParallel($procs, $totalFiles, $args, $assoc_args)
+    private static function runParallel($procs, $totalFiles, $args, $assoc_args, $activeFormats = ['webp'])
     {
         if (!function_exists('proc_open') || !function_exists('proc_close')) {
             \WP_CLI::warning('proc_open is unavailable (disabled?); converting sequentially.');
@@ -506,8 +642,8 @@ class CLI extends \WP_CLI_Command
 
         $cores = (new ConcurrencyAdvisor())->cpuCoreCount();
         \WP_CLI::log(
-            'Converting ' . number_format($totalFiles) . ' files using ' . $procs .
-            ' parallel processes (' . $cores . ' CPU cores detected)...'
+            'Converting ' . number_format($totalFiles) . ' files to ' . self::formatsLabel($activeFormats) .
+            ' using ' . $procs . ' parallel processes (' . $cores . ' CPU cores detected)...'
         );
         \WP_CLI::log('');
 
@@ -601,7 +737,7 @@ class CLI extends \WP_CLI_Command
 
         // --- wait for exit + aggregate -----------------------------------------
         $anyFailed = false;
-        $agg = ['converted' => 0, 'failed' => 0, 'org_bytes' => 0, 'webp_bytes' => 0];
+        $summaries = [];
 
         foreach ($children as $shard => &$child) {
             // Flush any leftover buffered output that didn't end in a newline.
@@ -616,34 +752,49 @@ class CLI extends \WP_CLI_Command
                 $anyFailed = true;
             }
             if (is_array($child['summary'])) {
-                $agg['converted']  += (int) $child['summary']['converted'];
-                $agg['failed']     += (int) $child['summary']['failed'];
-                $agg['org_bytes']  += (int) $child['summary']['org_bytes'];
-                $agg['webp_bytes'] += (int) $child['summary']['webp_bytes'];
+                $summaries[] = $child['summary'];
             } else {
                 // No machine-readable summary => treat as a failed shard so we
                 // don't silently under-report.
                 $anyFailed = true;
             }
-            if ($agg['failed'] > 0) {
-                $anyFailed = true;
-            }
         }
         unset($child);
+
+        // Pure aggregation (overall + per-format) — unit-tested via aggregateSummaries().
+        $agg = self::aggregateSummaries($summaries);
+        if ($agg['failed'] > 0) {
+            $anyFailed = true;
+        }
 
         \WP_CLI::log('');
         \WP_CLI::log('------------------------------');
         $pct = ($agg['org_bytes'] == 0) ? 100 : round(($agg['webp_bytes'] / $agg['org_bytes']) * 100);
         \WP_CLI::log(
             \WP_CLI::colorize(
-                'All shards done. Converted ' . number_format($agg['converted']) . ' files' .
+                'All shards done. Converted ' . number_format($agg['converted']) . ' images' .
                 ($agg['failed'] > 0 ? (', %R' . number_format($agg['failed']) . ' failed%n') : '') .
                 ($agg['org_bytes'] > 0
-                    ? ('. Size of webps: ' . $pct . '% of original (' .
+                    ? ('. Size of converted images: ' . $pct . '% of original (' .
                        self::printableSize($agg['org_bytes']) . ' => ' . self::printableSize($agg['webp_bytes']) . ')')
                     : '')
             )
         );
+
+        // Per-format breakdown when more than one format was produced.
+        if (count($activeFormats) > 1 && !empty($agg['formats'])) {
+            foreach ($activeFormats as $fmtId) {
+                if (!isset($agg['formats'][$fmtId])) { continue; }
+                $f = $agg['formats'][$fmtId];
+                if ((int) $f['converted'] === 0 && (int) $f['failed'] === 0) { continue; }
+                $fp = ($f['org_bytes'] == 0) ? 100 : round(($f['out_bytes'] / $f['org_bytes']) * 100);
+                \WP_CLI::log(
+                    '  ' . self::formatLabel($fmtId) . ': ' . number_format($f['converted']) . ' converted' .
+                    ($f['failed'] > 0 ? (', ' . number_format($f['failed']) . ' failed') : '') .
+                    ($f['org_bytes'] > 0 ? (' (' . $fp . '% of original)') : '')
+                );
+            }
+        }
 
         return $anyFailed ? 1 : 0;
     }
@@ -769,7 +920,7 @@ class CLI extends \WP_CLI_Command
      *    - positional <location> (args[0]),
      *    - --reconvert, --only-png, --only-jpeg               (boolean flags),
      *    - --quality, --near-lossless, --alpha-quality,
-     *      --encoding, --converter                             (value flags),
+     *      --encoding, --converter, --format                   (value flags),
      *    - WP-CLI globals --path / --url when present.
      *  NOT forwarded:
      *    - --procs (the parent already expanded it into a shard count),
@@ -790,7 +941,7 @@ class CLI extends \WP_CLI_Command
         }
 
         // Value flags.
-        foreach (['quality', 'near-lossless', 'alpha-quality', 'encoding', 'converter'] as $flag) {
+        foreach (['quality', 'near-lossless', 'alpha-quality', 'encoding', 'converter', 'format'] as $flag) {
             if (isset($assoc_args[$flag]) && $assoc_args[$flag] !== '' && $assoc_args[$flag] !== false) {
                 $argv[] = '--' . $flag . '=' . $assoc_args[$flag];
             }

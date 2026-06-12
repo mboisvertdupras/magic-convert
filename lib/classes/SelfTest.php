@@ -21,6 +21,13 @@ class SelfTest
         return SelfTestHelper::systemInfo();
     }
 
+    public static function avifInfo()
+    {
+        self::$next = 'done';
+        $config = Config::loadConfigAndFix(false);
+        return SelfTestHelper::avifCapabilities($config);
+    }
+
     public static function configInfo()
     {
         self::$next = 'capabilityTests';

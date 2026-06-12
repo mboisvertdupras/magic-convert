@@ -389,10 +389,14 @@ class Convert
      *  @param  bool         $skipIfFresh      Pass true to skip already-fresh
      *                                          destinations (bulk/REST default
      *                                          unless the caller forces reconvert).
+     *  @param  OutputFormat|string|null $format  Output format (defaults to webp).
+     *                                          Threaded through to convertFile() so the
+     *                                          REST /convert endpoint can request a
+     *                                          specific format (e.g. 'avif').
      *
      *  @return array  The per-file result array from convertFile().
      */
-    public static function runConversion($source, $converterId = null, $configOverrides = null, $skipIfFresh = false)
+    public static function runConversion($source, $converterId = null, $configOverrides = null, $skipIfFresh = false, $format = null)
     {
         if (!is_null($configOverrides)) {
             $config = Config::loadConfigAndFix();
@@ -425,13 +429,13 @@ class Convert
 
                 // what is this? - I forgot why!
                 //$config = array_merge($config, $converter['options']);
-                return self::convertFile($source, $config, $webpConvertOptions, $converterId, $skipIfFresh);
+                return self::convertFile($source, $config, $webpConvertOptions, $converterId, $skipIfFresh, $format);
             }
 
-            return self::convertFile($source, $config, null, null, $skipIfFresh);
+            return self::convertFile($source, $config, null, null, $skipIfFresh, $format);
         }
 
-        return self::convertFile($source, null, null, null, $skipIfFresh);
+        return self::convertFile($source, null, null, null, $skipIfFresh, $format);
     }
 
     /**

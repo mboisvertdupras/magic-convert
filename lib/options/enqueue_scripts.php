@@ -9,7 +9,7 @@ use \MagicConvert\Config;
 // a change of filename is neccessary, as there is a plugin that strips version strings out there...!
 // If only one file update is critical: change the name of the file
 // If several files are critical: rename the folder (ie "js2")
-$ver = '4';  // note: Minimum 1.  (bumped for the Phase 1.2 parallel bulk-convert rewrite)
+$ver = '5';  // note: Minimum 1.  (bumped for the Phase 2.5 multi-format bulk-convert rewrite)
 $jsDir = 'js';
 
 if (!function_exists('magic_convert_add_inline_script')) {

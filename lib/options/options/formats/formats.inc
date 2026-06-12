@@ -19,6 +19,9 @@ $mcAvifQuality = isset($mcAvif['quality']) ? intval($mcAvif['quality']) : 30;
 $mcAvifSpeed = isset($mcAvif['speed']) ? intval($mcAvif['speed']) : 6;
 ?>
 <fieldset class="block">
+    <button onclick="MagicConvert.SelfTest.openPopup('avifInfo')" class="button button-secondary" type="button" style="position: absolute; right: 15px; top:15px">
+        System AVIF capabilities
+    </button>
     <h3>Formats</h3>
     <p>
         Choose which image formats Magic Convert generates. <b>WebP</b> is always on — its quality and

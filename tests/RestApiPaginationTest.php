@@ -174,15 +174,17 @@ class RestApiPaginationTest extends TestCase
 
     public function testFlattenListProducesRootPathPairs(): void
     {
+        // Phase 2.5: every flat item now carries a 'formats' array. For legacy string file
+        // items (the webp-only fast path) it defaults to ['webp'], preserving the old meaning.
         $groups = [
             ['groupName' => 'uploads', 'root' => '/var/www/uploads', 'files' => ['2024/a.jpg', 'b.png']],
             ['groupName' => 'themes', 'root' => '/var/www/themes', 'files' => ['x/y.jpg']],
         ];
         $flat = RestApi::flattenList($groups);
         $this->assertSame([
-            ['root' => 'uploads', 'path' => '2024/a.jpg'],
-            ['root' => 'uploads', 'path' => 'b.png'],
-            ['root' => 'themes', 'path' => 'x/y.jpg'],
+            ['root' => 'uploads', 'path' => '2024/a.jpg', 'formats' => ['webp']],
+            ['root' => 'uploads', 'path' => 'b.png', 'formats' => ['webp']],
+            ['root' => 'themes', 'path' => 'x/y.jpg', 'formats' => ['webp']],
         ], $flat);
     }
 

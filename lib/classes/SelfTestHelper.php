@@ -418,6 +418,89 @@ class SelfTestHelper
         return $log;
     }
 
+    /**
+     * System AVIF capabilities report.
+     *
+     * DETECTION FAILURES ARE THE #1 SUPPORT GENERATOR for a multi-format plugin, so this
+     * surfaces, in one place, exactly which AVIF backends this server can use and — when one
+     * cannot — the precise reason.
+     *
+     * SINGLE SOURCE OF TRUTH: every per-converter line comes from AvifStack::selfTest(), which
+     * asks each converter's own isOperational() (the SAME code the conversion path consults).
+     * Nothing here re-implements detection (no second imageavif()/queryFormats()/binary probe),
+     * so the report can never disagree with what a real conversion would do. The only extra
+     * facts added are framing ones that are not converter-specific (PHP version, whether PHP can
+     * exec external binaries at all).
+     *
+     * @param  array|null  $config  Loaded config (used only to note whether AVIF is enabled).
+     * @return string[]  Markdown lines, in the same dialect the other *Info() methods emit.
+     */
+    public static function avifCapabilities($config = null)
+    {
+        $log = [];
+        $log[] = '#### System AVIF capabilities:';
+
+        // Framing facts (not per-converter detection — no duplication of AvifStack).
+        $phpOk = version_compare(phpversion(), '8.1', '>=');
+        $log[] = '- PHP version: ' . phpversion() . ($phpOk ? '' : ' **(AVIF needs PHP 8.1+)**{: .warn}');
+        $log[] = '- Can PHP execute external binaries (exec/proc_open)?: ' .
+            self::trueFalseNullString(self::canExecExternalBinaries());
+
+        if (is_array($config)) {
+            $avifEnabled = (isset($config['formats']['avif']['enabled']) && ($config['formats']['avif']['enabled'] === true));
+            $log[] = '- AVIF output enabled in settings?: ' . self::trueFalseNullString($avifEnabled);
+        }
+
+        // Per-converter rows — verbatim from the stack's own operability reasons.
+        $stack = new \MagicConvert\Avif\AvifStack();
+        $rows = $stack->selfTest();
+
+        $operationalIds = [];
+        $log[] = '';
+        $log[] = '#### AVIF converters:';
+        foreach ($rows as $row) {
+            if ($row['operational']) {
+                $operationalIds[] = $row['label'];
+                $log[] = '- **' . $row['label'] . '**: available';
+            } else {
+                $reason = ($row['reason'] !== '') ? $row['reason'] : 'not operational';
+                // Keep the {: .warn} attached to a bold token (the renderer only honours it there).
+                $log[] = '- **' . $row['label'] . '**: **not available**{: .warn} — ' . $reason;
+            }
+        }
+
+        // Verdict line.
+        $log[] = '';
+        if (!empty($operationalIds)) {
+            $log[] = '**AVIF conversion available via: ' . implode(', ', $operationalIds) . '**';
+        } else {
+            $log[] = '**No AVIF-capable converter found.**{: .warn} See the per-converter reasons above.';
+        }
+
+        return $log;
+    }
+
+    /**
+     * Whether PHP can run external binaries on this host (exec / proc_open et al.).
+     *
+     * Delegated to the SAME ExecWithFallback helper the exec-based converters use, so this
+     * top-level fact and the per-converter "PHP cannot execute external binaries" reasons stay
+     * consistent. Defensive: returns null if the helper is somehow unavailable.
+     *
+     * @return bool|null
+     */
+    private static function canExecExternalBinaries()
+    {
+        if (class_exists('\ExecWithFallback\ExecWithFallback')) {
+            try {
+                return (bool) \ExecWithFallback\ExecWithFallback::anyAvailable();
+            } catch (\Throwable $e) {
+                // fall through
+            }
+        }
+        return null;
+    }
+
     public static function wordpressInfo()
     {
         $log = [];
@@ -531,6 +614,7 @@ class SelfTestHelper
         $log = [];
 
         $log = array_merge($log, self::systemInfo());
+        $log = array_merge($log, self::avifCapabilities($config));
         $log = array_merge($log, self::wordpressInfo());
         $log = array_merge($log, self::configInfo($config));
         $log = array_merge($log, self::capabilityTests($config));

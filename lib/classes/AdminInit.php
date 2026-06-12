@@ -83,6 +83,7 @@ class AdminInit
             add_action('wp_ajax_magicconvert_purge_log', array('\MagicConvert\LogPurge', 'processAjaxPurgeLog'));
             add_action('wp_ajax_magicconvert_dismiss_message', array('\MagicConvert\DismissableMessages', 'processAjaxDismissMessage'));
             add_action('wp_ajax_magicconvert_dismiss_global_message', array('\MagicConvert\DismissableGlobalMessages', 'processAjaxDismissGlobalMessage'));
+            add_action('wp_ajax_magicconvert_dismiss_avif_notice', array('\MagicConvert\AvifNotice', 'processAjaxDismiss'));
             add_action('wp_ajax_magicconvert_self_test', array('\MagicConvert\SelfTest', 'processAjax'));
             add_action('wp_ajax_magicconvert-wcfm-api', array('\MagicConvert\WCFMApi', 'processRequest'));
 
@@ -121,6 +122,10 @@ class AdminInit
         add_action("admin_init", array('\MagicConvert\AdminInit', 'runMigrationIfNeeded'));
 
         add_action("admin_notices", array('\MagicConvert\DismissableGlobalMessages', 'printMessages'));
+
+        // Persistent "AVIF enabled but no AVIF-capable converter" notice (detection failures are
+        // the dominant AVIF support generator). Dismissable; reappears on the next config save.
+        add_action("admin_notices", array('\MagicConvert\AvifNotice', 'maybePrint'));
 
         if (Multisite::isNetworkActivated()) {
             if (is_network_admin()) {
