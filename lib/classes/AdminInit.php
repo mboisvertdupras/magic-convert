@@ -93,6 +93,14 @@ class AdminInit
             add_action('wp_ajax_magicconvert-wcfm-api', array('\MagicConvert\WCFMApi', 'processRequest'));
 
 
+            // Scheduled nginx drift nudge (Phase 3.3): on nginx hosts with a persisted rules
+            // fingerprint, do a throttled (~daily) cheap loopback check of the version endpoint and
+            // arm the "rules need updating" notice ONLY on a positive version-differs result. All
+            // failures are swallowed (loopback-blocked hosts never spam the notice). This method is
+            // itself an admin_init callback, so we invoke the nudge directly (it is internally
+            // throttled via a transient) rather than re-hooking admin_init from within it.
+            NginxDriftNudge::maybeCheck();
+
             // Add settings link on the plugins list page
             add_filter('plugin_action_links_' . plugin_basename(MAGIC_CONVERT_PLUGIN), array('\MagicConvert\AdminUi', 'pluginActionLinksFilter'), 10, 2);
 

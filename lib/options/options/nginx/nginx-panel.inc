@@ -90,6 +90,14 @@ $mc_renderPanelBody = function ()
         <?php endif; ?>
     </p>
 
+    <p>
+        <strong>Installed the rules and reloaded nginx?</strong>
+        Run a live test to confirm nginx is actually serving webp/avif by Accept, that the
+        <code>Vary: Accept</code> header is present, and that the installed rules match your current settings.
+        <button type="button" class="button button-secondary" style="margin-left:8px;"
+            onclick="MagicConvert.SelfTest.openPopup('nginxLiveTest')">Run live test</button>
+    </p>
+
     <h4>Choose your setup</h4>
 
     <?php

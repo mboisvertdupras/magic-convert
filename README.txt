@@ -326,199 +326,47 @@ Note that Firefox 66+ unfortunately stopped including "image/webp" in the "accep
 
 = I am on NGINX or OpenResty =
 
-WebP Express works well on NGINX, however the UI is not streamlined NGINX yet. And of course, NGINX does not process the .htaccess files that WebP Express generates. WebP Express can be used without redirection, as it can alter HTML to use picture tags which links to the webp alternative. See "The simple way" below. Or, you can get your hands dirty and set up redirection in NGINX guided by the "The advanced way" section below.
+NGINX does not read `.htaccess`, so Magic Convert cannot install its rewrite rules for you the way it does on Apache. Instead, Magic Convert **generates a per-site, settings-aware nginx configuration for you** — with the security hash, paths, cache directories, enabled image types and AVIF support all filled in automatically — and gives you a live test to confirm it works. No more hand-editing template snippets or pasting a hash by hand.
 
-**The simple way (no redirecting rules)**
-The easy solution is simply to use the plugin in "CDN friendly" mode, do a bulk conversion (takes care of converting existing images), activate the "Convert on upload" option (takes care of converting new images in the media library) and enable Alter HTML (takes care of delivering webp to webp enabled browsers while still delivering the original jpeg/png to browsers not supporting webp).
+There are two ways to serve WebP/AVIF on nginx:
 
-*PRO*: Very easy to set up.
-*CON*: Images in external CSS and images being dynamically added with javascript will not be served as webp.
-*CON*: New new theme images will not be converted until you run a new Bulk conversion
+**The simple way (no nginx config needed):** run Magic Convert in "CDN friendly" mode, do a bulk conversion, enable "Convert on upload", and enable Alter HTML → picture tags. The browser then picks WebP/AVIF via `<picture>` elements; nothing touches your nginx config. *PRO:* nothing to install. *CON:* images in external CSS or added dynamically by JavaScript are not covered.
 
-**The advanced way (creating NGINX redirecting rules)**
-Creating NGINX rules requires manually inserting redirection rules in the NGINX configuration file (nginx.conf or the configuration file for the site, found in `/etc/nginx/sites-available`). If you do not have access to do that, you will have to settle with the "simple way" described above.
+**The native way (generated nginx rules):** install the generated include and let nginx negotiate the format. Recommended when you can edit (or include) nginx config.
 
-There are two different approaches to achieve the redirections. The one that I recommend is based on a *try_files* directive. If that doesn't work for you, you can try the alternative rules that are based on the *rewrite* directive. The rules are described in the next couple of sections.
+**The native way — generate, install, test**
 
-For multisite on NGINX, read [here](https://github.com/rosell-dk/webp-express/issues/8)
+1. *Open the nginx panel.* Go to Settings → Magic Convert. When you are on nginx, the **nginx configuration** panel is shown prominently (on Apache it is tucked behind a "Running nginx?" toggle). It always reflects your current settings.
 
-**Recommended rules (using "try_files")**
+2. *Pick your setup and install the file(s).* The panel offers two ready-to-include artifacts, each with Copy and Download buttons and per-host install instructions:
+   - **Standard (two files)** — `magic-convert-maps.conf` goes in the http context (e.g. `/etc/nginx/conf.d/`), and `magic-convert-server.conf` is included in your site's server context (e.g. via `/etc/nginx/snippets/`). This is the cleanest, fastest shape.
+   - **Single file (control panels)** — `magic-convert.conf` is one self-contained server-context file for GridPane / RunCloud / Plesk-style hosts whose per-site include slot cannot hold http-context maps. Paste it into the panel's nginx include slot.
 
-__Preparational step:__
-The rules looks for existing webp files by appending ".webp" to the URL. So for this to work, you must configure *WebP Express* to store the converted files like that by setting *General > File extension* to *Append ".webp"*
+   The panel also covers Docker compose mounts and the "no nginx access" fallback (Alter HTML). The generated rules declare their own `types { image/avif avif; image/webp webp; ... }` block, so **you do not need to edit `mime.types`.**
 
-__Preparational step 2:__
-From 0.25.10 and up, the configuration file has been renamed so the filename contains a "hash" of random characters (a security meassure).
-You will have to find the hash by inspecting the filename of the config file.
-Look in the /wp-content/magic-convert/config folder for a file called something like "config.c513fe386c6b8793f9bf9ad1071d2266.json".
-The string of random characters between "config." and ".json" is what we here call the "hash".
-You will need to use that string of characters instead of "[your-hash-here]" in the rules suggested below.
+3. *Reload nginx.* Run `nginx -t` and then `systemctl reload nginx` (or `docker compose exec nginx nginx -s reload`, or your panel's reload control).
 
-__The rules:__
-Insert the following in the `server` context of your configuration file (usually found in `/etc/nginx/sites-available`). "The `server` context" refers to the part of the configuration that starts with "server {" and ends with the matching "}".
+4. *Run the live test.* Back in the nginx panel, click **Run live test**. Magic Convert deploys known-size dummy WebP and AVIF files into the cache, then fetches the test image over HTTP with different `Accept` headers and reports, with a verdict at the top:
+   - `Accept: image/webp` returns the WebP (and `Accept: image/avif,image/webp` returns the AVIF when AVIF is enabled — a true preference test).
+   - A request with no image `Accept` returns the original.
+   - The `Vary: Accept` header is present (with CDN-specific guidance if it is missing — Cloudflare free ignores `Vary`; CloudFront needs `Accept` in the cache policy).
+   - The installed rules match your current settings (drift detection — see below).
+   - If the rules are active but the content-type is wrong, the test tells you precisely that the mime mapping is missing and to regenerate the rules.
 
-`
-&#35; WebP Express rules
-&#35; --------------------
-location ~* ^/?wp-content/.*\.(png|jpe?g)$ {
-  add_header Vary Accept;
-  expires 365d;
-  if ($http_accept !~* "webp"){
-    break;
-  }
-  try_files
-    /wp-content/magic-convert/webp-images/doc-root/$uri.webp
-    $uri.webp
-    /wp-content/plugins/webp-express/wod/webp-on-demand.php?xsource=x$request_filename&wp-content=wp-content&hash=[your-hash-here]
-    ;
-}
+That is the whole flow: **panel → install → Run live test.**
 
-&#35; Route requests for non-existing webps to the converter
-location ~* ^/?wp-content/.*\.(png|jpe?g)\.webp$ {
-    try_files
-      $uri
-      /wp-content/plugins/webp-express/wod/webp-realizer.php?xdestination=x$request_filename&wp-content=wp-content&hash=[your-hash-here]
-      ;
-}
-&#35; ------------------- (WebP Express rules ends here)
-`
+**Keeping the rules in sync (drift detection)**
 
-__BEWARE:__
-- Beware that when copy/pasting you might get html-encoded characters. Verify that the ampersand before "wp-content" isn't encoded (in the last line in the try_files block)
+The generated config embeds a `location = /magic-convert-rules-version` marker that returns a fingerprint of the rule-affecting settings. Whenever you change a setting that affects the nginx rules, Magic Convert shows a dismissable "your nginx rules need updating" notice, and (on a daily, silent background check) compares the fingerprint your installed rules report over HTTP against your current settings, re-arming that notice if they have drifted apart. When you see the notice, re-open the nginx panel, copy/download the updated file(s), and reload nginx.
 
-- Beware that the rules looks for existing webp files by appending ".webp" to the URL. So for this to work, you __must__ configure *WebP Express* to store the converted files like that.
+Note about `add_header`: the generated location blocks set `add_header Vary Accept;`. In nginx, `add_header` inside a `location` replaces any headers inherited from the surrounding server/http context. If you rely on inherited headers (HSTS, CSP, X-Frame-Options…), re-declare them inside these location blocks, or they will be dropped for image responses. The generated files carry a prominent comment warning about this.
 
-- Beware that if you haven't enabled *png* conversion, you should replace "(png|jpe?g)" with "jpe?g".
+**Manual configuration (advanced)**
 
-- Beware that if you have moved wp-content to a non-standard place, you must change accordingly. Note that you must then also change the "wp-content" parameter to the script. It expects a relative path to wp-content (from document root) and is needed so the script can find the configuration file.
+You normally never need this — the panel is the source of truth and fills in everything (hash, paths, cache dirs, image types, AVIF, extension mode). But if you want to read or hand-tune the rules, the generated artifacts in the nginx panel are the canonical reference. Download `magic-convert-maps.conf` + `magic-convert-server.conf` (or the single `magic-convert.conf`), read the header comment block (it lists every setting reflected in the rules), and adapt from there. Keep General → File extension on "Append .webp" for the broadest compatibility; if you moved `wp-content`, regenerate from the panel (paths adjust automatically). For multisite on NGINX, read here: https://github.com/rosell-dk/webp-express/issues/8
 
-- Beware that there is a hack out there for permalinks which is based on "rewrite" (rather than the usual solution which is based on try_files). If you are using that hack to redirect missing files to index.php, you need to modify it as specified [here](https://wordpress.org/support/topic/nginx-server-404-not-found-when-convert-test-images/page/2/#post-11952444)
+Credits: the original try_files approach builds upon Eugene Lazutkin's solution (http://www.lazutkin.com/blog/2014/02/23/serve-files-with-nginx-conditionally/).
 
-- I have put in an expires statement for caching. You might want to modify or disable that.
-
-- The rules contains all redirections (as if you enabled all three redirection options in settings). If you do not wish to redirect to converter, remove the last line in the try_files block. If you do not wish to create webp files upon request, remove the last location block.
-
-- If you have configured WebP Express to store images in separate folder, you do not need the "$uri.webp" line in the first "try_files" block. But it doesn't hurt to have it. And beware that the reverse is not true. If configured to store images in the same folder ("mingled"), you still need the line that looks for a webp in the separate folder. The reason for this is that the "mingled" only applies to the images in the upload folder - other images - such as theme images are always stored in a separate folder.
-
-If you cannot get this to work then perhaps you need to add the following to your *mime.types* configuration file:
- `image/webp  webp;`
-
-If you still cannot get it to work, you can instead try the alternative rules below.
-
-Credits: These rules are builds upon [Eugene Lazutkins solution](http://www.lazutkin.com/blog/2014/02/23/serve-files-with-nginx-conditionally/).
-
-**Alternative rules (using "rewrite")**
-
-In case the recommended rules does not work for you, you can try these alternative rules.
-
-The reason I recommend the *try_files* approach above over these alternative rules is that it is a bit simpler and it is supposed to perform marginally better. These alternative rules are in no way inferior to the other. Choose whatever works!
-
-__Preparational step:__
-The rules looks for existing webp files by appending ".webp" to the URL. So for this to work, you must configure *WebP Express* to store the converted files like that by setting *General > File extension* to *Append ".webp"*. Also make sure that WebP Express is configured with "Destination" set to "Mingled".
-
-__The rules:__
-Insert the following in the `server` context of your configuration file (usually found in `/etc/nginx/sites-available`). "The `server` context" refers to the part of the configuration that starts with "server {" and ends with the matching "}".
-
-`
-&#35; WebP Express rules
-&#35; --------------------
-location ~* ^/wp-content/.*\.(png|jpe?g)$ {
-    add_header Vary Accept;
-    expires 365d;
-}
-location ~* ^/wp-content/.*\.webp$ {
-    expires 365d;
-    if ($whattodo = AB) {
-        add_header Vary Accept;
-    }
-}
-if ($http_accept ~* "webp"){
-    set $whattodo A;
-}
-if (-f $request_filename.webp) {
-    set $whattodo  "${whattodo}B";
-}
-if ($whattodo = AB) {
-    rewrite ^(.*) $1.webp last;
-}
-if ($whattodo = A) {
-    rewrite ^/wp-content/.*\.(jpe?g|png)$ /wp-content/plugins/webp-express/wod/webp-on-demand.php?xsource=x$request_filename&wp-content=wp-content&hash=[your-hash-here] break;
-}
-&#35; ------------------- (WebP Express rules ends here)
-```
-
-__BEWARE:__
-
-- Beware that when copy/pasting you might get html-encoded characters. Verify that the ampersand before "wp-content" isn't encoded (in the last line in the try_files block)
-
-- Beware that the rules looks for existing webp files by appending ".webp" to the URL. So for this to work, you __must__ configure *WebP Express* to store the converted files like that.
-
-- Beware that if you haven't enabled *png* conversion, you should replace "(png|jpe?g)" with "jpe?g".
-
-- Beware that if you have moved wp-content to a non-standard place, you must change accordingly. Note that you must then also change the "wp-content" parameter to the script. It expects a relative path to wp-content (from document root) and is needed so the script can find the configuration file.
-
-- Beware that there is a hack out there for permalinks which is based on "rewrite" (rather than the usual solution which is based on try_files). If you are using that hack to redirect missing files to index.php, you need to modify it as specified [here](https://wordpress.org/support/topic/nginx-server-404-not-found-when-convert-test-images/page/2/#post-11952444)
-
-- I have put in an expires statement for caching. You might want to modify or disable that.
-
-- I have not set any expire on the webp-on-demand.php request. This is not needed, as the script sets this according to what you set up in WebP Express settings. Also, trying to do it would require a new location block matching webp-on-demand.php, but that would override the location block handling php files, and thus break the functionality.
-
-- There is no longer any reason to add "&$args" to the line begining with "/wp-content". It was there to enable debugging a single image by appending "?debug" to the url. I however removed that functionality from `webp-on-demand.php`.
-
-It is possible to put this stuff inside a `location` directive. However, having `if` directives inside `location` directives [is considered evil](https://www.nginx.com/resources/wiki/start/topics/depth/ifisevil/). But it seems that in our case, it works. If you wish to do that, use the following rules instead:
-
-`
-&#35; WebP Express rules
-&#35; --------------------
-location ~* ^/wp-content/.*\.(png|jpe?g)$ {
-    add_header Vary Accept;
-    expires 365d;
-
-    if ($http_accept ~* "webp"){
-        set $whattodo A;
-    }
-    if (-f $request_filename.webp) {
-        set $whattodo  "${whattodo}B";
-    }
-    if ($whattodo = AB) {
-        rewrite ^(.*) $1.webp last;
-    }
-    if ($whattodo = A) {
-        rewrite ^/wp-content/.*\.(jpe?g|png)$ /wp-content/plugins/webp-express/wod/webp-on-demand.php?xsource=x$request_filename&wp-content=wp-content&hash=[your-hash-here] last;
-    }
-}
-
-location ~* ^/wp-content/.*\.webp$ {
-    expires 365d;
-    if ($whattodo = AB) {
-        add_header Vary Accept;
-    }
-}
-&#35; ------------------- (WebP Express rules ends here)
-`
-
-PS: In case you only want to redirect images to the script (and not to existing), the rules becomes much simpler:
-
-`
-&#35; WebP Express rules
-&#35; --------------------
-if ($http_accept ~* "webp"){
-  rewrite ^/(.*).(jpe?g|png)$ /wp-content/plugins/webp-express/wod/webp-on-demand.php?xsource=x$request_filename&wp-content=wp-content&hash=[your-hash-here] break;
-}
-&#35; ------------------- (WebP Express rules ends here)
-`
-
-Discussion on this topic [here](https://wordpress.org/support/topic/nginx-rewrite-rules-4/)
-And here: https://github.com/rosell-dk/webp-express/issues/166
-
-Here are rules if you need to *replace* the file extension with ".webp" rather than appending ".webp" to it: https://www.keycdn.com/support/optimus/configuration-to-deliver-webp
-
-### Important: WebP On Demand on NGINX now requires a hash parameter
-
-Recent versions of WebP Express (0.25.10 and up) require an instance-specific hash parameter
-when using WebP On Demand.
-
-```
 = I am on a Windows server =
 Good news! It should work now, thanks to a guy that calls himself lwxbr. At least on XAMPP 7.3.1, Windows 10. https://github.com/rosell-dk/webp-express/pull/213.
 

@@ -4,6 +4,7 @@ namespace MagicConvert\Tests;
 
 use PHPUnit\Framework\TestCase;
 use MagicConvert\NginxRules;
+use MagicConvert\SelfTestNginx;
 
 require_once __DIR__ . '/NginxHarness.php';
 
@@ -270,6 +271,74 @@ class NginxFunctionalTest extends TestCase
             $harness->cleanup();
             $this->harness = null;
         }
+    }
+
+    /**
+     * Phase 3.3 end-to-end: boots Artifact A and drives the live self-test's drift classifier
+     * (SelfTestNginx::classifyDrift) AND the preference-ordering classifier (classifyFetch) against
+     * the REAL booted nginx version endpoint + a negotiated fetch. This ties the pure 3.3 logic to a
+     * live server: the /magic-convert-rules-version body must classify UP_TO_DATE against the
+     * matching fingerprint and STALE against a different one, and an avif+webp fetch must classify as
+     * SERVED_AVIF (preference correct), not SERVED_WEBP.
+     *
+     * @return void
+     */
+    public function testLiveDriftAndPreferenceClassification(): void
+    {
+        $harness = new NginxHarness();
+        $this->harness = $harness;
+        if (!$harness->available()) {
+            $this->markTestSkipped('nginx binary not found — skipping live drift/preference classification test.');
+        }
+
+        $cfg = $this->config();
+        $env = $this->env();
+        $maps = NginxRules::generateMapsFile($cfg, $env);
+        $server = NginxRules::generateServerFile($cfg, $env);
+        $harness->writeConf($maps, $server);
+        [$tCode, $tOut] = $harness->test();
+        $this->assertSame(0, $tCode, "drift/preference conf failed nginx -t:\n" . $tOut);
+
+        $path = $this->placeFixtures($harness);
+        $this->assertTrue($harness->start(), 'nginx failed to boot for live drift/preference test');
+
+        $fp = NginxRules::settingsFingerprint($cfg, $env);
+
+        // --- Drift: GET the version endpoint, classify against matching + mismatching fingerprints.
+        [$vStatus, , $vBody] = $harness->get('/magic-convert-rules-version', '*/*');
+        $this->assertSame(200, $vStatus, 'version endpoint must respond 200');
+
+        $this->assertSame(
+            SelfTestNginx::DRIFT_UP_TO_DATE,
+            SelfTestNginx::classifyDrift(true, $vBody, $fp),
+            'installed version endpoint must classify as up-to-date against the matching fingerprint'
+        );
+        $this->assertSame(
+            SelfTestNginx::DRIFT_STALE,
+            SelfTestNginx::classifyDrift(true, $vBody, $fp . 'X'),
+            'a changed fingerprint must classify the installed rules as stale'
+        );
+
+        // --- Preference ordering: avif+webp Accept must classify as SERVED_AVIF (not webp).
+        [$aStatus, $aHeaders, ] = $harness->get($path, 'image/avif,image/webp,image/*,*/*');
+        $this->assertSame(200, $aStatus);
+        $lengths = [
+            'avif'     => strlen(self::AVIF_BODY),
+            'webp'     => strlen(self::WEBP_BODY),
+            'original' => strlen(self::JPG_BODY),
+        ];
+        $this->assertSame(
+            SelfTestNginx::FETCH_SERVED_AVIF,
+            SelfTestNginx::classifyFetch('avif', true, $aHeaders, $lengths, 'jpeg'),
+            'avif+webp Accept must classify as SERVED_AVIF — proving avif precedes webp (preference)'
+        );
+
+        // --- webp-only Accept must classify as SERVED_WEBP.
+        [, $wHeaders, ] = $harness->get($path, 'image/webp,*/*');
+        $this->assertSame(
+            SelfTestNginx::FETCH_SERVED_WEBP,
+            SelfTestNginx::classifyFetch('webp', true, $wHeaders, $lengths, 'jpeg')
+        );
     }
 
     public function testServesNegotiatedFormatByAccept(): void
