@@ -49,7 +49,12 @@ spl_autoload_register('magic_convert_autoload');
 function magic_convert_autoload($class) {
     $prefix = 'MagicConvert\\';
     if (strpos($class, $prefix) === 0) {
-        require_once MAGIC_CONVERT_PLUGIN_DIR . '/lib/classes/' . substr($class, strlen($prefix)) . '.php';
+        // Map the namespace tail to a path, turning sub-namespace separators ('\')
+        // into directory separators so e.g. MagicConvert\Avif\AvifStack resolves to
+        // lib/classes/Avif/AvifStack.php. For top-level classes this is a no-op, so
+        // existing resolution is unchanged.
+        $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
+        require_once MAGIC_CONVERT_PLUGIN_DIR . '/lib/classes/' . $relative . '.php';
     }
 }
 

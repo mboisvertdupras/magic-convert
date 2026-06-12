@@ -126,6 +126,26 @@ class Convert
                 throw new SanityException('conversion options are missing');
             }
 
+            // AVIF per-format options (Phase 2.3).
+            // -------------------------------
+            // When converting to AVIF, thread the formats.avif quality/speed into the
+            // options array under an 'avif' key so the (WordPress-independent) core can
+            // hand them to the AvifStack. Metadata is NOT duplicated here: the AVIF
+            // stack reads the global 'metadata' option already present in $convertOptions,
+            // keeping metadata handling consistent with the webp path. This block only
+            // runs for AVIF, so with AVIF disabled the options array is byte-for-byte
+            // unchanged.
+            $formatObj = OutputFormat::coerce($format);
+            if ($formatObj->id() === 'avif') {
+                $avifCfg = (isset($config['formats']['avif']) && is_array($config['formats']['avif']))
+                    ? $config['formats']['avif']
+                    : [];
+                $convertOptions['avif'] = [
+                    'quality' => isset($avifCfg['quality']) ? intval($avifCfg['quality']) : 30,
+                    'speed' => isset($avifCfg['speed']) ? intval($avifCfg['speed']) : 6,
+                ];
+            }
+
 
             // Check destination
             // -------------------------------

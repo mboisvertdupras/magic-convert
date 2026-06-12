@@ -16,6 +16,7 @@ use \MagicConvert\FileLock;
 use \MagicConvert\OutputFormat;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
+use \MagicConvert\Avif\AvifStack;
 
 class ConvertHelperIndependent
 {
@@ -814,20 +815,34 @@ APACHE
             }
 
             try {
-                // Encode dispatch is WebP-only for now. The OutputFormat parameter is
-                // threaded everywhere (paths, temp names, logs, markers, cache dirs)
-                // so the rest of the core is multi-format ready, but the actual
-                // encoder for non-webp formats arrives in step 2.3. Until then any
-                // non-webp format is a clear, logged failure rather than a silent
-                // mis-encode.
-                if (!$format->isDefault()) {
-                    throw new \Exception(
-                        'Output format "' . $format->id() . '" is not yet supported by the conversion core ' .
-                        '(the ' . strtoupper($format->id()) . ' encoder is added in a later step). Only "webp" is currently encodable.'
-                    );
-                }
+                // Encode dispatch (Phase 2.3): WebP goes through webp-convert exactly
+                // as before; AVIF is routed to the AvifStack. The OutputFormat parameter
+                // is threaded everywhere (paths, temp names, logs, markers, cache dirs),
+                // and this dispatch sits INSIDE the already-hardened section — the same
+                // cross-process lock, '<dest>.<pid>.tmp.<ext>' temp+rename, skip-if-fresh
+                // idempotency and finally-cleanup apply identically to both formats. We
+                // always write to $tempDestination (already '.tmp.avif' for AVIF, see
+                // tempDestinationFor()) so the atomic rename below is format-agnostic.
+                if ($format->id() === 'avif') {
+                    // AVIF stack. Quality/speed come from the per-format options the
+                    // caller threaded in (formats.avif block); metadata follows the
+                    // global 'metadata' option already present in $convertOptions —
+                    // honouring it consistently with how the webp path treats metadata.
+                    $avifOptions = self::deriveAvifOptions($convertOptions);
+                    $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
+                        . ', speed=' . $avifOptions['speed']
+                        . ', metadata=' . $avifOptions['metadata'] . ')');
+                    $logger->logLn('');
 
-                if (!is_null($converter)) {
+                    $stack = new AvifStack();
+                    $result = $stack->convert($source, $tempDestination, $avifOptions);
+
+                    // Surface the per-converter "tried/succeeded/why-failed" trail in the
+                    // same .md log the webp path produces.
+                    $logger->logLn($result['log']);
+                    $logger->logLn('');
+                    $logger->logLn('Converted with: ' . $result['converter']);
+                } elseif (!is_null($converter)) {
                 //if (isset($convertOptions['converter'])) {
                     //print_r($convertOptions);exit;
                     $logger->logLn('Converter set to: ' . $converter);
@@ -883,6 +898,48 @@ APACHE
             // as stale and re-acquired it, we will not delete their live lock.
             FileLock::release($lockPath, $lockToken);
         }
+    }
+
+    /**
+     *  Derive the AVIF stack options from the conversion options array.
+     *
+     *  The webp-convert options array ($convertOptions) is what the rest of the
+     *  core already threads around. For AVIF we read:
+     *    - quality / speed  : from the per-format block the caller injected under
+     *                         the 'avif' key (Config exposes formats.avif quality/
+     *                         speed; Convert.php copies them in). Falls back to the
+     *                         AVIF defaults (q30, speed6) when absent, so an
+     *                         out-of-band caller still gets sane encoding.
+     *    - metadata         : from the GLOBAL 'metadata' option already present in
+     *                         $convertOptions — the same value the webp path uses,
+     *                         so metadata handling is consistent across formats.
+     *
+     *  @param  array  $convertOptions
+     *  @return array{quality:int,speed:int,metadata:string,jobs:(int|null)}
+     */
+    private static function deriveAvifOptions($convertOptions)
+    {
+        $avif = (is_array($convertOptions) && isset($convertOptions['avif']) && is_array($convertOptions['avif']))
+            ? $convertOptions['avif']
+            : [];
+
+        $quality = isset($avif['quality']) ? (int) $avif['quality'] : 30;
+        $speed = isset($avif['speed']) ? (int) $avif['speed'] : 6;
+
+        // Global metadata option (webp path uses the same key). Default 'all' = keep.
+        $metadata = (is_array($convertOptions) && isset($convertOptions['metadata']))
+            ? $convertOptions['metadata']
+            : 'all';
+
+        // Optional thread hint for multi-threaded encoders (e.g. avifenc --jobs).
+        $jobs = isset($avif['jobs']) ? (int) $avif['jobs'] : null;
+
+        return [
+            'quality' => $quality,
+            'speed' => $speed,
+            'metadata' => $metadata,
+            'jobs' => $jobs,
+        ];
     }
 
     /**
