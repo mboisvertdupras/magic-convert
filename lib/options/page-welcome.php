@@ -34,11 +34,18 @@ if ($weKnowThereAreNoWorkingConverters) {
         '<li>You can set up a <a target="_blank" href="https://github.com/rosell-dk/webp-convert-cloud-service">webp-convert-cloud-service</a> on another server and connect to that. Its open source.</li>' .
         '<li>You can try to meet the server requirements of cwebp, imagick, vips, gmagick, ffmpeg or gd. Check out <a target="_blank" href="https://github.com/rosell-dk/webp-convert/wiki/Meeting-the-requirements-of-the-converters">this wiki page</a> on how to do that</li>' .
         '</ol>' .
-        "<p>Btw, don't worry, your images still works. The rewrite rules will not be saved until you click the " .
+        "<p>Btw, don't worry, your images still work. Settings are saved when you click the " .
         '"Save settings" button.</p>';
         //'(and you also have "Response on failure" set to "Original image", so they will work even if you click save)</p>';
 } else {
-    echo '<p>The rewrite rules are not active yet. They will be activated the first time you click the "Save settings" button.</p>';
+    if (PlatformInfo::isNginx()) {
+        echo '<p>Settings are saved when you click the "Save settings" button. Because this server is nginx ' .
+            '(which does not read <i>.htaccess</i>), image serving is configured from the <strong>NGINX</strong> section ' .
+            'on this page: HTML alteration works with zero configuration, and you can install the generated native ' .
+            'nginx rules for the fastest serving.</p>';
+    } else {
+        echo '<p>The rewrite rules are not active yet. They will be activated the first time you click the "Save settings" button.</p>';
+    }
 }
 
 //echo 'working converters:';

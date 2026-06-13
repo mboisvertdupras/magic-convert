@@ -337,6 +337,71 @@ class Config
     }
 
     /**
+     * Decide the platform-aware config overrides applied on FIRST activation (zero-config setup).
+     *
+     * This is the only place that knows "what should a fresh install look like on this platform?".
+     * It is pure & static (no WordPress, no filesystem, no $_SERVER) — the caller passes in the
+     * already-fixed default config and a single boolean for the platform — so it is trivially
+     * unit-testable (see tests/FirstActivationDefaultsTest.php).
+     *
+     * Apache / LiteSpeed ($isNginx === false):
+     *   Returns the config UNCHANGED. The default operation mode ('varied-image-responses') plus
+     *   the .htaccess rules that saveConfigurationAndHTAccess() writes already serve converted
+     *   images with zero further configuration. Nothing to override.
+     *
+     * nginx ($isNginx === true):
+     *   nginx does NOT read .htaccess, and the generated nginx rewrite rules are NOT installed yet
+     *   on a fresh activation — so redirection-to-converter / redirection-to-realizer cannot serve
+     *   anything. The only mechanism that works with ZERO server configuration is HTML alteration:
+     *   we rewrite <img> references to already-converted files. So we enable Alter HTML and pick the
+     *   one safe combination:
+     *     - 'enabled'                      => true   — turn HTML alteration on.
+     *     - 'replacement'                  => 'picture' — emit <picture> with a <source> for the
+     *                                         converted file and the original <img> as fallback, so
+     *                                         browsers without webp/avif still get a working image.
+     *     - 'only-for-webps-that-exists'   => true   — CRITICAL: only reference a converted file when
+     *                                         it actually exists on disk (AlterHtmlHelper /
+     *                                         DestinationUrl honour this flag). Without the nginx
+     *                                         rules there is no realizer to create a missing file on
+     *                                         request, so we must never emit a reference to a file
+     *                                         that does not exist.
+     *     - 'only-for-webp-enabled-browsers' => false — irrelevant in 'picture' mode (the <picture>
+     *                                         element handles capability negotiation), and matching
+     *                                         submit.php's own picture-mode choice keeps the value
+     *                                         stable across a settings round-trip.
+     *
+     *   Why these survive a round-trip through loadConfigAndFix() -> fix() -> applyOperationMode():
+     *   the default operation mode is 'varied-image-responses', and applyOperationMode() does NOT
+     *   touch any 'alter-html' key for that mode (only 'no-conversion' forces
+     *   only-for-webps-that-exists = true). fix() merges alter-html with
+     *   array_replace_recursive($defaultConfig['alter-html'], $config['alter-html']), which keeps
+     *   the caller's values. So on the next settings-page visit these exact flags reload intact.
+     *
+     * @param  array  $config    A fixed config array (typically Config::loadConfigAndFix(true)).
+     * @param  bool   $isNginx   Whether the server is nginx.
+     * @return array  The config with platform-aware first-activation overrides applied.
+     */
+    public static function applyFirstActivationPlatformDefaults(array $config, bool $isNginx)
+    {
+        if (!$isNginx) {
+            // Apache / LiteSpeed: defaults are already zero-config; htaccess redirection is written
+            // by saveConfigurationAndHTAccess(). Nothing to override.
+            return $config;
+        }
+
+        // nginx: serve converted images immediately via HTML alteration, with zero server config.
+        if (!isset($config['alter-html']) || !is_array($config['alter-html'])) {
+            $config['alter-html'] = [];
+        }
+        $config['alter-html']['enabled'] = true;
+        $config['alter-html']['replacement'] = 'picture';
+        $config['alter-html']['only-for-webps-that-exists'] = true;
+        $config['alter-html']['only-for-webp-enabled-browsers'] = false;
+
+        return $config;
+    }
+
+    /**
      *   Apply operation mode (set the hidden defaults that comes along with the mode)
      *   @return An altered configuration array
      */
