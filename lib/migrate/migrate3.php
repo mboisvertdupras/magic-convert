@@ -91,22 +91,7 @@ function magicconvert_migrate3() {
             '<li>New conversion method, which calls imagick binary directly</li>' .
             '<li>Made sure not to trigger LFI warning i Wordfence (to activate, click the force .htaccess button)</li>' .
             "<li>Imagick can now be configured to set quality to auto on systems where the auto option isn't generally available</li>" .
-            '<li><a href="https://github.com/rosell-dk/webp-express/issues?q=is%3Aclosed+milestone%3A0.8.0">and more...</a></li>' .
-            '</ul>' .
-            '</ul>' .
-            '<br><i>Roadmap / wishlist:</i>' .
-            '<ul style="list-style-type:disc;margin-left:20px">' .
-            '<li>Rule in .htaccess to serve already converted images immediately (optional)</li>' .
-            '<li>Better NGINX support (print rules that needs to be manually inserted in nginx.conf)</li>' .
-            '<li>Diagnose button</li>' .
-            '<li>A file explorer for viewing converted images, reconverting them, and seeing them side by side with the original</li>' .
-            '<li>IIS support, WAMP support, Multisite support</li>' .
-            '<li><a href="https://github.com/rosell-dk/webp-express/issues">and more...</a></li>' .
-            '</ul>' .
-            '<b>Please help me making this happen faster / happen at all by donating even a small sum. ' .
-            '<a href="https://ko-fi.com/rosell" target="_blank" >Buy me a coffee</a>, ' .
-            'or support me on <a href="http://www.patreon.com/rosell" target="_blank" >patreon.com</a>' .
-            '</b>'
+            '</ul>'
         );
     }
 

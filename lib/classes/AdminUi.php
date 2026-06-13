@@ -17,12 +17,12 @@ class AdminUi
     {
         if (Multisite::isNetworkActivated()) {
             $mylinks= [
-                '<a href="https://ko-fi.com/rosell" target="_blank">donate?</a>',
+                '<a href="https://github.com/mboisvertdupras/magic-convert" target="_blank">GitHub</a>',
             ];
         } else {
             $mylinks = array(
                 '<a href="' . admin_url('options-general.php?page=magic_convert_settings_page') . '">Settings</a>',
-                '<a href="https://wordpress.org/plugins/magic-convert/#%0Ahow%20do%20i%20buy%20you%20a%20cup%20of%20coffee%3F%0A" target="_blank">Provide coffee for the developer</a>',
+                '<a href="https://github.com/mboisvertdupras/magic-convert" target="_blank">GitHub</a>',
             );
 
         }
@@ -35,7 +35,7 @@ class AdminUi
     {
         $mylinks = array(
             '<a href="' . network_admin_url('settings.php?page=magic_convert_settings_page') . '">Settings</a>',
-            '<a href="https://ko-fi.com/rosell" target="_blank">donate?</a>',
+            '<a href="https://github.com/mboisvertdupras/magic-convert" target="_blank">GitHub</a>',
         );
         return array_merge($links, $mylinks);
     }

@@ -20,11 +20,6 @@ use \MagicConvert\State;
 
 if (!(State::getState('configured', false))) {
     include __DIR__ . "/page-welcome.php";
-
-    if (PlatformInfo::isNginx()) {
-        DismissableMessages::addDismissableMessage('0.16.0/nginx-link-to-faq');
-    }
-
 }
 
 $storedCapTests = $config['base-htaccess-on-these-capability-tests'];

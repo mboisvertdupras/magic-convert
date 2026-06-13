@@ -1,6 +1,5 @@
 === Magic Convert ===
 Contributors: mboisvertdupras, rosell.dk
-Donate link: https://ko-fi.com/rosell
 Tags: webp, avif, images, performance
 Requires at least: 5.9
 Tested up to: 6.9
@@ -165,42 +164,9 @@ I'm considering adding commands for viewing status, viewing conversion stats, ge
 
 * The plugin [should now work on Microsoft IIS server](https://github.com/rosell-dk/webp-express/pull/213), but it has not been tested thoroughly.
 
-== Supporting WebP Express ==
-Bread on the table don't come for free, even though this plugin does, and always will. I enjoy developing this, and supporting you guys, but I kind of need the bread too. Please make it possible for me to continue wasting time on this plugin:
+== Contributing ==
 
-* [Buy me a Coffee](https://ko-fi.com/rosell)
-* [Buy me coffee on a regular basis](https://github.com/sponsors/rosell-dk) and help ensuring my coffee supplies doesn't run dry.
-
-== Supporters of WebP Express ==
-
-**Persons who recently contributed with [ko-fi](https://ko-fi.com/rosell) - Thanks!**
-
-* 5 Jan: Joel
-* 24 Dec: Patrick Müller
-* 16 Dec: Dragos
-* 9 Aug: Tanzi
-* 3 Jul: Jen
-* 26 Jun: Per
-* 16 May: Erick Danzer
-* 8 May: Mike
-* 31 May: parallactic
-* 14 May: Gitte Rebsdorf
-* 9 May: La Braud
-
-**Persons who recently contributed on [github sponsors](https://github.com/sponsors/rosell-dk) - Thanks!**
-* 16 Dec: kcrlost
-* 16 Dec: Yakovos Frountas (Greece)
-
-**Persons who contributed with extra generously amounts of coffee / lifetime backing (>80$) - thanks!:**
-
-* Patrick Müller ($250)
-* Max Kreminsky ($115)
-* Justin - BigScoots ($105)
-* Bill Vallance ($102)
-* Joel ($100)
-* Label Vier ($100)
-* Sebastian ($99)
-* Tammy Lee ($90)
+Magic Convert is open source and developed on GitHub. Bug reports, feature requests and pull requests are welcome at [github.com/mboisvertdupras/magic-convert](https://github.com/mboisvertdupras/magic-convert/issues).
 
 == Frequently Asked Questions ==
 
@@ -236,8 +202,6 @@ Don't fret - you have options!
 - I have written a [template letter](https://github.com/rosell-dk/webp-convert/wiki/A-template-letter-for-shared-hosts) which you can send to your webhost
 - You can try to get one of the local converters working. Check out [this page](https://github.com/rosell-dk/webp-convert/wiki/Meeting-the-requirements-of-the-converters) on the webp-convert wiki. There is also this [test/troubleshooting script](https://github.com/rosell-dk/webp-convert/wiki/A-PHP-script-for-the-webhost) which is handy when messing around with this.
 - Finally, if you have access to another server and are comfortable with installing projects with composer, you can install [webp-convert-cloud-service](https://github.com/rosell-dk/webp-convert-cloud-service). It's open source.
-
-Of course, there is also the option of using another plugin altogether. I can recommend Optimole. If you want to try that out and want to support me in the process, [follow this link](https://optimole.pxf.io/20b0M). It is an affiliate link and will give me a reward in case you decide to sign up.
 
 = It doesn't work - Although test conversions work, it still serves jpeg images =
 Actually, you might be mistaking, so first, make sure that you didn't make the very common mistake of thinking that something with the URL *example.com/image.jpg* must be a jpeg image. The plugin serves webp images on same URL as the original (unconverted) images, so do not let appearances fool you! Confused? See next FAQ item.
@@ -502,8 +466,6 @@ To make the redirection work, you must:
 
 WebP Express tweaks the workings of "Redirect to converter" a bit for WP engine. That PHP script usually serves the webp directly, along with a Vary:Accept header. This header is however overwritten by the caching machinery on WP engine. As a work-around, I modified the response of the script for WP engine. Instead of serving the image, it serves a redirect to itself. As there now IS a corresponding webp, this repeated request will not be redirected to the PHP script, but directly to the webp. And headers are OK for those redirects. You can hit the "Live test" button next to "Enable redirection to converter?" to verify that this works as just described.
 
-If you (contrary to this headline!) are in fact not on WP Engine, but might want to be, I have an affiliate link for you. It will give you 3 months free and it will give me a reward too, if you should decide to stay there. Here you go: [Get 3 months free when you sign up for WP Engine.](https://shareasale.com/r.cfm?b=1343154&u=2194916&m=41388&urllink=&afftrack=)
-
 = WebP Express / ShortPixel setup =
 Here is a recipe for using WebP Express together with ShortPixel, such that WebP Express generates the webp's, and ShortPixel only is used to create `<picture>` tags, when it detects a webp image in the same folder as an original.
 
@@ -664,15 +626,10 @@ Here are other things in pipeline:
 
 The current milestones, their subtasks and their progress can be viewed here: https://github.com/rosell-dk/webp-express/milestones
 
-If you wish to affect priorities, it is certainly possible. You can try to argue your case in the forum or you can simply let the money do the talking. By donating as little as a cup of coffee on [ko-fi.com/rosell](https://ko-fi.com/rosell), you can leave a wish. I shall take these wishes into account when prioritizing between new features.
+If you wish to affect priorities, open a feature request on [GitHub](https://github.com/mboisvertdupras/magic-convert/issues) and make your case there.
 
 = Beta testing =
-I generally create a pre-release before publishing. If you [follow me on ko-fi](https://ko-fi.com/rosell), you will get notified when a pre-release is available. I generally create a pre-release on fridays and mark it as stable on mondays. In order to download a pre-release, go to [the advanced page](https://wordpress.org/plugins/webp-express/advanced/) and scroll down to "Please select a specific version to download". I don't name the pre-releases different. You will just see the next version here before it is available the usual way.
-
-= Can I buy you a cup of coffee? =
-You sure can! To do so, [go here!](https://ko-fi.com/rosell). If payment doesn't work for your country, [try here instead](https://buymeacoff.ee/rosell).
-
-If you want to make sure that my coffee supplies don't run dry, you can even buy me a cup of coffee on a regular basis [by going here](https://github.com/sponsors/rosell-dk)
+Releases and pre-releases are published on [GitHub](https://github.com/mboisvertdupras/magic-convert/releases). Watch the repository to get notified when a new version is available, and download any version from the Releases page.
 
 
 == Screenshots ==

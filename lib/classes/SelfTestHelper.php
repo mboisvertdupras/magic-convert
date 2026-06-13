@@ -677,12 +677,14 @@ class SelfTestHelper
         if (strpos($headers['server'], 'nginx') === 0) {
 
             // Nginx
-            $log[] = 'Notice that you are on Nginx and the rules that Magic Convert stores in the *.htaccess* files probably does not ' .
-                'have any effect. ';
-            $log[] = 'Please read the "I am on Nginx" section in the FAQ (https://wordpress.org/plugins/magic-convert/)';
-            $log[] = 'And did you remember to restart the nginx service after updating the configuration?';
+            $log[] = 'Notice that you are on Nginx and the rules that Magic Convert stores in the *.htaccess* files have ' .
+                'no effect - Nginx does not read *.htaccess* files. ';
+            $log[] = 'Magic Convert has **native Nginx support**{: .ok}. Head over to the *Nginx* section on the Magic Convert ' .
+                'settings page: it generates a ready-to-install Nginx config for your exact setup and includes a live test ' .
+                'so you can verify it works.';
+            $log[] = 'And did you remember to restart (or reload) the nginx service after installing the configuration?';
 
-            $log[] = 'PS: If you cannot get the redirect to work, you can simply rely on Alter HTML as described in the FAQ.';
+            $log[] = 'PS: If you cannot install the Nginx config (ie on a managed host without config access), you can simply rely on Alter HTML instead.';
             return $log;
         }
 
@@ -787,9 +789,8 @@ class SelfTestHelper
                     $log[] = '';
                     $log[] = '**As the test script works, it would seem that the explanation for the 500 internal server ' .
                         'error is that the PHP script (webp-on-demand.php) crashes. ' .
-                        'You can help me by enabling debugging and post the error on the support forum on Wordpress ' .
-                        '(https://wordpress.org/support/plugin/magic-convert/), or create an issue on github ' .
-                        '(https://github.com/rosell-dk/webp-express/issues)**';
+                        'You can help by enabling debugging and creating an issue on GitHub ' .
+                        '(https://github.com/mboisvertdupras/magic-convert/issues) with the error**';
                     $log[] = '';
                 }
             } else {
@@ -836,9 +837,8 @@ class SelfTestHelper
                     $log[] = '';
                     $log[] = '**As the test script works, it would seem that the explanation for the 500 internal server ' .
                         'error is that the PHP script (webp-on-demand.php) crashes. ' .
-                        'You can help me by enabling debugging and post the error on the support forum on Wordpress ' .
-                        '(https://wordpress.org/support/plugin/magic-convert/), or create an issue on github ' .
-                        '(https://github.com/rosell-dk/webp-express/issues)**';
+                        'You can help by enabling debugging and creating an issue on GitHub ' .
+                        '(https://github.com/mboisvertdupras/magic-convert/issues) with the error**';
                     $log[] = '';
                 }
             } else {
