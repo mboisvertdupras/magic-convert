@@ -164,9 +164,9 @@ class PluginActivate
                 if ($rulesWritten) {
                     Messenger::addMessage(
                         'success',
-                        'Magic Convert is ready. Your images are now served as WebP/AVIF automatically. ' .
+                        'Magic Convert is ready. Your images are now served as WebP automatically. ' .
                             'Head to the <a href="' . Paths::getSettingsUrl() . '">settings page</a> to bulk-convert ' .
-                            'your existing images and tweak options.'
+                            'your existing images, enable AVIF and tweak options.'
                     );
                 } else {
                     // Config saved (State 'configured' is true), but the rewrite rules could not be
@@ -175,7 +175,7 @@ class PluginActivate
                     Messenger::addMessage(
                         'warning',
                         'Magic Convert was installed, but it could not write the rewrite rules that serve your ' .
-                            'images as WebP/AVIF (likely a file-permission issue), so automatic serving is not ' .
+                            'images as WebP (likely a file-permission issue), so automatic serving is not ' .
                             'active yet. Fix the permissions noted below, then re-save the settings ' .
                             '<a href="' . Paths::getSettingsUrl() . '">here</a>.'
                     );
