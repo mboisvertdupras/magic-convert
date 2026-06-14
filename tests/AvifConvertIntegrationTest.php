@@ -93,4 +93,67 @@ class AvifConvertIntegrationTest extends TestCase
             @unlink($dest);
         }
     }
+
+    public function testConfigBuiltStackEncodesAValidAvif(): void
+    {
+        // Prove the CONFIG-DRIVEN stack (AvifStack::fromConverterList, the path the conversion
+        // dispatch now uses) is a real, working stack — not just a correctly-ordered object.
+        $this->freshStackOrSkip(); // skip on hosts without any AVIF support
+
+        $stack = AvifStack::fromConverterList(array_map(
+            static fn ($id) => ['converter' => $id],
+            AvifStack::defaultConverterIds()
+        ));
+
+        $dest = tempnam(sys_get_temp_dir(), 'mc-avif-cfg-') . '.avif';
+        @unlink($dest);
+        try {
+            $result = $stack->convert(
+                $this->fixture('very-small.jpg'),
+                $dest,
+                ['quality' => 30, 'speed' => 6, 'metadata' => 'none']
+            );
+            $info = getimagesize($dest);
+            $this->assertIsArray($info);
+            $this->assertSame('image/avif', $info['mime']);
+            $this->assertNotSame('', $result['converter']);
+        } finally {
+            @unlink($dest);
+        }
+    }
+
+    public function testDeactivatingTheWinningConverterRemovesItFromTheStack(): void
+    {
+        // The exact bug the user reported: deactivating a converter must remove it from the AVIF
+        // stack. Machine-aware (adapts to whichever backend is operational here) but not flaky.
+        $full = $this->freshStackOrSkip();
+
+        $winner = null;
+        foreach ($full->selfTest() as $row) {
+            if ($row['operational']) {
+                $winner = $row['id'];
+                break;
+            }
+        }
+        $this->assertNotNull($winner, 'a freshly-operational stack must have at least one working converter');
+
+        // Build the list the UI produces when the user clicks "deactivate" on that converter:
+        // default order, all active EXCEPT the winner.
+        $list = array_map(static function ($id) use ($winner) {
+            $entry = ['converter' => $id];
+            if ($id === $winner) {
+                $entry['deactivated'] = true;
+            }
+            return $entry;
+        }, AvifStack::defaultConverterIds());
+
+        $filtered = AvifStack::fromConverterList($list);
+        $ids = array_map(static fn ($c) => $c->id(), $filtered->converters());
+
+        $this->assertNotContains(
+            $winner,
+            $ids,
+            'a deactivated converter must not appear in the AVIF stack (this is what was broken)'
+        );
+    }
 }

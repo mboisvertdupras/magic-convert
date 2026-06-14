@@ -15,18 +15,14 @@ $mcFormats = (isset($config['formats']) && is_array($config['formats'])) ? $conf
 $mcAvif = (isset($mcFormats['avif']) && is_array($mcFormats['avif'])) ? $mcFormats['avif'] : [];
 
 $mcAvifEnabled = isset($mcAvif['enabled']) ? (bool) $mcAvif['enabled'] : false;
-$mcAvifQuality = isset($mcAvif['quality']) ? intval($mcAvif['quality']) : 30;
-$mcAvifSpeed = isset($mcAvif['speed']) ? intval($mcAvif['speed']) : 6;
 ?>
 <fieldset class="block">
-    <button onclick="MagicConvert.SelfTest.openPopup('avifInfo')" class="button button-secondary" type="button" style="position: absolute; right: 15px; top:15px">
-        System AVIF capabilities
-    </button>
     <h3>Formats</h3>
     <p>
         Choose which image formats Magic Convert generates. <b>WebP</b> is always on — its quality and
         converter settings live in the <i>Conversion</i> section below. <b>AVIF</b> is newer and compresses
-        even smaller, but encodes much more slowly, so it is off by default.
+        even smaller, but encodes much more slowly, so it is off by default. AVIF quality, encoding speed
+        and conversion methods are configured in the <i>AVIF</i> section below.
     </p>
     <table class="form-table">
         <tbody>
@@ -52,43 +48,9 @@ $mcAvifSpeed = isset($mcAvif['speed']) ? intval($mcAvif['speed']) : 6;
                     >
                     <label for="avif_enabled">Enable AVIF<?php echo helpIcon(
                         '<p>AVIF typically produces smaller files than WebP at similar quality, but encoding is ' .
-                        'much slower (often several seconds per image). Generate AVIF using the bulk converter.</p>'
+                        'much slower (often several seconds per image). Generate AVIF using the bulk converter.</p>' .
+                        '<p>Quality, encoding speed and conversion methods are configured in the <i>AVIF</i> section below.</p>'
                     ); ?></label>
-
-                    <div id="avif_options_div" class="toggler effect-opacity" style="margin-top:12px;">
-                        <div style="margin:6px 0;">
-                            <label for="avif_quality">
-                                Quality
-                                <?php echo helpIcon('AVIF quality 30 looks similar to JPEG quality 75'); ?>
-                            </label>
-                            <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="1"
-                                id="avif_quality"
-                                name="avif-quality"
-                                value="<?php echo esc_attr($mcAvifQuality); ?>"
-                                style="width:64px; margin-left:6px;"
-                            >
-                        </div>
-                        <div style="margin:6px 0;">
-                            <label for="avif_speed">
-                                Encoding speed
-                                <?php echo helpIcon('Lower = smaller files but much slower. 6 is a good balance'); ?>
-                            </label>
-                            <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                step="1"
-                                id="avif_speed"
-                                name="avif-speed"
-                                value="<?php echo esc_attr($mcAvifSpeed); ?>"
-                                style="width:64px; margin-left:6px;"
-                            >
-                        </div>
-                    </div>
                 </td>
             </tr>
         </tbody>

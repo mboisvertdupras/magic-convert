@@ -30,6 +30,17 @@
 
             include_once 'prevent-using-webps-larger-than-original.inc';
 
+            // Cross-format behaviour settings (moved here from the WebP "Conversion"
+            // section). These are NOT WebP-specific — they apply to every enabled output
+            // format: "convert on upload" generates each enabled format (WebP + AVIF),
+            // bulk convert iterates them, and logging is written per-format. Hidden in
+            // no-conversion mode, exactly as before (they are meaningless without conversion).
+            if (($config['operation-mode'] != 'no-conversion')) {
+                include_once 'convert-on-upload.inc';
+                include_once 'logging.inc';
+                include_once 'bulk-convert.inc';
+            }
+
             ?>
         </tbody>
     </table>

@@ -2,6 +2,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
+use \MagicConvert\Avif\AvifStack;
 use \MagicConvert\CacheMover;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
@@ -12,6 +13,9 @@ use \MagicConvert\Messenger;
 use \MagicConvert\PathHelper;
 use \MagicConvert\Paths;
 use \MagicConvert\PlatformInfo;
+
+// Pure, side-effect-free AVIF converter-list sanitizer (shared with the unit tests).
+require_once __DIR__ . '/avif-converters-sanitize.php';
 
 // TODO: Move this code to a class
 
@@ -319,6 +323,24 @@ function magicconvert_getSanitizedConverters() {
 }
 
 /**
+ * Get the sanitized AVIF converter list from $_POST['avif-converters'] (a JSON array, like the
+ * WebP 'converters' field). Whitelisted against the known AVIF converter id space.
+ *
+ * The whitelist/dedup/shape logic lives in the side-effect-free helper
+ * magicconvert_sanitizeAvifConverters() (lib/options/avif-converters-sanitize.php, required at the
+ * top of this file) so it stays unit-testable without loading this admin-post handler.
+ *
+ * @return array  Sanitized ordered list of {converter[,deactivated:true]}.
+ */
+function magicconvert_getSanitizedAvifConverters() {
+    $posted = isset($_POST['avif-converters']) ? $_POST['avif-converters'] : '[]';
+    // WordPress slash-escapes POST globals (see note in magicconvert_getSanitizedConverters()).
+    $posted = json_decode(wp_unslash($posted), true);
+
+    return magicconvert_sanitizeAvifConverters($posted, AvifStack::defaultConverterIds());
+}
+
+/**
  * Get sanitized converters.
  *
  * @return array  Sanitized array of the converters json array received in $_POST
@@ -471,6 +493,7 @@ $sanitized = [
     'avif-enabled' => isset($_POST['avif-enabled']),
     'avif-quality' => magicconvert_getSanitizedClampedInt('avif-quality', 30, 0, 100),
     'avif-speed' => magicconvert_getSanitizedClampedInt('avif-speed', 6, 0, 10),
+    'avif-converters' => magicconvert_getSanitizedAvifConverters(),
 
 
     // Serve options
@@ -687,6 +710,15 @@ if ($sanitized['operation-mode'] != 'no-conversion') {
     $config['formats']['avif']['enabled'] = $sanitized['avif-enabled'];
     $config['formats']['avif']['quality'] = $sanitized['avif-quality'];
     $config['formats']['avif']['speed'] = $sanitized['avif-speed'];
+
+    // AVIF converter stack (order + per-converter deactivation), mirroring how config['converters']
+    // is written for WebP just above. Guard: only overwrite when the posted list is non-empty, so a
+    // submit where the AVIF list input is somehow absent (e.g. JS failed to load) cannot silently
+    // wipe the user's carefully-ordered stack. An empty result therefore preserves the existing
+    // config value (already merged with defaults by loadConfigAndFix()).
+    if (!empty($sanitized['avif-converters'])) {
+        $config['formats']['avif']['converters'] = $sanitized['avif-converters'];
+    }
 }
 
 $config['destination-structure'] = $sanitized['destination-structure'];

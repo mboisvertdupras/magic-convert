@@ -88,6 +88,124 @@ class AvifStack
     }
 
     /**
+     * The ids of the default production stack, in priority order — WITHOUT instantiating
+     * any converter object.
+     *
+     * This is the SINGLE SOURCE OF TRUTH for "which AVIF converters exist and in what default
+     * order". Config::getDefaultFormats() seeds formats.avif.converters from it, and submit.php
+     * whitelists posted ids against it. It deliberately returns plain strings so callers (Config,
+     * the sanitizer) can reference the AVIF stack WITHOUT loading the heavy converter classes /
+     * exec helpers — preserving the plugin's lazy-vendor-autoloader contract.
+     *
+     * Keep this in lock-step with defaultConverters() (same ids, same order).
+     *
+     * @return string[]  e.g. ['imagick','vips','gd','magick-binary','avifenc','cavif'].
+     */
+    public static function defaultConverterIds()
+    {
+        return ['imagick', 'vips', 'gd', 'magick-binary', 'avifenc', 'cavif'];
+    }
+
+    /**
+     * Instantiate the concrete converter for a given id, or null when the id is unknown.
+     *
+     * The mapping mirrors defaultConverters() one-to-one. Unknown ids return null so callers
+     * can skip them (a hand-edited config could carry a stale/typo id).
+     *
+     * @param  string  $id
+     * @return AbstractAvifConverter|null
+     */
+    private static function makeById($id)
+    {
+        switch ($id) {
+            case 'imagick':       return new ImagickAvif();
+            case 'vips':          return new VipsAvif();
+            case 'gd':            return new GdAvif();
+            case 'magick-binary': return new MagickBinaryAvif();
+            case 'avifenc':       return new AvifEncBinary();
+            case 'cavif':         return new CavifBinary();
+            default:              return null;
+        }
+    }
+
+    /**
+     * Build a stack from a config-driven converter list (formats.avif.converters).
+     *
+     * This is what makes the AVIF stack honour the user's settings — the reorderable,
+     * per-converter activate/deactivate list configured in the AVIF section. It mirrors how the
+     * WebP path honours config['converters'] (order = try order; 'deactivated' = skip).
+     *
+     * Each list item is an associative array shaped like {converter:<id>, deactivated?:bool},
+     * exactly as Config seeds it and submit.php sanitizes it.
+     *
+     * Resolution rules (chosen to honour deliberate user intent while staying defensive against a
+     * missing/corrupt config — never crashing, never producing a confusing partial stack):
+     *
+     *   - $converterList is not a non-empty array (missing/pre-migration/malformed)
+     *       -> fall back to the FULL default stack. With AVIF freshly enabled but the per-format
+     *          'converters' key somehow absent, conversion still works out of the box.
+     *   - The list references NO known converter id at all (e.g. every entry is a stale/typo id)
+     *       -> treat as malformed -> FULL default stack.
+     *   - The list references known ids but the user deactivated EVERY one
+     *       -> honour it: return an EMPTY stack. convert() then throws a clear "No AVIF converters
+     *          are configured" message — the same outcome the WebP path gives when all its
+     *          converters are deactivated (parity, and it respects an explicit user choice).
+     *   - Otherwise -> the operational converters, in the configured order, deactivated ones
+     *          skipped, unknown ids skipped, duplicate ids collapsed to first occurrence.
+     *
+     * @param  mixed  $converterList  Typically array<int,array{converter:string,deactivated?:bool}>.
+     * @return self
+     */
+    public static function fromConverterList($converterList)
+    {
+        if (!is_array($converterList) || count($converterList) === 0) {
+            // Missing / malformed / pre-migration: full default stack (never empty).
+            return new self();
+        }
+
+        $known = self::defaultConverterIds();
+        $converters = [];
+        $seen = [];
+        $sawKnownId = false;
+
+        foreach ($converterList as $item) {
+            $id = (is_array($item) && isset($item['converter'])) ? $item['converter'] : null;
+            if ($id === null || !in_array($id, $known, true)) {
+                // Missing or unknown converter id — ignore it.
+                continue;
+            }
+            $sawKnownId = true;
+            if (isset($seen[$id])) {
+                // Duplicate id — first occurrence (and its position) wins.
+                continue;
+            }
+            $seen[$id] = true;
+            if (!empty($item['deactivated'])) {
+                // User turned this converter off for AVIF — skip it.
+                continue;
+            }
+            $converter = self::makeById($id);
+            if ($converter === null) {
+                // Defence in depth: $id passed the defaultConverterIds() whitelist above, so
+                // makeById() should always resolve it. Guard anyway so a future edit that adds an
+                // id to defaultConverterIds() but forgets the makeById() case can never push a null
+                // into the stack (which would fatal later at $converter->label()).
+                continue;
+            }
+            $converters[] = $converter;
+        }
+
+        if (!$sawKnownId) {
+            // The list named no recognisable converter at all — treat as malformed and fall back
+            // to the full default stack rather than failing every conversion.
+            return new self();
+        }
+
+        // Known ids were present; honour the selection even if it is empty (all deactivated).
+        return new self($converters);
+    }
+
+    /**
      * Convert $source to AVIF at $destination using the first operational converter.
      *
      * @param  string  $source       absolute path to an existing source image.

@@ -9,7 +9,7 @@ use \MagicConvert\Config;
 // a change of filename is neccessary, as there is a plugin that strips version strings out there...!
 // If only one file update is critical: change the name of the file
 // If several files are critical: rename the folder (ie "js2")
-$ver = '5';  // note: Minimum 1.  (bumped for the Phase 2.5 multi-format bulk-convert rewrite)
+$ver = '7';  // note: Minimum 1.  (bumped: bulk-convert deadlock fix + self-tuning concurrency)
 $jsDir = 'js';
 
 if (!function_exists('magic_convert_add_inline_script')) {
@@ -68,6 +68,27 @@ if (!(isset($config['operation-mode']) && ($config['operation-mode'] == 'no-conv
         'before'
     );
     wp_enqueue_script('converters');
+
+    // AVIF converters
+    // ---------------
+    // Mirrors the WebP converters plumbing above, but for the SEPARATE AVIF converter stack
+    // (formats.avif.converters). The entries already carry transient working/error status
+    // (annotated in Config::getConfigForOptionsPage) so the list can render ✓/✗ per converter.
+    // Depends on 'converters' (which injects window.magicConvertPaths) and 'page' (window.magicConvert,
+    // carrying the convert ajax-nonce) in addition to sortable/daspopup/escapehtml — the per-converter
+    // "test" link reads those globals, so declare the dependency rather than rely on enqueue order.
+    wp_register_script('avifconverters', plugins_url($jsDir . '/avif-converters.js', __FILE__), ['converters', 'page', 'sortable', 'daspopup', 'escapehtml'], $ver);
+
+    $avifConverters = (isset($config['formats']['avif']['converters']) && is_array($config['formats']['avif']['converters']))
+        ? array_values($config['formats']['avif']['converters'])
+        : [];
+    // PS: no escaping/sanitizing needed as json_encode always produces something safe
+    magic_convert_add_inline_script(
+        'avifconverters',
+        'window.avifConverters = ' . json_encode($avifConverters) . ';',
+        'before'
+    );
+    wp_enqueue_script('avifconverters');
 
     // Whitelist
     // ---------

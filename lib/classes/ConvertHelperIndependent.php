@@ -834,7 +834,15 @@ APACHE
                         . ', metadata=' . $avifOptions['metadata'] . ')');
                     $logger->logLn('');
 
-                    $stack = new AvifStack();
+                    // Build the AVIF stack from the configured converter list (order +
+                    // per-converter deactivation), threaded in under $convertOptions['avif']
+                    // ['converters'] by Convert.php. fromConverterList() falls back to the full
+                    // default stack when the list is empty/missing, so callers that don't thread
+                    // a list (legacy/on-demand) still get the complete stack — backward compatible.
+                    $avifConverterList = (isset($convertOptions['avif']['converters']) && is_array($convertOptions['avif']['converters']))
+                        ? $convertOptions['avif']['converters']
+                        : [];
+                    $stack = AvifStack::fromConverterList($avifConverterList);
                     $result = $stack->convert($source, $tempDestination, $avifOptions);
 
                     // Surface the per-converter "tried/succeeded/why-failed" trail in the

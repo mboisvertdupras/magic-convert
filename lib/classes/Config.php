@@ -124,8 +124,15 @@ class Config
      *
      * formats.avif, by contrast, is a brand-new format with no legacy consumers, so it owns its
      * own settings here: `enabled` (false by default — see the zero-config / byte-for-byte
-     * equivalence requirement), `quality` (30, "AVIF Q30 ≈ JPEG Q75"), and `speed` (0-10 encoding
-     * effort, 6 = good balance). The AVIF converter stack (Phase 2.3) will read these.
+     * equivalence requirement), `quality` (30, "AVIF Q30 ≈ JPEG Q75"), `speed` (0-10 encoding
+     * effort, 6 = good balance), and `converters` (the per-format AVIF converter stack — an ordered,
+     * per-converter activate/deactivate list, mirroring the top-level WebP config['converters']).
+     * The AVIF converter stack (Phase 2.3) reads quality/speed; the conversion dispatch reads
+     * `converters` to honour the user's order + deactivations (AvifStack::fromConverterList()).
+     *
+     * NOTE — formats.avif.converters is DISTINCT from the top-level config['converters'] (the WebP
+     * stack). They share some names ('vips', 'gd', 'imagick') but are different id spaces and
+     * different code paths: deactivating WebP's 'vips' must NOT touch AVIF, and vice-versa.
      *
      * @return array<string,array<string,mixed>>
      */
@@ -143,6 +150,17 @@ class Config
                 'enabled' => false,
                 'quality' => 30,    // AVIF Q30 looks similar to JPEG Q75.
                 'speed' => 6,       // Encoding effort 0-10. Lower = smaller but much slower; 6 balances.
+                // The AVIF converter stack, in priority (try) order, all active by default. Seeded
+                // DRY from AvifStack::defaultConverterIds() (which returns plain id strings WITHOUT
+                // instantiating any converter object, so building defaults stays cheap and never
+                // loads the heavy Avif\* / exec-helper classes). Each entry is {converter:<id>} and
+                // gains an optional 'deactivated' => true when the user turns it off in the UI.
+                'converters' => array_map(
+                    static function ($id) {
+                        return ['converter' => $id];
+                    },
+                    \MagicConvert\Avif\AvifStack::defaultConverterIds()
+                ),
             ],
         ];
     }
@@ -485,7 +503,22 @@ class Config
             if (!isset($config['formats']) || !is_array($config['formats'])) {
                 $config['formats'] = $defaultConfig['formats'];
             } else {
+                // formats.avif.converters is an ORDERED LIST, not a mergeable map.
+                // array_replace_recursive() merges lists index-wise, so a shorter (hand-edited)
+                // list would have the default's tail entries re-appended (producing duplicates).
+                // Capture the user's list first and restore it verbatim after the recursive merge,
+                // so the ordered stack is always taken wholesale (its membership is managed as a
+                // unit by submit.php). When the key is absent the merge fills it from defaults.
+                $userAvifConverters = (isset($config['formats']['avif']['converters'])
+                    && is_array($config['formats']['avif']['converters']))
+                    ? $config['formats']['avif']['converters']
+                    : null;
+
                 $config['formats'] = array_replace_recursive($defaultConfig['formats'], $config['formats']);
+
+                if ($userAvifConverters !== null) {
+                    $config['formats']['avif']['converters'] = $userAvifConverters;
+                }
             }
 
             // Stamp the schema version if missing (e.g. a direct fix() caller bypassing loadConfigAndFix).
@@ -701,9 +734,65 @@ class Config
 
         if ($config['operation-mode'] != 'no-conversion') {
             $config = self::updateConverterStatusWithFreshTest($config);
+            $config = self::annotateAvifConverterStatus($config);
         }
 
         self::$configForOptionsPage = $config;  // cache the result
+        return $config;
+    }
+
+    /**
+     * Annotate each formats.avif.converters entry with live operational status for the options UI.
+     *
+     * The AVIF section shows a per-converter ✓/✗ exactly like the WebP list. Rather than a live
+     * AJAX probe, we run ONE capability detection over the FULL default AVIF stack
+     * (AvifStack::selfTest() — "what CAN this machine encode AVIF with"), index it by converter id,
+     * and stamp each saved-list entry with:
+     *   - 'working' => bool   (true when this backend is operational on this host right now)
+     *   - 'error'   => string (the precise reason when NOT operational — e.g. "GD compiled without
+     *                          AVIF support"; omitted when operational).
+     *
+     * These are TRANSIENT, render-only fields: they are computed here for getConfigForOptionsPage()
+     * (which feeds both the page and window.avifConverters), and the submit sanitizer strips them,
+     * so they are never persisted to config.json. selfTest() only inspects extensions/binaries (no
+     * encoding), so this is cheap — on par with the WebP status probe already running just above.
+     *
+     * Defensive: a config without an avif converters list (shouldn't happen post-fix()) is returned
+     * untouched.
+     *
+     * @param  array  $config
+     * @return array
+     */
+    private static function annotateAvifConverterStatus($config)
+    {
+        if (
+            !isset($config['formats']['avif']['converters'])
+            || !is_array($config['formats']['avif']['converters'])
+        ) {
+            return $config;
+        }
+
+        // Full default stack: capability detection (what is POSSIBLE), independent of the user's
+        // order/deactivation — the status of a deactivated converter is still meaningful to show.
+        $rows = [];
+        foreach ((new \MagicConvert\Avif\AvifStack())->selfTest() as $row) {
+            $rows[$row['id']] = $row;
+        }
+
+        foreach ($config['formats']['avif']['converters'] as &$entry) {
+            $id = isset($entry['converter']) ? $entry['converter'] : null;
+            if ($id !== null && isset($rows[$id])) {
+                $entry['working'] = (bool) $rows[$id]['operational'];
+                if (!$rows[$id]['operational']) {
+                    $entry['error'] = $rows[$id]['reason'];
+                }
+            } else {
+                // Unknown id (hand-edited config) — show as not operational rather than omit.
+                $entry['working'] = false;
+            }
+        }
+        unset($entry);
+
         return $config;
     }
 
@@ -961,6 +1050,12 @@ class Config
                 'enabled' => isset($avifFmt['enabled']) ? (bool) $avifFmt['enabled'] : false,
                 'quality' => isset($avifFmt['quality']) ? intval($avifFmt['quality']) : $formatDefaults['avif']['quality'],
                 'speed' => isset($avifFmt['speed']) ? intval($avifFmt['speed']) : $formatDefaults['avif']['speed'],
+                // The configured AVIF converter stack (order + per-converter deactivation) so the
+                // wod scripts honour the user's selection without loading the full WordPress config.
+                // array_values() guarantees a clean JSON list. Falls back to the default stack.
+                'converters' => (isset($avifFmt['converters']) && is_array($avifFmt['converters']))
+                    ? array_values($avifFmt['converters'])
+                    : $formatDefaults['avif']['converters'],
             ],
         ];
 

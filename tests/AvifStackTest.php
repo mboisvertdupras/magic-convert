@@ -214,6 +214,125 @@ class AvifStackTest extends TestCase
             $ids
         );
     }
+
+    public function testDefaultConverterIdsMatchPriorityOrder(): void
+    {
+        // The id-only list (no instantiation) must mirror defaultConverters() exactly.
+        $this->assertSame(
+            ['imagick', 'vips', 'gd', 'magick-binary', 'avifenc', 'cavif'],
+            AvifStack::defaultConverterIds()
+        );
+        $this->assertSame(
+            array_map(static fn ($c) => $c->id(), AvifStack::defaultConverters()),
+            AvifStack::defaultConverterIds()
+        );
+    }
+
+    // --- config-driven stack (formats.avif.converters) ------------------------
+
+    /** Helper: the ids of the converters a stack ended up with, in order. */
+    private static function idsOf(AvifStack $stack): array
+    {
+        return array_map(static fn ($c) => $c->id(), $stack->converters());
+    }
+
+    public function testFromConverterListOrdersAndFiltersByConfig(): void
+    {
+        // Reordered, with one converter explicitly deactivated.
+        $stack = AvifStack::fromConverterList([
+            ['converter' => 'avifenc'],
+            ['converter' => 'imagick', 'deactivated' => true],
+            ['converter' => 'gd'],
+        ]);
+        // imagick is skipped (deactivated); the rest keep the configured order.
+        $this->assertSame(['avifenc', 'gd'], self::idsOf($stack));
+    }
+
+    public function testFromConverterListSkipsUnknownIdsButKeepsValidOnes(): void
+    {
+        $stack = AvifStack::fromConverterList([
+            ['converter' => 'imagick'],
+            ['converter' => 'bogus'],
+            ['converter' => 'cavif'],
+        ]);
+        $this->assertSame(['imagick', 'cavif'], self::idsOf($stack));
+    }
+
+    public function testFromConverterListCollapsesDuplicateIdsToFirst(): void
+    {
+        $stack = AvifStack::fromConverterList([
+            ['converter' => 'vips'],
+            ['converter' => 'gd'],
+            ['converter' => 'vips'], // duplicate -> ignored
+        ]);
+        $this->assertSame(['vips', 'gd'], self::idsOf($stack));
+    }
+
+    public function testFromConverterListFallsBackToFullStackWhenMissingOrMalformed(): void
+    {
+        $defaults = AvifStack::defaultConverterIds();
+
+        // Empty / null / non-array => defensive full default stack.
+        $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList([])));
+        $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList(null)));
+        $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList('nonsense')));
+
+        // A list that names NO recognisable converter is treated as malformed.
+        $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList([
+            ['converter' => 'bogus'],
+            ['nope' => true],
+        ])));
+    }
+
+    public function testFromConverterListHonoursAllDeactivatedAsEmptyStack(): void
+    {
+        // Known ids present but every one is deactivated: respect the user's choice.
+        // An empty stack yields the clear "No AVIF converters are configured" message
+        // (parity with the WebP path), rather than silently re-enabling everything.
+        $stack = AvifStack::fromConverterList(
+            array_map(
+                static fn ($id) => ['converter' => $id, 'deactivated' => true],
+                AvifStack::defaultConverterIds()
+            )
+        );
+        $this->assertSame([], self::idsOf($stack));
+        $this->assertFalse($stack->isOperational());
+
+        try {
+            $stack->convert('/src', '/dst', []);
+            $this->fail('expected AvifStackException for an empty stack');
+        } catch (AvifStackException $e) {
+            $this->assertStringContainsString('No AVIF converters are configured', $e->getMessage());
+        }
+    }
+
+    public function testFromConverterListBuildsRealConvertersWithExpectedClasses(): void
+    {
+        $stack = AvifStack::fromConverterList([['converter' => 'gd']]);
+        $converters = $stack->converters();
+        $this->assertCount(1, $converters);
+        $this->assertInstanceOf(\MagicConvert\Avif\GdAvif::class, $converters[0]);
+    }
+
+    public function testEveryDefaultIdResolvesToANonNullConverter(): void
+    {
+        // Maintenance guard: building the full default list must yield a converter object for EVERY
+        // id (no nulls slipping in). Catches the case where a new id is added to defaultConverterIds()
+        // but its makeById() mapping is forgotten — which would otherwise fatal at convert() time.
+        $stack = AvifStack::fromConverterList(array_map(
+            static fn ($id) => ['converter' => $id],
+            AvifStack::defaultConverterIds()
+        ));
+        $converters = $stack->converters();
+        $this->assertCount(count(AvifStack::defaultConverterIds()), $converters);
+        foreach ($converters as $c) {
+            $this->assertInstanceOf(AbstractAvifConverter::class, $c);
+        }
+        $this->assertSame(
+            AvifStack::defaultConverterIds(),
+            array_map(static fn ($c) => $c->id(), $converters)
+        );
+    }
 }
 
 /**

@@ -4,6 +4,7 @@ namespace MagicConvert;
 
 use \WebPConvert\Convert\Converters\Ewww;
 
+use \MagicConvert\Avif\AvifStack;
 use \MagicConvert\ConvertHelperIndependent;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
@@ -128,13 +129,15 @@ class Convert
 
             // AVIF per-format options (Phase 2.3).
             // -------------------------------
-            // When converting to AVIF, thread the formats.avif quality/speed into the
-            // options array under an 'avif' key so the (WordPress-independent) core can
-            // hand them to the AvifStack. Metadata is NOT duplicated here: the AVIF
-            // stack reads the global 'metadata' option already present in $convertOptions,
-            // keeping metadata handling consistent with the webp path. This block only
-            // runs for AVIF, so with AVIF disabled the options array is byte-for-byte
-            // unchanged.
+            // When converting to AVIF, thread the formats.avif quality/speed AND the configured
+            // AVIF converter stack (order + per-converter deactivation) into the options array
+            // under an 'avif' key so the (WordPress-independent) core can hand them to the
+            // AvifStack. The converter list is what makes deactivating/reordering AVIF converters
+            // in the settings actually affect AVIF conversion (AvifStack::fromConverterList()).
+            // Metadata is NOT duplicated here: the AVIF stack reads the global 'metadata' option
+            // already present in $convertOptions, keeping metadata handling consistent with the
+            // webp path. This block only runs for AVIF, so with AVIF disabled the options array is
+            // byte-for-byte unchanged.
             $formatObj = OutputFormat::coerce($format);
             if ($formatObj->id() === 'avif') {
                 $avifCfg = (isset($config['formats']['avif']) && is_array($config['formats']['avif']))
@@ -143,6 +146,9 @@ class Convert
                 $convertOptions['avif'] = [
                     'quality' => isset($avifCfg['quality']) ? intval($avifCfg['quality']) : 30,
                     'speed' => isset($avifCfg['speed']) ? intval($avifCfg['speed']) : 6,
+                    'converters' => (isset($avifCfg['converters']) && is_array($avifCfg['converters']))
+                        ? $avifCfg['converters']
+                        : [],
                 ];
             }
 
@@ -305,12 +311,35 @@ class Convert
             // PS: No need to check mime version as webp-convert does that.
 
 
+            // Check output format (defaults to webp). The AVIF "test" link sends format=avif so a
+            // single AVIF converter can be exercised with a real encode.
+            // ---------------------
+            $checking = '"format" argument';
+            $format = OutputFormat::DEFAULT_ID;
+            if (isset($_POST['format'])) {
+                $candidateFormat = sanitize_text_field(wp_unslash($_POST['format']));
+                if (in_array($candidateFormat, OutputFormat::ids(), true)) {
+                    $format = $candidateFormat;
+                }
+            }
+
+
             // Check converter id
             // ---------------------
             $checking = '"converter" argument';
             if (isset($_POST['converter'])) {
                 $converterId = sanitize_text_field($_POST['converter']);
-                Validate::isConverterId($converterId);
+                if ($format === 'avif') {
+                    // AVIF converter ids are a DIFFERENT id space than WebP (and may contain '-',
+                    // e.g. 'magick-binary'), so the WebP-oriented Validate::isConverterId() does not
+                    // apply. Accept only a known AVIF id; anything else is ignored, in which case the
+                    // test simply runs the full configured AVIF stack.
+                    if (!in_array($converterId, AvifStack::defaultConverterIds(), true)) {
+                        $converterId = null;
+                    }
+                } else {
+                    Validate::isConverterId($converterId);
+                }
             }
 
 
@@ -344,12 +373,27 @@ class Convert
         // shared runConversion() core so the REST endpoint executes the exact same
         // code path. The AJAX path never opts into skip-if-fresh: a manual
         // single-file convert from the test/convert UI should always re-encode.
-        $result = self::runConversion(
-            $filename,
-            $converterId,
-            $configOverrides,
-            false
-        );
+        if ($format === 'avif') {
+            // AVIF per-converter "test": encode a sample image with the AVIF stack. When a known
+            // AVIF converter was requested, force the stack to JUST that converter so the test
+            // isolates it (otherwise the full configured stack runs). We go straight to the shared,
+            // security-hardened convertFile() rather than the WebP-shaped runConversion() path —
+            // config-overrides / specific-converter regeneration are WebP concepts that do not
+            // apply to AVIF (its converters take only quality/speed/metadata, not webp-convert
+            // options). convertFile() still runs the same path-containment guard for every caller.
+            $config = Config::loadConfigAndFix();
+            if (!is_null($converterId)) {
+                $config['formats']['avif']['converters'] = [['converter' => $converterId]];
+            }
+            $result = self::convertFile($filename, $config, null, null, false, 'avif');
+        } else {
+            $result = self::runConversion(
+                $filename,
+                $converterId,
+                $configOverrides,
+                false
+            );
+        }
 
         $nonceTick = wp_verify_nonce($_REQUEST['nonce'], 'magicconvert-ajax-convert-nonce');
         if ($nonceTick == 2) {

@@ -50,7 +50,15 @@ class HandleUploadHooks
             return;
         }
 
-        Convert::convertFile($filename, $config);
+        // Convert to every enabled output format — not just WebP. enabledFormatIds()
+        // is the SAME single source of truth the bulk/REST/CLI paths use (webp always;
+        // avif only when enabled in the Formats section), so "convert on upload" stays
+        // in lock-step with them. Generating the .avif alongside the .webp at upload time
+        // is what lets the serve-time rules actually prefer AVIF (then WebP, then the
+        // original) — those rules only ever match when the converted file already exists.
+        foreach (Config::enabledFormatIds($config) as $format) {
+            Convert::convertFile($filename, $config, null, null, false, $format);
+        }
 
     }
 

@@ -651,3 +651,144 @@ ul.with-bullets {
     right: 0;
     left: 3%;
 }
+
+
+/* ---------------------------------------------------------------------------
+   AVIF converter list — same look & behaviour as the WebP #converters list,
+   retargeted to the separate #avif-converters list. Only #avif-converters-
+   specific rules are duplicated; shared .popup/.help styling already applies
+   by class. (Duplicated rather than sharing a CSS class because the drag
+   handlers overwrite the list element's className, which would drop it.)
+   --------------------------------------------------------------------------- */
+#avif-converters li {
+    border: 1px solid grey;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    line-height: 1.4em;
+    background-color: #fff;
+    padding: 6px 10px 0;
+    max-width: 400px;
+    min-height: 26px;
+    position: relative;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+#avif-converters li {
+    cursor: move;
+}
+#avif-converters li:hover {
+    border-color: #000;
+    box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+#avif-converters li.deactivated {
+    border-color: #ccc;
+    background-color: #f0f0f0;
+    min-height: auto;
+    height: 22px;
+    padding-top: 3px;
+}
+#avif-converters li.deactivated:hover {
+    border-color: #999;
+}
+#avif-converters li.deactivated,
+#avif-converters li.deactivated a.configure-converter,
+#avif-converters li.deactivated a.test-converter,
+#avif-converters li.deactivated a.activate-converter {
+    color: #888;
+}
+#avif-converters li.not-operational {
+    border-style: dotted;
+    border-color: #666;
+}
+#avif-converters li.not-operational:hover {
+    border-style: solid;
+}
+#avif-converters li a {
+    cursor: pointer;
+}
+#avif-converters li[data-id='gmagick'] a.configure-converter {
+    visibility: hidden;
+}
+#avif-converters li > * {
+    vertical-align: middle;
+
+}
+#avif-converters li > div {
+    display: inline-block;
+    line-height: 1;
+}
+#avif-converters li > .text {
+    padding-left: 10px;
+    width: 160px;
+}
+#avif-converters li > a.btn {
+/*    border: 1px solid transparent;
+    border-radius: 8px;
+    */
+    padding: 2px 6px;
+    margin-right: 4px;
+    text-decoration: none;
+}
+#avif-converters li > a.btn:hover {
+    text-decoration: underline;
+    /*border-color: #666;
+    background-color: #eee;*/
+}
+#avif-converters li > a.configure-converter {
+}
+#avif-converters li .status {
+    font-size: 10px;
+    position: absolute;
+    right: 7px;
+    bottom: 3px;
+}
+#avif-converters li .status svg {
+    padding: 0px;
+}
+#avif-converters li svg#status_ok {
+    color: #008000;
+}
+#avif-converters li.deactivated svg#status_ok {
+    color: #99cc99;
+}
+#avif-converters li svg#status_not_ok {
+    color: #b11010; /* 444444 */
+}
+#avif-converters li svg#status_warning {
+    color: #dc0;
+}
+#avif-converters li.deactivated svg#status_not_ok {
+    color: #999999;
+}
+#avif-converters li.deactivated .status {
+    bottom: unset;
+}
+#avif-converters li.deactivated .status svg {
+    width: 15px;
+    padding: 0;
+}
+#avif-converters li .popup {
+    display: none;
+    position: absolute;
+    border: 1px solid #666;
+    z-index:2;
+    background-color: #ffffaa;
+    padding: 8px 10px;
+    /*left: 22px;
+    top: 20px;*/
+    margin-top: -5px;
+    /*white-space: nowrap;*/
+    min-width: 150px;
+}
+#avif-converters li.operational .popup {
+    background-color: #80ff80;
+}
+#avif-converters li.has-warnings .popup {
+    background-color: #ff5;
+}
+#avif-converters li:hover .status .popup {
+    display: block;
+}
+#avif-converters.dragging li:hover .status .popup {
+    display: none;
+
+}

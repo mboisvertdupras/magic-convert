@@ -63,4 +63,27 @@ class AvifNoticeTest extends TestCase
             AvifNotice::shouldShow($this->avifEnabledConfig(true), $this->stackThatIs(false), true)
         );
     }
+
+    public function testUnaffectedByPresenceOfAvifConverterList(): void
+    {
+        // Regression guard: the notice decision must depend ONLY on formats.avif.enabled (+ the
+        // injected stack's operability + dismissed flag), NOT on the new formats.avif.converters
+        // list. A config carrying a custom converter list must yield the identical decision.
+        $withList = [
+            'formats' => [
+                'webp' => ['enabled' => true],
+                'avif' => [
+                    'enabled' => true,
+                    'converters' => [
+                        ['converter' => 'imagick', 'deactivated' => true],
+                        ['converter' => 'gd'],
+                    ],
+                ],
+            ],
+        ];
+
+        // Same operability/dismissed inputs as testShownWhenAvifEnabledButNoConverterOperational.
+        $this->assertTrue(AvifNotice::shouldShow($withList, $this->stackThatIs(false), false));
+        $this->assertFalse(AvifNotice::shouldShow($withList, $this->stackThatIs(true), false));
+    }
 }
