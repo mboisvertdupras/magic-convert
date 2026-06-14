@@ -251,7 +251,7 @@ class ConvertHelperIndependent
                             'automatically stop to structure the webp files as relative to document root and instead structure them as relative to image root folders.'
                         );
                     }
-                    $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
+                    $docRoot = rtrim(realpath(PathHelper::getDocumentRoot()), '/');
                     $imageRoot = $webExpressContentDirAbs . '/' . $cacheDirName;
 
                     // TODO: make this check work with symlinks
@@ -357,7 +357,7 @@ class ConvertHelperIndependent
                     // We also eat the slash (+1)
                     $sourceRel = substr($destination, strlen($imageRoot) + 1);
 
-                    $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
+                    $docRoot = rtrim(realpath(PathHelper::getDocumentRoot()), '/');
                     $source = $docRoot . '/' . $sourceRel;
                     $source =  preg_replace('/\\.(' . $extQuoted . ')$/', '', $source);
                 } else {
@@ -398,7 +398,7 @@ class ConvertHelperIndependent
 
                             $sourceRel = substr($destinationResolved, strlen($imageRootResolved) + 1);
 
-                            $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
+                            $docRoot = rtrim(realpath(PathHelper::getDocumentRoot()), '/');
                             $source = $docRoot . '/' . $sourceRel;
                             $source =  preg_replace('/\\.(' . $extQuoted . ')$/', '', $source);
                             return $source;
@@ -616,7 +616,7 @@ class ConvertHelperIndependent
             // "Eat" the left part off the source parameter which contains the document root.
             // and also eat the slash (+1)
 
-            $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
+            $docRoot = rtrim(realpath(PathHelper::getDocumentRoot()), '/');
             $sourceRel = substr($source, strlen($docRoot) + 1);
             $logFileName = $logDir . '/doc-root/' . $sourceRel . '.md';
             SanityCheck::absPathIsInDocRoot($logFileName);
@@ -675,7 +675,7 @@ APACHE
             self::createLogDir($logDir);
         }
 
-        $text = preg_replace('#' . preg_quote($_SERVER["DOCUMENT_ROOT"]) . '#', '[doc-root]', $text);
+        $text = preg_replace('#' . preg_quote(PathHelper::getDocumentRoot()) . '#', '[doc-root]', $text);
 
         // TODO: Put version number somewhere else. Ie \MagicConvert\VersionNumber::version
         $text = 'Magic Convert 0.25.14. ' . $msgTop . ', ' . date("Y-m-d H:i:s") . "\n\r\n\r" . $text;

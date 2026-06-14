@@ -89,13 +89,7 @@ class Paths
     public static function docRootStatusText()
     {
         if (!PathHelper::isDocRootAvailable()) {
-            if (!isset($_SERVER['DOCUMENT_ROOT'])) {
-                return 'Unavailable (DOCUMENT_ROOT is not set in the global $_SERVER var)';
-            }
-            if ($_SERVER['DOCUMENT_ROOT'] == '') {
-                return 'Unavailable (empty string)';
-            }
-            return 'Unavailable';
+            return 'Unavailable (could not be derived from ABSPATH and site_url())';
         }
 
         $imageRootsWithin = self::canUseDocRootForRelPaths();

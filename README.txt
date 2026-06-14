@@ -3,7 +3,7 @@ Contributors: mboisvertdupras, rosell.dk
 Tags: webp, avif, images, performance
 Requires at least: 5.9
 Tested up to: 6.9
-Stable tag: 0.26.1
+Stable tag: 0.26.2
 Requires PHP: 8.1
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html

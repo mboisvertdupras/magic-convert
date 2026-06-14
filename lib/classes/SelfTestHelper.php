@@ -404,11 +404,11 @@ class SelfTestHelper
         $log[] = '- Server software: ' . $_SERVER["SERVER_SOFTWARE"];
         $log[] = '- Document Root status: ' . Paths::docRootStatusText();
         if (PathHelper::isDocRootAvailable()) {
-            $log[] = '- Document Root: ' . $_SERVER['DOCUMENT_ROOT'];
-        }
-        if (PathHelper::isDocRootAvailableAndResolvable()) {
-            if ($_SERVER['DOCUMENT_ROOT'] != realpath($_SERVER['DOCUMENT_ROOT'])) {
-                $log[] = '- Document Root (symlinked resolved): ' . realpath($_SERVER['DOCUMENT_ROOT']);
+            $docRoot = PathHelper::getDocumentRoot();
+            $log[] = '- Document Root (derived from ABSPATH + site_url()): ' . $docRoot;
+            $log[] = '- $_SERVER[DOCUMENT_ROOT] (for reference): ' . (isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : '(not set)');
+            if (PathHelper::isDocRootAvailableAndResolvable() && ($docRoot != realpath($docRoot))) {
+                $log[] = '- Document Root (symlinked resolved): ' . realpath($docRoot);
             }
         }
 

@@ -120,4 +120,47 @@ class PathHelperTest extends TestCase
     {
         $this->assertSame('a/b/c', PathHelper::getRelDir('/root', '/root/a/b/c'));
     }
+
+    /**
+     * deriveDocumentRoot() must return the web root that maps to the site's root
+     * URL, derived from ABSPATH and the site_url() path — so it is correct for
+     * Bedrock and other "WordPress in a subdirectory" layouts, in web and CLI
+     * alike, without relying on $_SERVER['DOCUMENT_ROOT'].
+     */
+    public function testDeriveDocumentRootForBedrock()
+    {
+        // Bedrock: core in /web/wp, web root /web (site_url path "/wp").
+        $this->assertSame(
+            '/srv/site/web',
+            PathHelper::deriveDocumentRoot('/srv/site/web/wp/', '/wp')
+        );
+    }
+
+    public function testDeriveDocumentRootForClassicInstall()
+    {
+        // Classic install at the web root: site_url() has no path, so the web
+        // root IS ABSPATH.
+        $this->assertSame('/var/www/html', PathHelper::deriveDocumentRoot('/var/www/html/', ''));
+        $this->assertSame('/var/www/html', PathHelper::deriveDocumentRoot('/var/www/html/', null));
+    }
+
+    public function testDeriveDocumentRootForWordPressInSubdirectory()
+    {
+        // WP installed under /blog: ABSPATH /var/www/html/blog, site_url path
+        // "/blog" -> web root /var/www/html.
+        $this->assertSame(
+            '/var/www/html',
+            PathHelper::deriveDocumentRoot('/var/www/html/blog/', '/blog')
+        );
+    }
+
+    public function testDeriveDocumentRootFallsBackToAbsPathOnUnexpectedLayout()
+    {
+        // If ABSPATH does not end with the site_url() path, fall back to ABSPATH
+        // rather than returning a wrong (stripped) path.
+        $this->assertSame(
+            '/var/www/html',
+            PathHelper::deriveDocumentRoot('/var/www/html/', '/some/other/path')
+        );
+    }
 }

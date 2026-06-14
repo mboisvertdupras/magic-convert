@@ -283,14 +283,12 @@ class SanityCheck
     {
         self::absPath($input);
 
-        if (!isset($_SERVER["DOCUMENT_ROOT"])) {
-            return $input;
-        }
-        if ($_SERVER["DOCUMENT_ROOT"] == '') {
+        $docRoot = PathHelper::getDocumentRoot();
+        if ($docRoot === '') {
             return $input;
         }
 
-        $docRoot = self::absPath($_SERVER["DOCUMENT_ROOT"]);
+        $docRoot = self::absPath($docRoot);
         $docRoot = rtrim($docRoot, '/');
 
         try {

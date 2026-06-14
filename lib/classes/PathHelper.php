@@ -5,19 +5,68 @@ namespace MagicConvert;
 class PathHelper
 {
 
+    /**
+     * The document root — the filesystem directory that maps to the site's root
+     * URL — resolved the WordPress-native way instead of from
+     * $_SERVER['DOCUMENT_ROOT'].
+     *
+     * $_SERVER['DOCUMENT_ROOT'] is unreliable: it is empty under WP-CLI and is
+     * overridden to ABSPATH by WP-CLI's bootstrap. It is also wrong for "WordPress
+     * in a subdirectory" layouts such as Bedrock, where core lives in a subdir
+     * (e.g. /srv/web/wp) of the web root (/srv/web) and wp-content is a sibling
+     * (/srv/web/app). See https://roots.io/bedrock/docs/compatibility/
+     *
+     * We derive it from ABSPATH and the path component of site_url() — both come
+     * from configuration / the database, so they are correct in web requests and
+     * under WP-CLI alike. The web root is ABSPATH with the site_url() path removed
+     * (for a classic install site_url() has no path, so the web root IS ABSPATH).
+     *
+     * @return string  Absolute document root without trailing slash, or '' if it
+     *                 cannot be determined (WordPress not loaded).
+     */
+    public static function getDocumentRoot() {
+        if (defined('ABSPATH') && function_exists('site_url')) {
+            return self::deriveDocumentRoot(ABSPATH, parse_url(site_url(), PHP_URL_PATH));
+        }
+        // WordPress not loaded (e.g. the standalone webp-on-demand script): fall
+        // back to the historical behaviour. Note that DOCUMENT_ROOT does not end
+        // with a trailing slash on old litespeed servers.
+        if (isset($_SERVER['DOCUMENT_ROOT']) && $_SERVER['DOCUMENT_ROOT'] !== '') {
+            return self::untrailSlash(self::backslashesToForwardSlashes($_SERVER['DOCUMENT_ROOT']));
+        }
+        return '';
+    }
+
+    /**
+     * Pure derivation of the web root from ABSPATH and the site_url() path,
+     * separated from getDocumentRoot() so it can be unit-tested without booting
+     * WordPress. The web root is ABSPATH with the site_url() path stripped from
+     * its end (for a classic install the path is empty, so the web root IS
+     * ABSPATH).
+     *
+     * @param  string       $absPath      Value of ABSPATH (may have a trailing slash).
+     * @param  string|null  $siteUrlPath  Path component of site_url(), e.g. "/wp" or "".
+     * @return string  Web root without trailing slash.
+     */
+    public static function deriveDocumentRoot($absPath, $siteUrlPath) {
+        $absPath = self::untrailSlash(self::backslashesToForwardSlashes((string) $absPath));
+        $sitePath = trim((string) $siteUrlPath, '/');
+        if ($sitePath === '') {
+            return $absPath;
+        }
+        $suffix = '/' . $sitePath;
+        // ABSPATH normally ends with the site_url() path (e.g. ".../web/wp" for a
+        // site_url of ".../wp"); strip it to get the web root.
+        if (substr($absPath, -strlen($suffix)) === $suffix) {
+            return substr($absPath, 0, -strlen($suffix));
+        }
+        // Unexpected layout (ABSPATH does not end with the site_url path): fall
+        // back to ABSPATH so paths stay resolvable.
+        return $absPath;
+    }
+
     public static function isDocRootAvailable() {
-
-        // BTW:
-        // Note that DOCUMENT_ROOT does not end with trailing slash on old litespeed servers:
-        // https://www.litespeedtech.com/support/forum/threads/document_root-trailing-slash.5304/
-
-        if (!isset($_SERVER['DOCUMENT_ROOT'])) {
-            return false;
-        }
-        if ($_SERVER['DOCUMENT_ROOT'] == '') {
-            return false;
-        }
-        return true;
+        return (self::getDocumentRoot() !== '');
     }
 
     /**
@@ -41,7 +90,7 @@ class PathHelper
     public static function isDocRootAvailableAndResolvable() {
         return (
             self::isDocRootAvailable() &&
-            self::pathExistsAndIsResolvable($_SERVER['DOCUMENT_ROOT'])
+            self::pathExistsAndIsResolvable(self::getDocumentRoot())
         );
     }
 
@@ -58,8 +107,9 @@ class PathHelper
      */
     public static function fixAbsPathToUseUnresolvedDocRoot($absPath) {
         if (self::isDocRootAvailableAndResolvable()) {
-            if (strpos($absPath, realpath($_SERVER['DOCUMENT_ROOT'])) === 0) {
-                return $_SERVER['DOCUMENT_ROOT'] . substr($absPath, strlen(realpath($_SERVER['DOCUMENT_ROOT'])));
+            $docRoot = self::getDocumentRoot();
+            if (strpos($absPath, realpath($docRoot)) === 0) {
+                return $docRoot . substr($absPath, strlen(realpath($docRoot)));
             }
         }
         return $absPath;
@@ -97,9 +147,11 @@ class PathHelper
             throw new \Exception('Cannot calculate relative path from document root to dir, as document root is not available');
         }
 
+        $docRoot = self::getDocumentRoot();
+
         // First try unresolved.
         // This will even work when ie wp-content is symlinked to somewhere outside document root, while the symlink itself is within document root)
-        $relPath = self::getRelDir($_SERVER['DOCUMENT_ROOT'], $dir);
+        $relPath = self::getRelDir($docRoot, $dir);
         if (strpos($relPath, '../') !== 0) {  // Check if relPath starts with "../" (if it does, we cannot use it)
             return $relPath;
         }
@@ -107,14 +159,14 @@ class PathHelper
         if (self::isDocRootAvailableAndResolvable()) {
             if (self::pathExistsAndIsResolvable($dir)) {
                 // Try with both resolved
-                $relPath = self::getRelDir(realpath($_SERVER['DOCUMENT_ROOT']), realpath($dir));
+                $relPath = self::getRelDir(realpath($docRoot), realpath($dir));
                 if (strpos($relPath, '../') !== 0) {
                     return $relPath;
                 }
             }
 
             // Try with just document root resolved
-            $relPath = self::getRelDir(realpath($_SERVER['DOCUMENT_ROOT']), $dir);
+            $relPath = self::getRelDir(realpath($docRoot), $dir);
             if (strpos($relPath, '../') !== 0) {
                 return $relPath;
             }
@@ -122,7 +174,7 @@ class PathHelper
 
         if (self::pathExistsAndIsResolvable($dir)) {
             // Try with dir resolved
-            $relPath = self::getRelDir($_SERVER['DOCUMENT_ROOT'], realpath($dir));
+            $relPath = self::getRelDir($docRoot, realpath($dir));
             if (strpos($relPath, '../') !== 0) {
                 return $relPath;
             }

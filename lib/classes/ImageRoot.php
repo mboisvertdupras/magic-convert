@@ -31,7 +31,7 @@ class ImageRoot
     {
         $def = $this->imageRootDef;
         if (isset($def['rel-path']) && PathHelper::isDocRootAvailable()) {
-            return rtrim($_SERVER["DOCUMENT_ROOT"], '/') . '/' . $def['rel-path'];
+            return PathHelper::getDocumentRoot() . '/' . $def['rel-path'];
         } elseif (isset($def['abs-path'])) {
             return $def['abs-path'];
         } else {

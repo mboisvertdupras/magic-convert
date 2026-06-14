@@ -763,7 +763,7 @@ $config['environment-when-config-was-saved'] = [
 ];
 
 if (PathHelper::isDocRootAvailable()) {
-    $config['document-root'] = $_SERVER['DOCUMENT_ROOT'];
+    $config['document-root'] = PathHelper::getDocumentRoot();
 }
 
 // SAVE!

@@ -93,8 +93,9 @@ class HTAccessRules
         return $absPath;
 
         if (PathHelper::isDocRootAvailable()) {
-            if (strpos($absPath, $_SERVER['DOCUMENT_ROOT']) === 0) {
-                return "%{DOCUMENT_ROOT}" . substr($absPath, strlen($_SERVER['DOCUMENT_ROOT']));
+            $docRoot = PathHelper::getDocumentRoot();
+            if (strpos($absPath, $docRoot) === 0) {
+                return "%{DOCUMENT_ROOT}" . substr($absPath, strlen($docRoot));
             }
         }
         return $absPath;

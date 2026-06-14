@@ -1,3 +1,9 @@
+= 0.26.2 =
+* Bedrock compatibility: the document root is now resolved the WordPress-native way, from ABSPATH and the path component of site_url(), instead of $_SERVER['DOCUMENT_ROOT']. $_SERVER['DOCUMENT_ROOT'] is empty under WP-CLI (and overridden to ABSPATH), and wrong for "WordPress in a subdirectory" layouts such as Bedrock, where core lives in /web/wp and wp-content in /web/app. This fixes bulk conversion failing with "path is outside document root" and restores webp/avif delivery on Bedrock and nginx. See https://roots.io/bedrock/docs/compatibility/
+
+= 0.26.1 =
+* Packaging: the release zip now ships the production (no-dev) Composer autoloader, built via bin/build-zip.sh. Installing the plugin from the GitHub release asset no longer fatals on a missing dev-only dependency (myclabs/deep-copy).
+
 = 0.1.0 =
 * Forked from WebP Express 0.25.14; rebranded to Magic Convert.
 

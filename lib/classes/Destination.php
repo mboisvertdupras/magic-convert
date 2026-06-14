@@ -149,7 +149,7 @@ class Destination
                             'automatically stop to structure the webp files as relative to document root and instead structure them as relative to image root folders.'
                         );
                     }
-                    $docRoot = rtrim(realpath($_SERVER["DOCUMENT_ROOT"]), '/');
+                    $docRoot = rtrim(realpath(PathHelper::getDocumentRoot()), '/');
                     $imageRoot = $webExpressContentDirAbs . '/' . $cacheDirName;
 
                     // TODO: make this check work with symlinks

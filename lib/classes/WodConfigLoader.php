@@ -268,7 +268,7 @@ class WodConfigLoader
                 );
             }
 
-            $docRoot = SanityCheck::absPath($_SERVER["DOCUMENT_ROOT"]);
+            $docRoot = SanityCheck::absPath(PathHelper::getDocumentRoot());
             $docRoot = rtrim($docRoot, '/');
             self::$docRoot = $docRoot;
         }
