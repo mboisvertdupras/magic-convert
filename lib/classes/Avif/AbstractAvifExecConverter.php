@@ -15,8 +15,15 @@ use LocateBinaries\LocateBinaries;
  *   - rosell-dk/locate-binaries (LocateBinaries) for finding the binary in common
  *     system paths and via the OS "which" command — exactly what Cwebp.php uses to
  *     discover cwebp.
- * Both are already vendored as transitive deps of webp-convert, so no new
- * dependency is introduced.
+ * Both are vendored transitive deps of webp-convert, so no new dependency is introduced.
+ *
+ * Being vendored on disk is NOT the same as being autoloadable: the plugin loads
+ * Composer's vendor autoloader lazily (front-end requests stay lean), so these classes
+ * resolve only after a code path that needs them has pulled vendor/autoload.php in.
+ * AvifStack (the only thing that builds these converters) does exactly that in its
+ * constructor. As a second line of defence, isOperational() below verifies the classes
+ * are actually loadable and degrades to a clear "not operational" reason rather than
+ * fataling if they somehow are not.
  *
  * Binary discovery order (first hit wins):
  *   1. an explicit override: constant MAGIC_CONVERT_<UPPER>_PATH or env var of the
@@ -47,6 +54,20 @@ abstract class AbstractAvifExecConverter extends AbstractAvifConverter
      */
     public function isOperational()
     {
+        // Defence in depth: the exec helpers are loaded by AvifStack's constructor, but if
+        // this converter is ever exercised without that autoloader having been registered,
+        // report a clear reason instead of fataling on the static calls below. Use the
+        // default autoload=true so a registered-but-not-yet-referenced class resolves
+        // normally; only a genuinely unresolvable class trips the graceful degradation.
+        if (!class_exists('\ExecWithFallback\ExecWithFallback')
+            || !class_exists('\LocateBinaries\LocateBinaries')
+        ) {
+            return [
+                'operational' => false,
+                'reason' => 'The exec helper libraries (exec-with-fallback / locate-binaries) '
+                    . 'are not loaded, so binary-based AVIF conversion is unavailable.',
+            ];
+        }
         if (!ExecWithFallback::anyAvailable()) {
             return [
                 'operational' => false,

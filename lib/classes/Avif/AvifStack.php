@@ -32,7 +32,42 @@ class AvifStack
      */
     public function __construct(?array $converters = null)
     {
+        self::ensureVendorAutoloader();
         $this->converters = ($converters === null) ? self::defaultConverters() : $converters;
+    }
+
+    /**
+     * Make sure Composer's vendor autoloader is registered before any AVIF converter runs.
+     *
+     * The plugin does NOT register the vendor autoloader globally — to keep front-end
+     * requests lean (serving a cached image must not pay for loading webp-convert), it is
+     * pulled in lazily only at the code paths that need vendor classes (e.g. TestRun,
+     * WebPOnDemand, ConvertHelperIndependent). The AVIF stack is one of those paths: the
+     * exec-based converters (avifenc/cavif/magick) reference \ExecWithFallback\ExecWithFallback
+     * and \LocateBinaries\LocateBinaries. AvifStack is the single chokepoint every AVIF
+     * operation goes through (self-test, the AVIF admin notice, and conversion), so loading
+     * the autoloader here guarantees those classes resolve. Without this, isOperational()
+     * fatals with "Class ExecWithFallback\ExecWithFallback not found" the first time the AVIF
+     * self-test runs (the WebP path happened to load the autoloader; the AVIF path did not).
+     *
+     * Public + idempotent so any other AVIF/exec entry point (e.g. the self-test's
+     * "can PHP exec external binaries?" probe, which runs before the stack is built) can
+     * call it to guarantee the exec-helper classes resolve.
+     */
+    public static function ensureVendorAutoloader()
+    {
+        // Already resolvable (e.g. a WebP code path already pulled vendor/autoload.php in
+        // this request, registering Composer's autoloader) — nothing to do. Use the default
+        // autoload=true so a registered-but-not-yet-referenced class counts as available.
+        if (class_exists('\ExecWithFallback\ExecWithFallback')) {
+            return;
+        }
+        if (defined('MAGIC_CONVERT_PLUGIN_DIR')) {
+            $autoload = MAGIC_CONVERT_PLUGIN_DIR . '/vendor/autoload.php';
+            if (is_file($autoload)) {
+                include_once $autoload;
+            }
+        }
     }
 
     /**

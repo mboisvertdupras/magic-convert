@@ -491,6 +491,11 @@ class SelfTestHelper
      */
     private static function canExecExternalBinaries()
     {
+        // This probe can run before the AVIF stack is built (the framing facts in
+        // avifCapabilities() are logged first), so make sure the vendor autoloader that
+        // provides ExecWithFallback is registered — otherwise this would report "could not
+        // be determined" on hosts where exec actually works.
+        \MagicConvert\Avif\AvifStack::ensureVendorAutoloader();
         if (class_exists('\ExecWithFallback\ExecWithFallback')) {
             try {
                 return (bool) \ExecWithFallback\ExecWithFallback::anyAvailable();
