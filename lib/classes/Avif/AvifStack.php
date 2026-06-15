@@ -112,6 +112,24 @@ class AvifStack
     }
 
     /**
+     * @param  AbstractAvifConverter[]  $converters
+     * @return AbstractAvifConverter[]
+     */
+    public static function orderPreferringOutOfProcess(array $converters)
+    {
+        $outOfProcess = [];
+        $inProcess = [];
+        foreach ($converters as $converter) {
+            if ($converter instanceof AbstractAvifConverter && $converter->reclaimsMemoryOnExit()) {
+                $outOfProcess[] = $converter;
+            } else {
+                $inProcess[] = $converter;
+            }
+        }
+        return array_merge($outOfProcess, $inProcess);
+    }
+
+    /**
      * @param  string  $source
      * @param  string  $destination
      * @param  array   $options
@@ -123,7 +141,7 @@ class AvifStack
         $log = [];
         $reasons = [];
 
-        foreach ($this->converters as $converter) {
+        foreach (self::orderPreferringOutOfProcess($this->converters) as $converter) {
             $label = $converter->label();
 
             $op = $converter->isOperational();

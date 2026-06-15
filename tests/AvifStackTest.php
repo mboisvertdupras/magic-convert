@@ -290,6 +290,76 @@ class AvifStackTest extends TestCase
             array_map(static fn ($c) => $c->id(), $converters)
         );
     }
+
+    public function testOrderPreferringOutOfProcessMovesBinariesFirstStably(): void
+    {
+        $a = new FakeAvifConverter('a', true, true, '', 'x', false);
+        $b = new FakeAvifConverter('b', true, true, '', 'x', true);
+        $c = new FakeAvifConverter('c', true, true, '', 'x', false);
+        $d = new FakeAvifConverter('d', true, true, '', 'x', true);
+
+        $ordered = AvifStack::orderPreferringOutOfProcess([$a, $b, $c, $d]);
+        $this->assertSame(
+            ['b', 'd', 'a', 'c'],
+            array_map(static fn ($conv) => $conv->id(), $ordered)
+        );
+    }
+
+    public function testOrderPreferringOutOfProcessIsNoOpWhenAllInProcess(): void
+    {
+        $a = new FakeAvifConverter('a', true, true);
+        $b = new FakeAvifConverter('b', true, true);
+        $ordered = AvifStack::orderPreferringOutOfProcess([$a, $b]);
+        $this->assertSame(['a', 'b'], array_map(static fn ($conv) => $conv->id(), $ordered));
+    }
+
+    public function testConvertPrefersOutOfProcessOverAnEarlierInProcessConverter(): void
+    {
+        $inProcess = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $outOfProcess = new FakeAvifConverter('avifenc', true, true, '', 'x', true);
+        $stack = new AvifStack([$inProcess, $outOfProcess]);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('avifenc', $result['converter']);
+        $this->assertTrue($outOfProcess->convertCalled);
+        $this->assertFalse($inProcess->convertCalled, 'the leaky in-process encoder must not run when a binary one works');
+    }
+
+    public function testConvertFallsBackToInProcessWhenOutOfProcessFails(): void
+    {
+        $inProcess = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $outOfProcess = new FakeAvifConverter('avifenc', true, false, '', 'binary blew up', true);
+        $stack = new AvifStack([$inProcess, $outOfProcess]);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('gd', $result['converter']);
+        $this->assertTrue($outOfProcess->convertCalled);
+        $this->assertTrue($inProcess->convertCalled);
+    }
+
+    public function testConvertersViewKeepsConfiguredOrderUnchanged(): void
+    {
+        $inProcess = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $outOfProcess = new FakeAvifConverter('avifenc', true, true, '', 'x', true);
+        $stack = new AvifStack([$inProcess, $outOfProcess]);
+
+        $this->assertSame(
+            ['gd', 'avifenc'],
+            array_map(static fn ($conv) => $conv->id(), $stack->converters())
+        );
+    }
+
+    public function testRealConvertersDeclareMemoryReclaimCorrectly(): void
+    {
+        $this->assertFalse((new \MagicConvert\Avif\GdAvif())->reclaimsMemoryOnExit());
+        $this->assertFalse((new \MagicConvert\Avif\ImagickAvif())->reclaimsMemoryOnExit());
+        $this->assertFalse((new \MagicConvert\Avif\VipsAvif())->reclaimsMemoryOnExit());
+        $this->assertTrue((new \MagicConvert\Avif\AvifEncBinary())->reclaimsMemoryOnExit());
+        $this->assertTrue((new \MagicConvert\Avif\MagickBinaryAvif())->reclaimsMemoryOnExit());
+        $this->assertTrue((new \MagicConvert\Avif\CavifBinary())->reclaimsMemoryOnExit());
+    }
 }
 
 class FakeAvifConverter extends AbstractAvifConverter
@@ -301,13 +371,19 @@ class FakeAvifConverter extends AbstractAvifConverter
         private bool $operational,
         private bool $succeeds,
         private string $reason = '',
-        private string $failMessage = 'fake convert failure'
+        private string $failMessage = 'fake convert failure',
+        private bool $outOfProcess = false
     ) {
     }
 
     public function id()
     {
         return $this->idStr;
+    }
+
+    public function reclaimsMemoryOnExit()
+    {
+        return $this->outOfProcess;
     }
 
     public function label()

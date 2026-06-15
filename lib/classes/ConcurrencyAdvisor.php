@@ -12,20 +12,30 @@ class ConcurrencyAdvisor
 
     const CLI_MAX = 8;
 
+    const AVIF_ENCODE_RESERVE_BYTES = 1073741824;
+
+    const WEBP_ENCODE_RESERVE_BYTES = 268435456;
+
+    const MEMORY_USABLE_PERCENT = 75;
+
     private $coresOverride;
 
     private $loadOverride;
+
+    private $memoryOverride;
 
     private $detectedCores = null;
 
     /**
      * @param int|null   $cores
      * @param float|null $load
+     * @param int|null   $availableMemoryBytes
      */
-    public function __construct($cores = null, $load = null)
+    public function __construct($cores = null, $load = null, $availableMemoryBytes = null)
     {
         $this->coresOverride = $cores;
         $this->loadOverride = $load;
+        $this->memoryOverride = $availableMemoryBytes;
     }
 
     public function cpuCoreCount()
@@ -65,6 +75,149 @@ class ConcurrencyAdvisor
         }
 
         return self::FALLBACK_CORES;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function availableMemoryBytes()
+    {
+        if ($this->memoryOverride !== null) {
+            return max(0, (int) $this->memoryOverride);
+        }
+        return self::detectAvailableMemoryBytes();
+    }
+
+    /**
+     * @return int|null
+     */
+    public static function detectAvailableMemoryBytes()
+    {
+        $candidates = [];
+
+        if (@is_readable('/proc/meminfo')) {
+            $host = self::parseMemAvailableBytes((string) @file_get_contents('/proc/meminfo'));
+            if ($host !== null) {
+                $candidates[] = $host;
+            }
+        }
+
+        $cgroup = self::detectCgroupAvailableBytes();
+        if ($cgroup !== null) {
+            $candidates[] = $cgroup;
+        }
+
+        if (empty($candidates)) {
+            return null;
+        }
+        return min($candidates);
+    }
+
+    /**
+     * @param  string  $meminfo
+     * @return int|null
+     */
+    public static function parseMemAvailableBytes($meminfo)
+    {
+        if (!is_string($meminfo) || $meminfo === '') {
+            return null;
+        }
+        if (preg_match('/^MemAvailable:\s+(\d+)\s*kB/mi', $meminfo, $m)) {
+            return (int) $m[1] * 1024;
+        }
+        return null;
+    }
+
+    /**
+     * @return int|null
+     */
+    private static function detectCgroupAvailableBytes()
+    {
+        $limit = null;
+        $usage = null;
+
+        if (@is_readable('/sys/fs/cgroup/memory.max')) {
+            $limit = self::parseCgroupLimitBytes((string) @file_get_contents('/sys/fs/cgroup/memory.max'));
+            $usage = self::parseCgroupLimitBytes((string) @file_get_contents('/sys/fs/cgroup/memory.current'));
+        } elseif (@is_readable('/sys/fs/cgroup/memory/memory.limit_in_bytes')) {
+            $limit = self::parseCgroupLimitBytes((string) @file_get_contents('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
+            $usage = self::parseCgroupLimitBytes((string) @file_get_contents('/sys/fs/cgroup/memory/memory.usage_in_bytes'));
+        }
+
+        if ($limit === null) {
+            return null;
+        }
+        if ($usage === null || $usage > $limit) {
+            return $limit;
+        }
+        return $limit - $usage;
+    }
+
+    /**
+     * @param  string  $raw
+     * @return int|null
+     */
+    public static function parseCgroupLimitBytes($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '' || strtolower($raw) === 'max') {
+            return null;
+        }
+        if (!ctype_digit($raw)) {
+            return null;
+        }
+        $value = (int) $raw;
+        if ($value <= 0 || $value >= PHP_INT_MAX) {
+            return null;
+        }
+        return $value;
+    }
+
+    /**
+     * @param  string  $formatId
+     * @return int
+     */
+    public static function reserveBytesForFormat($formatId)
+    {
+        return ($formatId === 'avif')
+            ? self::AVIF_ENCODE_RESERVE_BYTES
+            : self::WEBP_ENCODE_RESERVE_BYTES;
+    }
+
+    /**
+     * @param  int|null  $availableBytes
+     * @param  int       $reserveBytes
+     * @return int|null
+     */
+    public static function memoryBudget($availableBytes, $reserveBytes)
+    {
+        if ($availableBytes === null) {
+            return null;
+        }
+        $reserveBytes = (int) $reserveBytes;
+        if ($reserveBytes < 1) {
+            $reserveBytes = 1;
+        }
+        $usable = intdiv((int) $availableBytes * self::MEMORY_USABLE_PERCENT, 100);
+        return max(1, intdiv($usable, $reserveBytes));
+    }
+
+    /**
+     * @param  string    $formatId
+     * @param  int       $cores
+     * @param  int|null  $availableBytes
+     * @param  int       $max
+     * @return int
+     */
+    public static function concurrencyForFormat($formatId, $cores, $availableBytes, $max)
+    {
+        $weight = ($formatId === 'avif') ? 2 : 1;
+        $cpu = (int) floor(max(1, (int) $cores) / $weight);
+
+        $budget = self::memoryBudget($availableBytes, self::reserveBytesForFormat($formatId));
+        $n = ($budget === null) ? $cpu : min($cpu, $budget);
+
+        return self::clamp($n, 1, $max);
     }
 
     /**
@@ -117,9 +270,25 @@ class ConcurrencyAdvisor
 
     public function recommendedWebConcurrencyForFormat($formatId)
     {
-        $weight = ($formatId === 'avif') ? 2 : 1;
-        $cores = $this->cpuCoreCount();
-        return self::clamp((int) floor($cores / $weight), 1, self::WEB_MAX);
+        return self::concurrencyForFormat(
+            (string) $formatId,
+            $this->cpuCoreCount(),
+            $this->availableMemoryBytes(),
+            self::WEB_MAX
+        );
+    }
+
+    /**
+     * @param  string[]  $formatIds
+     * @return int
+     */
+    public function webHardCeiling(array $formatIds)
+    {
+        $ceiling = 1;
+        foreach ($formatIds as $formatId) {
+            $ceiling = max($ceiling, $this->recommendedWebConcurrencyForFormat((string) $formatId));
+        }
+        return $ceiling;
     }
 
     /**
@@ -144,7 +313,13 @@ class ConcurrencyAdvisor
             $procs = (int) floor($procs / 2);
             $procs = max(1, $procs);
         }
-        return $procs;
+
+        $budget = self::memoryBudget($this->availableMemoryBytes(), self::AVIF_ENCODE_RESERVE_BYTES);
+        if ($budget !== null) {
+            $procs = min($procs, $budget);
+        }
+
+        return max(1, $procs);
     }
 
     private static function clamp($value, $min, $max)

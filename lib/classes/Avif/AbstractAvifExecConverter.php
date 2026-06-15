@@ -13,6 +13,14 @@ abstract class AbstractAvifExecConverter extends AbstractAvifConverter
     abstract protected function binaryName();
 
     /**
+     * @return bool
+     */
+    public function reclaimsMemoryOnExit()
+    {
+        return true;
+    }
+
+    /**
      * @return array{operational:bool,reason:string}
      */
     public function isOperational()

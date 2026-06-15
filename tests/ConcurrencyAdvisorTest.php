@@ -7,6 +7,10 @@ use PHPUnit\Framework\TestCase;
 
 class ConcurrencyAdvisorTest extends TestCase
 {
+    private const AMPLE_MEMORY = 274877906944;
+
+    private const GIB = 1073741824;
+
     public function testInjectedCoreCountIsReturned(): void
     {
         $this->assertSame(8, (new ConcurrencyAdvisor(8))->cpuCoreCount());
@@ -46,7 +50,7 @@ class ConcurrencyAdvisorTest extends TestCase
      */
     public function testRecommendedWebConcurrencyIdle(int $cores, int $expected): void
     {
-        $advisor = new ConcurrencyAdvisor($cores, 0.0);
+        $advisor = new ConcurrencyAdvisor($cores, 0.0, self::AMPLE_MEMORY);
         $this->assertSame($expected, $advisor->recommendedWebConcurrency());
     }
 
@@ -66,8 +70,8 @@ class ConcurrencyAdvisorTest extends TestCase
      */
     public function testRecommendedWebConcurrencyIgnoresLoad(int $cores): void
     {
-        $idle = new ConcurrencyAdvisor($cores, 0.0);
-        $busy = new ConcurrencyAdvisor($cores, $cores * 3.0);
+        $idle = new ConcurrencyAdvisor($cores, 0.0, self::AMPLE_MEMORY);
+        $busy = new ConcurrencyAdvisor($cores, $cores * 3.0, self::AMPLE_MEMORY);
         $this->assertTrue($busy->isBusy());
         $this->assertSame(
             $idle->recommendedWebConcurrency(),
@@ -80,7 +84,7 @@ class ConcurrencyAdvisorTest extends TestCase
      */
     public function testRecommendedWebConcurrencyForFormat(int $cores, string $format, int $expected): void
     {
-        $advisor = new ConcurrencyAdvisor($cores, 0.0);
+        $advisor = new ConcurrencyAdvisor($cores, 0.0, self::AMPLE_MEMORY);
         $this->assertSame($expected, $advisor->recommendedWebConcurrencyForFormat($format));
     }
 
@@ -100,7 +104,7 @@ class ConcurrencyAdvisorTest extends TestCase
 
     public function testWebTargetsMapsEachFormat(): void
     {
-        $advisor = new ConcurrencyAdvisor(10, 0.0);
+        $advisor = new ConcurrencyAdvisor(10, 0.0, self::AMPLE_MEMORY);
         $this->assertSame(
             ['webp' => 8, 'avif' => 5],
             $advisor->webTargets(['webp', 'avif'])
@@ -112,7 +116,7 @@ class ConcurrencyAdvisorTest extends TestCase
      */
     public function testRecommendedCliProcsIdle(int $cores, int $expected): void
     {
-        $advisor = new ConcurrencyAdvisor($cores, 0.0);
+        $advisor = new ConcurrencyAdvisor($cores, 0.0, self::AMPLE_MEMORY);
         $this->assertSame($expected, $advisor->recommendedCliProcs());
     }
 
@@ -132,7 +136,7 @@ class ConcurrencyAdvisorTest extends TestCase
      */
     public function testRecommendedCliProcsBusyHalved(int $cores, int $expected): void
     {
-        $advisor = new ConcurrencyAdvisor($cores, $cores * 3.0);
+        $advisor = new ConcurrencyAdvisor($cores, $cores * 3.0, self::AMPLE_MEMORY);
         $this->assertTrue($advisor->isBusy());
         $this->assertSame($expected, $advisor->recommendedCliProcs());
     }
@@ -158,5 +162,101 @@ class ConcurrencyAdvisorTest extends TestCase
         $detected = ConcurrencyAdvisor::detectCpuCoreCount();
         $this->assertGreaterThanOrEqual(1, $detected);
         $this->assertGreaterThanOrEqual(1, (new ConcurrencyAdvisor())->cpuCoreCount());
+    }
+
+    public function testInjectedAvailableMemoryIsReturned(): void
+    {
+        $this->assertSame(5 * self::GIB, (new ConcurrencyAdvisor(8, 0.0, 5 * self::GIB))->availableMemoryBytes());
+        $this->assertSame(0, (new ConcurrencyAdvisor(8, 0.0, -100))->availableMemoryBytes());
+    }
+
+    public function testMemoryBudgetDividesUsableMemoryByReserve(): void
+    {
+        $this->assertSame(6, ConcurrencyAdvisor::memoryBudget(8 * self::GIB, self::GIB));
+        $this->assertSame(2, ConcurrencyAdvisor::memoryBudget(3 * self::GIB, self::GIB));
+    }
+
+    public function testMemoryBudgetIsNullWhenMemoryUnknown(): void
+    {
+        $this->assertNull(ConcurrencyAdvisor::memoryBudget(null, self::GIB));
+    }
+
+    public function testMemoryBudgetNeverDropsBelowOne(): void
+    {
+        $this->assertSame(1, ConcurrencyAdvisor::memoryBudget(0, self::GIB));
+        $this->assertSame(1, ConcurrencyAdvisor::memoryBudget(100, self::GIB));
+    }
+
+    public function testReserveBytesIsLargerForAvifThanWebp(): void
+    {
+        $this->assertGreaterThan(
+            ConcurrencyAdvisor::reserveBytesForFormat('webp'),
+            ConcurrencyAdvisor::reserveBytesForFormat('avif')
+        );
+    }
+
+    public function testConcurrencyForFormatIsCappedByAvailableMemory(): void
+    {
+        $this->assertSame(3, ConcurrencyAdvisor::concurrencyForFormat('avif', 16, 4 * self::GIB, 8));
+    }
+
+    public function testConcurrencyForFormatIsCpuBoundWhenMemoryAmple(): void
+    {
+        $this->assertSame(8, ConcurrencyAdvisor::concurrencyForFormat('avif', 16, self::AMPLE_MEMORY, 8));
+    }
+
+    public function testConcurrencyForFormatIsCpuOnlyWhenMemoryUnknown(): void
+    {
+        $this->assertSame(8, ConcurrencyAdvisor::concurrencyForFormat('avif', 16, null, 8));
+        $this->assertSame(1, ConcurrencyAdvisor::concurrencyForFormat('avif', 2, null, 8));
+    }
+
+    public function testWebpAllowsMoreConcurrencyThanAvifUnderSameMemory(): void
+    {
+        $avif = ConcurrencyAdvisor::concurrencyForFormat('avif', 16, 3 * self::GIB, 8);
+        $webp = ConcurrencyAdvisor::concurrencyForFormat('webp', 16, 3 * self::GIB, 8);
+        $this->assertSame(2, $avif);
+        $this->assertSame(8, $webp);
+    }
+
+    public function testWebConcurrencyIsConstrainedByMemoryEndToEnd(): void
+    {
+        $advisor = new ConcurrencyAdvisor(16, 0.0, 4 * self::GIB);
+        $this->assertSame(3, $advisor->recommendedWebConcurrencyForFormat('avif'));
+    }
+
+    public function testWebHardCeilingIsMaxAcrossFormats(): void
+    {
+        $advisor = new ConcurrencyAdvisor(16, 0.0, self::GIB);
+        $this->assertSame(1, $advisor->recommendedWebConcurrencyForFormat('avif'));
+        $this->assertSame(3, $advisor->recommendedWebConcurrencyForFormat('webp'));
+        $this->assertSame(3, $advisor->webHardCeiling(['avif', 'webp']));
+    }
+
+    public function testCliProcsConstrainedByMemory(): void
+    {
+        $advisor = new ConcurrencyAdvisor(16, 0.0, 2 * self::GIB);
+        $this->assertSame(1, $advisor->recommendedCliProcs());
+    }
+
+    public function testParseMemAvailableConvertsKbToBytes(): void
+    {
+        $meminfo = "MemTotal:       16384000 kB\nMemFree:         1000000 kB\nMemAvailable:    2097152 kB\n";
+        $this->assertSame(2097152 * 1024, ConcurrencyAdvisor::parseMemAvailableBytes($meminfo));
+    }
+
+    public function testParseMemAvailableReturnsNullWhenMissing(): void
+    {
+        $this->assertNull(ConcurrencyAdvisor::parseMemAvailableBytes("MemTotal: 100 kB\n"));
+        $this->assertNull(ConcurrencyAdvisor::parseMemAvailableBytes(''));
+    }
+
+    public function testParseCgroupLimitBytes(): void
+    {
+        $this->assertSame(1073741824, ConcurrencyAdvisor::parseCgroupLimitBytes("1073741824\n"));
+        $this->assertNull(ConcurrencyAdvisor::parseCgroupLimitBytes("max\n"));
+        $this->assertNull(ConcurrencyAdvisor::parseCgroupLimitBytes('0'));
+        $this->assertNull(ConcurrencyAdvisor::parseCgroupLimitBytes('not-a-number'));
+        $this->assertNull(ConcurrencyAdvisor::parseCgroupLimitBytes(''));
     }
 }

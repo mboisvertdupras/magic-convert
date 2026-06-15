@@ -148,7 +148,7 @@ class RestApi
                 'files' => array_slice($flat, $slice['offset'], $slice['length']),
                 'concurrency' => [
                     'recommended' => $advisor->recommendedWebConcurrency(),
-                    'max' => self::WEB_MAX,
+                    'max' => $advisor->webHardCeiling($enabledFormats),
                     'cores' => $advisor->cpuCoreCount(),
                     'targets' => $advisor->webTargets($enabledFormats),
                 ],
@@ -188,7 +188,7 @@ class RestApi
             'files' => array_slice($flat, $slice['offset'], $slice['length']),
             'concurrency' => [
                 'recommended' => $advisor->recommendedWebConcurrency(),
-                'max' => self::WEB_MAX,
+                'max' => $advisor->webHardCeiling($listFormats),
                 'cores' => $advisor->cpuCoreCount(),
                 'targets' => $advisor->webTargets($listFormats),
             ],

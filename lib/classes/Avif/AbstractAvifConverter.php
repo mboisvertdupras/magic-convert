@@ -27,6 +27,14 @@ abstract class AbstractAvifConverter
     abstract public function convert($source, $destination, array $options);
 
     /**
+     * @return bool
+     */
+    public function reclaimsMemoryOnExit()
+    {
+        return false;
+    }
+
+    /**
      * @param  array  $options
      * @return int
      */
