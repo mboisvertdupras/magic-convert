@@ -57,18 +57,54 @@ class ConcurrencyAdvisorTest extends TestCase
             'two cores'     => [2, 1],
             'four cores'    => [4, 2],
             'eight cores'   => [8, 4],
-            'sixteen cores' => [16, 6],
+            'sixteen cores' => [16, 8],
         ];
     }
 
     /**
      * @dataProvider coreCountProvider
      */
-    public function testRecommendedWebConcurrencyBusyAlwaysOne(int $cores): void
+    public function testRecommendedWebConcurrencyIgnoresLoad(int $cores): void
     {
-        $advisor = new ConcurrencyAdvisor($cores, $cores * 3.0);
-        $this->assertTrue($advisor->isBusy());
-        $this->assertSame(1, $advisor->recommendedWebConcurrency());
+        $idle = new ConcurrencyAdvisor($cores, 0.0);
+        $busy = new ConcurrencyAdvisor($cores, $cores * 3.0);
+        $this->assertTrue($busy->isBusy());
+        $this->assertSame(
+            $idle->recommendedWebConcurrency(),
+            $busy->recommendedWebConcurrency()
+        );
+    }
+
+    /**
+     * @dataProvider webFormatProvider
+     */
+    public function testRecommendedWebConcurrencyForFormat(int $cores, string $format, int $expected): void
+    {
+        $advisor = new ConcurrencyAdvisor($cores, 0.0);
+        $this->assertSame($expected, $advisor->recommendedWebConcurrencyForFormat($format));
+    }
+
+    public static function webFormatProvider(): array
+    {
+        return [
+            'avif 2 cores'   => [2, 'avif', 1],
+            'avif 4 cores'   => [4, 'avif', 2],
+            'avif 10 cores'  => [10, 'avif', 5],
+            'avif 16 cores'  => [16, 'avif', 8],
+            'avif 32 cores'  => [32, 'avif', 8],
+            'webp 4 cores'   => [4, 'webp', 4],
+            'webp 10 cores'  => [10, 'webp', 8],
+            'webp 16 cores'  => [16, 'webp', 8],
+        ];
+    }
+
+    public function testWebTargetsMapsEachFormat(): void
+    {
+        $advisor = new ConcurrencyAdvisor(10, 0.0);
+        $this->assertSame(
+            ['webp' => 8, 'avif' => 5],
+            $advisor->webTargets(['webp', 'avif'])
+        );
     }
 
     /**

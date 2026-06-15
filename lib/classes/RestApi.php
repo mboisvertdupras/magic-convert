@@ -145,6 +145,8 @@ class RestApi
                 'concurrency' => [
                     'recommended' => $advisor->recommendedWebConcurrency(),
                     'max' => self::WEB_MAX,
+                    'cores' => $advisor->cpuCoreCount(),
+                    'targets' => $advisor->webTargets($enabledFormats),
                 ],
                 'server_busy' => $advisor->isBusy(),
                 'nonce' => self::freshNonce(),
@@ -183,6 +185,8 @@ class RestApi
             'concurrency' => [
                 'recommended' => $advisor->recommendedWebConcurrency(),
                 'max' => self::WEB_MAX,
+                'cores' => $advisor->cpuCoreCount(),
+                'targets' => $advisor->webTargets($listFormats),
             ],
             'server_busy' => $advisor->isBusy(),
             'nonce' => self::freshNonce(),

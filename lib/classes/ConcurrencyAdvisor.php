@@ -8,7 +8,7 @@ class ConcurrencyAdvisor
 
     const FALLBACK_CORES = 2;
 
-    const WEB_MAX = 6;
+    const WEB_MAX = 8;
 
     const CLI_MAX = 8;
 
@@ -112,11 +112,27 @@ class ConcurrencyAdvisor
 
     public function recommendedWebConcurrency()
     {
-        if ($this->isBusy()) {
-            return 1;
-        }
+        return $this->recommendedWebConcurrencyForFormat('avif');
+    }
+
+    public function recommendedWebConcurrencyForFormat($formatId)
+    {
+        $weight = ($formatId === 'avif') ? 2 : 1;
         $cores = $this->cpuCoreCount();
-        return self::clamp((int) floor($cores / 2), 1, self::WEB_MAX);
+        return self::clamp((int) floor($cores / $weight), 1, self::WEB_MAX);
+    }
+
+    /**
+     * @param  string[]  $formatIds
+     * @return array<string,int>
+     */
+    public function webTargets(array $formatIds)
+    {
+        $targets = [];
+        foreach ($formatIds as $formatId) {
+            $targets[(string) $formatId] = $this->recommendedWebConcurrencyForFormat((string) $formatId);
+        }
+        return $targets;
     }
 
     public function recommendedCliProcs()
