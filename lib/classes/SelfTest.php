@@ -83,11 +83,6 @@ class SelfTest
         return $result;
     }
 
-    /**
-     * The live nginx rules test (Phase 3.3): deploys known-size dummy webp/avif into the per-format
-     * cache, probes the test image over HTTP with different Accept headers, asserts the negotiated
-     * format is served, checks Vary, detects rules-version drift, and probes the converter fallback.
-     */
     public static function nginxLiveTest()
     {
         self::$next = 'done';

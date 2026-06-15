@@ -6,24 +6,8 @@ use MagicConvert\SanityCheck;
 use MagicConvert\SanityException;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Unit tests for MagicConvert\SanityCheck.
- *
- * SanityCheck is the security boundary inherited from upstream WebP Express:
- * it rejects directory traversal, NUL bytes, control characters and stream
- * wrappers in untrusted paths. These checks are pure PHP (no WordPress).
- *
- * On rejection, SanityCheck::fail() calls error_log() and then throws a
- * SanityException. error_log() output goes to the PHP error log, not to test
- * stdout, so it does not trip PHPUnit's strict-output mode.
- *
- * The accept-case methods return the (sanitized) input on success, which is
- * what we assert against.
- */
 class SanityCheckTest extends TestCase
 {
-    // --- mustBeString --------------------------------------------------------
-
     public function testMustBeStringAcceptsString()
     {
         $this->assertSame('hello', SanityCheck::mustBeString('hello'));
@@ -38,7 +22,6 @@ class SanityCheckTest extends TestCase
 
     public function testMustBeStringRejectsBoolean()
     {
-        // Any non-string scalar must be rejected by the type guard.
         $this->expectException(SanityException::class);
         SanityCheck::mustBeString(true);
     }
@@ -48,8 +31,6 @@ class SanityCheckTest extends TestCase
         $this->expectException(SanityException::class);
         SanityCheck::mustBeString(1.5);
     }
-
-    // --- noNUL ---------------------------------------------------------------
 
     public function testNoNulAcceptsCleanString()
     {
@@ -61,8 +42,6 @@ class SanityCheckTest extends TestCase
         $this->expectException(SanityException::class);
         SanityCheck::noNUL("/var/www/logo.jpg\0.php");
     }
-
-    // --- noControlChars ------------------------------------------------------
 
     public function testNoControlCharsAcceptsPrintableString()
     {
@@ -87,8 +66,6 @@ class SanityCheckTest extends TestCase
         SanityCheck::noControlChars("path/to\rfile");
     }
 
-    // --- noDirectoryTraversal ------------------------------------------------
-
     public function testNoDirectoryTraversalAcceptsSafePath()
     {
         $this->assertSame('/var/www/uploads/logo.jpg', SanityCheck::noDirectoryTraversal('/var/www/uploads/logo.jpg'));
@@ -105,8 +82,6 @@ class SanityCheckTest extends TestCase
         $this->expectException(SanityException::class);
         SanityCheck::noDirectoryTraversal('../secret');
     }
-
-    // --- noStreamWrappers ----------------------------------------------------
 
     public function testNoStreamWrappersAcceptsPlainPath()
     {
@@ -125,8 +100,6 @@ class SanityCheckTest extends TestCase
         SanityCheck::noStreamWrappers('php://filter/resource=secret');
     }
 
-    // --- notEmpty ------------------------------------------------------------
-
     public function testNotEmptyAcceptsNonEmptyString()
     {
         $this->assertSame('x', SanityCheck::notEmpty('x'));
@@ -137,8 +110,6 @@ class SanityCheckTest extends TestCase
         $this->expectException(SanityException::class);
         SanityCheck::notEmpty('');
     }
-
-    // --- path (composite) ----------------------------------------------------
 
     public function testPathAcceptsCleanAbsolutePath()
     {
@@ -157,8 +128,6 @@ class SanityCheckTest extends TestCase
         SanityCheck::path('phar://x/y');
     }
 
-    // --- absPath -------------------------------------------------------------
-
     public function testAbsPathAcceptsLeadingSlash()
     {
         $this->assertSame('/var/www/logo.jpg', SanityCheck::absPath('/var/www/logo.jpg'));
@@ -170,8 +139,6 @@ class SanityCheckTest extends TestCase
         SanityCheck::absPath('relative/path.jpg');
     }
 
-    // --- pregMatch -----------------------------------------------------------
-
     public function testPregMatchAcceptsMatchingInput()
     {
         $this->assertSame('logo.webp', SanityCheck::pregMatch('#\.webp$#', 'logo.webp'));
@@ -182,8 +149,6 @@ class SanityCheckTest extends TestCase
         $this->expectException(SanityException::class);
         SanityCheck::pregMatch('#\.webp$#', 'logo.jpg');
     }
-
-    // --- isJSONArray / isJSONObject -----------------------------------------
 
     public function testIsJsonArrayAcceptsArray()
     {

@@ -11,12 +11,8 @@ class BiggerThanSourceDummyFilesBulk
     /**
      * Update the status for a all images.
      *
-     * @param  array|null                $config  Config array (loaded if null).
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp). The bulk
-     *                                            marker sweep stays webp-only by default for now
-     *                                            (multi-format bulk arrives in step 2.5); the
-     *                                            parameter is threaded so the sweep can target a
-     *                                            specific format once that lands.
+     * @param  array|null                $config
+     * @param  OutputFormat|string|null  $format
      */
     public static function updateStatus($config = null, $format = null)
     {

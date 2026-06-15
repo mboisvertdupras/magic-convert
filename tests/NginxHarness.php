@@ -2,18 +2,6 @@
 
 namespace MagicConvert\Tests;
 
-/**
- * Dev-only nginx test harness (NOT shipped behaviour).
- *
- * Wraps generated NginxRules artifacts in a minimal nginx.conf and runs
- * `nginx -t` (syntax validation) and, for the functional test, an actual
- * `nginx` boot against a temp prefix + docroot. Everything lives under a
- * unique temp prefix dir so multiple runs don't collide, and the prefix is
- * recursively removed on cleanup.
- *
- * Portability: locateBinary() returns null when no nginx is found, so PHPUnit
- * tests SKIP on CI rather than fail.
- */
 class NginxHarness
 {
     /** @var string */
@@ -38,7 +26,6 @@ class NginxHarness
         $this->prefix = self::makeTempDir('mc-nginx-prefix-');
         $this->docroot = $this->prefix . '/docroot';
         @mkdir($this->docroot, 0777, true);
-        // nginx needs these dirs to exist for some directives / temp paths.
         foreach (['logs', 'client_body_temp', 'proxy_temp', 'fastcgi_temp', 'uwsgi_temp', 'scgi_temp'] as $d) {
             @mkdir($this->prefix . '/' . $d, 0777, true);
         }
@@ -46,8 +33,6 @@ class NginxHarness
     }
 
     /**
-     * Find an nginx binary. Tries the known homebrew path first, then PATH.
-     *
      * @return string|null
      */
     public static function locateBinary()
@@ -58,7 +43,6 @@ class NginxHarness
                 return $c;
             }
         }
-        // PATH lookup
         $which = @shell_exec('command -v nginx 2>/dev/null');
         if (is_string($which)) {
             $which = trim($which);
@@ -76,11 +60,8 @@ class NginxHarness
     }
 
     /**
-     * Write the maps file and server file into the prefix and build a minimal nginx.conf that
-     * includes them.
-     *
-     * @param  string  $mapsBody    maps file body (http context) — or '' for single-file mode.
-     * @param  string  $serverBody  server file body (server context).
+     * @param  string  $mapsBody
+     * @param  string  $serverBody
      */
     public function writeConf($mapsBody, $serverBody)
     {
@@ -115,8 +96,6 @@ class NginxHarness
     }
 
     /**
-     * Run `nginx -t` against the written conf. Returns [exitCode, combinedOutput].
-     *
      * @return array{0:int,1:string}
      */
     public function test()
@@ -131,8 +110,6 @@ class NginxHarness
     }
 
     /**
-     * Boot nginx in the background (daemon on). Returns true on success.
-     *
      * @return bool
      */
     public function start()
@@ -146,12 +123,11 @@ class NginxHarness
         if ($code !== 0) {
             return false;
         }
-        // Wait for the pidfile + port to come up.
         for ($i = 0; $i < 50; $i++) {
             if ($this->isUp()) {
                 return true;
             }
-            usleep(100000); // 100ms
+            usleep(100000);
         }
         return false;
     }
@@ -168,9 +144,6 @@ class NginxHarness
     }
 
     /**
-     * HTTP GET against the running server with a given Accept header. Returns
-     * [statusLine, headers(assoc lowercased), body].
-     *
      * @param  string  $path
      * @param  string  $accept
      * @return array{0:int,1:array,2:string}
@@ -213,7 +186,6 @@ class NginxHarness
         return [$status, $headers, $body];
     }
 
-    /** Stop nginx by pidfile (failure-safe). */
     public function stop()
     {
         if ($this->binary !== null && is_file($this->confPath)) {
@@ -222,7 +194,6 @@ class NginxHarness
                 ' -c ' . escapeshellarg($this->confPath) . ' 2>/dev/null';
             @exec($cmd);
         }
-        // Belt-and-braces: kill by pidfile.
         $pidFile = $this->prefix . '/nginx.pid';
         if (is_file($pidFile)) {
             $pid = (int) trim(@file_get_contents($pidFile));
@@ -232,16 +203,12 @@ class NginxHarness
         }
     }
 
-    /** Recursively remove the temp prefix (failure-safe). */
     public function cleanup()
     {
         $this->stop();
-        // give nginx a moment to release the pid
         usleep(150000);
         self::rrmdir($this->prefix);
     }
-
-    // --- helpers ---
 
     private static function makeTempDir($prefix)
     {

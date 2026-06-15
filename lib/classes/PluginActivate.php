@@ -77,20 +77,12 @@ class PluginActivate
 
     private static function activateFirstTime()
     {
-        // Issue platform warnings, if any.
-        // -------------------------------
-
         if (PlatformInfo::isMicrosoftIis()) {
             Messenger::addMessage(
                 'warning',
                 'You are on Microsoft IIS server. Magic Convert has not been tested on IIS, so it may not work correctly.'
             );
         }
-
-        // On network-wide (multisite) activation we cannot safely auto-configure each site here, so
-        // keep the classic "configure it here" flow. Single-site (the normal case) gets zero-config
-        // auto-setup below.
-        // -------------------------------
 
         if (Multisite::isNetworkActivated()) {
             Messenger::addMessage(
@@ -101,46 +93,26 @@ class PluginActivate
             return;
         }
 
-        // Zero-config auto-setup (single site).
-        // -------------------------------
-        // An activation hook must NEVER fatal — a thrown error white-screens the activation — so the
-        // whole attempt is wrapped in try/catch and any failure falls back to the classic
-        // "configure it here" message.
-
         try {
             $isNginx = PlatformInfo::isNginx();
 
             $config = Config::loadConfigAndFix(true);
             if (!is_array($config)) {
-                // Couldn't build a config (extremely unlikely). Fall back.
                 self::addConfigureItHereMessage();
                 return;
             }
 
-            // Platform-aware overrides (e.g. enable Alter HTML on nginx so converted images are
-            // served with zero server configuration). Pure helper, fully decided in Config.
             $config = Config::applyFirstActivationPlatformDefaults($config, $isNginx);
 
-            // Persist config + wod options, write .htaccess where relevant, and set State 'configured'.
             $result = Config::saveConfigurationAndHTAccess($config, true);
 
             $savedOk = is_array($result) && !empty($result['saved-both-config']);
             if (!$savedOk) {
-                // Saving failed (e.g. file permissions). Fall back to the classic flow so the user
-                // can sort it out on the settings page.
                 self::addConfigureItHereMessage();
                 return;
             }
 
-            // Success! Platform-aware upbeat notice.
-            // Note: 'convert-on-upload' is OFF by default, so we do NOT promise automatic conversion
-            // of newly uploaded images — we point users at Bulk Convert for existing images instead.
             if ($isNginx) {
-                // nginx never serves via .htaccess, so the htaccess-result is irrelevant here — the
-                // HTML-alteration path we enabled above serves converted images with zero server
-                // config. (We deliberately do NOT call showSaveRulesMessages on nginx: it would add a
-                // confusing ".htaccess was written but nginx ignores it" warning on top of this
-                // message.) Serving works immediately; native rules are an optional speed-up.
                 Messenger::addMessage(
                     'success',
                     'Magic Convert is ready. Image serving works immediately via HTML alteration — ' .
@@ -150,12 +122,6 @@ class PluginActivate
                         'your existing images.'
                 );
             } else {
-                // Apache / LiteSpeed: serving depends on the .htaccess rewrite rules actually being
-                // written. saveConfigurationAndHTAccess() reports saved-both-config=true once the
-                // config JSON files are written — REGARDLESS of whether HTAccess::saveRules() managed
-                // to write the rewrite rules (a common failure on shared hosts where wp-content/root
-                // .htaccess is not writable). So we must inspect the htaccess outcome ourselves and
-                // never make the cheerful "served automatically" promise when rule writing failed.
                 $htaccessResult = (isset($result['htaccess-result']) && is_array($result['htaccess-result']))
                     ? $result['htaccess-result']
                     : null;
@@ -169,9 +135,6 @@ class PluginActivate
                             'your existing images, enable AVIF and tweak options.'
                     );
                 } else {
-                    // Config saved (State 'configured' is true), but the rewrite rules could not be
-                    // written, so serving is NOT yet active. Tell the user honestly and let
-                    // showSaveRulesMessages emit the specific permission error below.
                     Messenger::addMessage(
                         'warning',
                         'Magic Convert was installed, but it could not write the rewrite rules that serve your ' .
@@ -181,22 +144,15 @@ class PluginActivate
                     );
                 }
 
-                // Emit the detailed per-file rewrite-rule outcome (which files were written / failed,
-                // with the exact permission fix), exactly as the manual save flow in submit.php does.
                 if (is_array($htaccessResult)) {
                     HTAccess::showSaveRulesMessages($htaccessResult);
                 }
             }
         } catch (\Throwable $e) {
-            // An activation hook must never fatal. On any failure, fall back to the classic flow.
             self::addConfigureItHereMessage();
         }
     }
 
-    /**
-     * The classic "installed — go configure it" fallback message, used when auto-config is skipped
-     * (network activation) or fails for any reason.
-     */
     private static function addConfigureItHereMessage()
     {
         Messenger::addMessage(

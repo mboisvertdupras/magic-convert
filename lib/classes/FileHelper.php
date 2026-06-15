@@ -280,8 +280,6 @@ class FileHelper
             return false;
         }
         if (!@is_dir($destinationDir)) {
-            // Tolerant of the concurrent-creation race: re-check is_dir() after the
-            // attempt so a racer winning the create is not mistaken for a failure.
             @mkdir($destinationDir);
             if (!@is_dir($destinationDir)) {
                 return false;
@@ -392,24 +390,10 @@ class FileHelper
     }
 
     /**
-     *  Atomically write $contents to $path.
+     *  @param  string  $path
+     *  @param  string  $contents
      *
-     *  Writes to a uniquely-named temp file in the SAME directory as $path, then
-     *  rename()s it onto the final path. On POSIX, a rename within one directory
-     *  is atomic, so a concurrent reader of $path always sees either the complete
-     *  old content or the complete new content — never a half-written file. This
-     *  also makes writes crash-safe: a process killed mid-write leaves at most a
-     *  stray ".tmp" file, never a truncated target.
-     *
-     *  Used for every config/options/state JSON write (config.json,
-     *  wod-options.json) and for the per-source conversion log files.
-     *
-     *  @param  string  $path      Absolute path of the final file to write.
-     *  @param  string  $contents  The full contents to write.
-     *
-     *  @return bool  True on success, false on any failure (temp create, write,
-     *                or rename). On failure the temp file is cleaned up and the
-     *                existing target (if any) is left untouched.
+     *  @return bool
      */
     public static function atomicPutContents($path, $contents)
     {
@@ -418,8 +402,6 @@ class FileHelper
             $dir = '.';
         }
 
-        // Unique temp name in the same directory (so rename stays within one fs).
-        // getmypid()+uniqid() keeps concurrent writers from colliding on the temp.
         $pid = function_exists('getmypid') ? getmypid() : 0;
         $tmp = $path . '.' . $pid . '.' . uniqid('', true) . '.tmp';
 
@@ -429,8 +411,6 @@ class FileHelper
             return false;
         }
 
-        // Match the permissions file_put_contents would have produced for the
-        // final file: if the target already exists, preserve its mode.
         $existingPerm = self::filePerm($path);
         if ($existingPerm !== false) {
             @chmod($tmp, $existingPerm);

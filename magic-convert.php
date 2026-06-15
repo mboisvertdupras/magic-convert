@@ -15,15 +15,8 @@
  * Originally based on WebP Express by Bjørn Rosell (https://github.com/rosell-dk/webp-express).
  */
 
-if (!defined('ABSPATH')) exit; // Exit if accessed directly
+if (!defined('ABSPATH')) exit;
 
-// --- Minimum PHP version guard -------------------------------------------------
-// Magic Convert requires PHP 8.1+ (needed for GD imageavif(), typed properties,
-// enums and the modern conversion core). The rest of the plugin uses PHP 8.1+
-// syntax that would fatal-error during parse on older PHP. This guard block is
-// deliberately kept PHP 5.6-parseable (no short closures, no typed properties,
-// no named args) so that, on an ancient host, the admin sees an explanatory
-// notice instead of a white-screen fatal error. Do not add modern syntax here.
 if (PHP_VERSION_ID < 80100) {
     if (!function_exists('magic_convert_php_version_notice')) {
         function magic_convert_php_version_notice() {
@@ -35,38 +28,27 @@ if (PHP_VERSION_ID < 80100) {
     }
     add_action('admin_notices', 'magic_convert_php_version_notice');
     add_action('network_admin_notices', 'magic_convert_php_version_notice');
-    return; // Stop here. Do NOT load any of the PHP 8.1+ plugin code below.
+    return;
 }
-// -------------------------------------------------------------------------------
 
-if (defined('MAGIC_CONVERT_PLUGIN')) exit;  // Prevent problems if plugin is included twice (#472)
+if (defined('MAGIC_CONVERT_PLUGIN')) exit;
 
 define('MAGIC_CONVERT_PLUGIN', __FILE__);
 define('MAGIC_CONVERT_PLUGIN_DIR', __DIR__);
 
-// Autoload MagicConvert classes
 spl_autoload_register('magic_convert_autoload');
 function magic_convert_autoload($class) {
     $prefix = 'MagicConvert\\';
     if (strpos($class, $prefix) === 0) {
-        // Map the namespace tail to a path, turning sub-namespace separators ('\')
-        // into directory separators so e.g. MagicConvert\Avif\AvifStack resolves to
-        // lib/classes/Avif/AvifStack.php. For top-level classes this is a no-op, so
-        // existing resolution is unchanged.
         $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
         require_once MAGIC_CONVERT_PLUGIN_DIR . '/lib/classes/' . $relative . '.php';
     }
 }
 
 if (is_admin()) {
-    // Initialize admin hooks
     \MagicConvert\AdminInit::init();
 }
 
-// Register the REST API routes for parallel bulk conversion (Phase 1.2).
-// IMPORTANT: this must run on EVERY request, not only is_admin() — REST requests
-// are served outside wp-admin, so gating this behind is_admin() would make the
-// routes invisible. The routes themselves enforce manage_options + X-WP-Nonce.
 add_action('rest_api_init', array('\MagicConvert\RestApi', 'registerRoutes'));
 
 if ( class_exists( 'WP_CLI' ) ) {
@@ -74,7 +56,6 @@ if ( class_exists( 'WP_CLI' ) ) {
 }
 
 function magic_convert_process_post() {
-    // strip query string
     $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
     $requestUriNoQS = parse_url($requestUri, PHP_URL_PATH);
 
@@ -88,21 +69,16 @@ function magic_convert_process_post() {
     }
 }
 add_action( 'init', 'magic_convert_process_post' );
-//add_action( 'parse_request', 'magic_convert_process_post' );
 
 if (\MagicConvert\Option::getOption('magic-convert-alter-html', false)) {
     require_once __DIR__ . '/lib/classes/AlterHtmlInit.php';
     \MagicConvert\AlterHtmlInit::setHooks();
 }
 
-// When images are uploaded with Gutenberg, is_admin() returns false, so, hook needs to be added here
 add_filter('wp_handle_upload', array('\MagicConvert\HandleUploadHooks', 'handleUpload'), 10, 2);
 add_filter('image_make_intermediate_size', array('\MagicConvert\HandleUploadHooks', 'handleMakeIntermediateSize'), 10, 1);
 add_filter('wp_delete_file', array('\MagicConvert\HandleDeleteFileHook', 'deleteAssociatedWebP'), 10, 2);
 
-//add_action( 'template_redirect', 'magic_convert_template_redirect' );
-
-// Add hooks for tasks that might be scheduled for wp_cron
 add_action('magic_convert_task_bulk_update_dummy_files', array('\MagicConvert\BiggerThanSourceDummyFilesBulk', 'updateStatus'), 10, 0);
 add_action('magic_convert_task_regenerate_config', array('\MagicConvert\Config', 'regenerateConfig'), 10, 0);
 add_action('magic_convert_task_regenerate_config_and_htaccess', array('\MagicConvert\Config', 'regenerateConfigAndHtaccessFiles'), 10, 0);

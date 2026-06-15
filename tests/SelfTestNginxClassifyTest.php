@@ -5,30 +5,16 @@ namespace MagicConvert\Tests;
 use PHPUnit\Framework\TestCase;
 use MagicConvert\SelfTestNginx;
 
-/**
- * Pure-logic tests for the Phase 3.3 live nginx self-test classification core. These exercise the
- * type/length -> verdict matrix, the drift comparison outcomes, the CDN guidance selection, and the
- * overall verdict enum — all WITHOUT WordPress, HTTP, or the filesystem (the WP-http glue stays
- * thin and is covered functionally by NginxFunctionalTest).
- *
- * The fixture sizes mirror what the runner deploys: webp dummy 24 bytes, avif dummy 46 bytes, and a
- * distinct "original" size so content-length uniquely identifies the served file.
- */
 class SelfTestNginxClassifyTest extends TestCase
 {
-    /** Distinct known sizes (must differ from each other). */
     private function lengths(): array
     {
         return [
             'avif'     => 46,
             'webp'     => 24,
-            'original' => 3195, // very-small.jpg
+            'original' => 3195,
         ];
     }
-
-    // =====================================================================================
-    //  classifyFetch — content-type + content-length matrix
-    // =====================================================================================
 
     public function testWebpServedCleanly(): void
     {
@@ -66,10 +52,6 @@ class SelfTestNginxClassifyTest extends TestCase
         );
     }
 
-    /**
-     * Rules active but mime mapping missing: the webp BYTES were served (content-length == 24) but
-     * the content-type is the original's (image/jpeg) because the types{} block is absent.
-     */
     public function testWebpBytesServedWithWrongTypeIsMimeMissing(): void
     {
         $headers = ['content-type' => 'image/jpeg', 'content-length' => '24'];
@@ -97,10 +79,6 @@ class SelfTestNginxClassifyTest extends TestCase
         );
     }
 
-    /**
-     * Preference/order wrong: expected avif but got a clean webp (content-type image/webp). This is
-     * the signal the runner uses to flag bad try_files ordering.
-     */
     public function testExpectedAvifButGotWebpIsServedWebp(): void
     {
         $headers = ['content-type' => 'image/webp', 'content-length' => '24'];
@@ -110,9 +88,6 @@ class SelfTestNginxClassifyTest extends TestCase
         );
     }
 
-    /**
-     * Rules NOT active: expected webp but got the original jpeg bytes (content-length 3195).
-     */
     public function testExpectedWebpButGotOriginalIsServedOriginal(): void
     {
         $headers = ['content-type' => 'image/jpeg', 'content-length' => '3195'];
@@ -122,15 +97,9 @@ class SelfTestNginxClassifyTest extends TestCase
         );
     }
 
-    /**
-     * Missing-content-length edge (chunked transfer / on-the-fly gzip): the response carries the
-     * ORIGINAL content-type and NO content-length header, but we expected a webp. We cannot confirm
-     * the original BYTES were served, so the right diagnosis is mime-missing (rules active, type
-     * wrong) — NOT the more pessimistic "rules not active" served-original.
-     */
     public function testWebpExpectedOriginalTypeNoContentLengthIsMimeMissing(): void
     {
-        $headers = ['content-type' => 'image/jpeg']; // no content-length
+        $headers = ['content-type' => 'image/jpeg'];
         $this->assertSame(
             SelfTestNginx::FETCH_MIME_MISSING_WEBP,
             SelfTestNginx::classifyFetch('webp', true, $headers, $this->lengths(), 'jpeg')
@@ -139,45 +108,31 @@ class SelfTestNginxClassifyTest extends TestCase
 
     public function testAvifExpectedOriginalTypeNoContentLengthIsMimeMissing(): void
     {
-        $headers = ['content-type' => 'image/jpeg']; // no content-length
+        $headers = ['content-type' => 'image/jpeg'];
         $this->assertSame(
             SelfTestNginx::FETCH_MIME_MISSING_AVIF,
             SelfTestNginx::classifyFetch('avif', true, $headers, $this->lengths(), 'jpeg')
         );
     }
 
-    /**
-     * Same missing-content-length edge, but with a generic (non-original) content-type — still
-     * mime-missing when a conversion was expected.
-     */
     public function testWebpExpectedGenericTypeNoContentLengthIsMimeMissing(): void
     {
-        $headers = ['content-type' => 'application/octet-stream']; // no content-length
+        $headers = ['content-type' => 'application/octet-stream'];
         $this->assertSame(
             SelfTestNginx::FETCH_MIME_MISSING_WEBP,
             SelfTestNginx::classifyFetch('webp', true, $headers, $this->lengths(), 'jpeg')
         );
     }
 
-    /**
-     * When the ORIGINAL is what we expected (Accept without an image type), the absence of a
-     * content-length must NOT be misread as a conversion — there is nothing to convert. The
-     * original content-type with no content-length stays served-original.
-     */
     public function testOriginalExpectedOriginalTypeNoContentLengthIsServedOriginal(): void
     {
-        $headers = ['content-type' => 'image/jpeg']; // no content-length
+        $headers = ['content-type' => 'image/jpeg'];
         $this->assertSame(
             SelfTestNginx::FETCH_SERVED_ORIGINAL,
             SelfTestNginx::classifyFetch('original', true, $headers, $this->lengths(), 'jpeg')
         );
     }
 
-    /**
-     * Regression guard: a PRESENT content-length that matches the original (and a conversion was
-     * expected) must still be served-original — the present-length path is unchanged by the
-     * missing-content-length fix.
-     */
     public function testWebpExpectedOriginalBytesWithMatchingLengthStaysServedOriginal(): void
     {
         $headers = ['content-type' => 'image/jpeg', 'content-length' => '3195'];
@@ -215,7 +170,6 @@ class SelfTestNginxClassifyTest extends TestCase
 
     public function testWrongFormatWhenNothingMatches(): void
     {
-        // Unknown content-type and a length matching no fixture.
         $headers = ['content-type' => 'text/html', 'content-length' => '999'];
         $this->assertSame(
             SelfTestNginx::FETCH_WRONG_FORMAT,
@@ -233,10 +187,6 @@ class SelfTestNginxClassifyTest extends TestCase
         $this->assertFalse(SelfTestNginx::fetchIsClean(SelfTestNginx::FETCH_REQUEST_FAILED));
         $this->assertFalse(SelfTestNginx::fetchIsClean(SelfTestNginx::FETCH_WRONG_FORMAT));
     }
-
-    // =====================================================================================
-    //  classifyDrift — version endpoint comparison
-    // =====================================================================================
 
     public function testDriftUpToDate(): void
     {
@@ -264,7 +214,6 @@ class SelfTestNginxClassifyTest extends TestCase
 
     public function testDriftAbsentOn404(): void
     {
-        // request failed (e.g. 404) => absent
         $this->assertSame(
             SelfTestNginx::DRIFT_ABSENT,
             SelfTestNginx::classifyDrift(false, null, 'abc123')
@@ -286,10 +235,6 @@ class SelfTestNginxClassifyTest extends TestCase
             SelfTestNginx::classifyDrift(true, null, 'abc123')
         );
     }
-
-    // =====================================================================================
-    //  selectCdnGuidance — CDN detection from headers
-    // =====================================================================================
 
     public function testCloudflareGuidance(): void
     {
@@ -324,10 +269,6 @@ class SelfTestNginxClassifyTest extends TestCase
         $this->assertStringContainsString('add_header vary accept', $joined);
     }
 
-    // =====================================================================================
-    //  verdict — overall enum
-    // =====================================================================================
-
     public function testVerdictWorkingWebpAvif(): void
     {
         $this->assertSame(
@@ -352,7 +293,6 @@ class SelfTestNginxClassifyTest extends TestCase
 
     public function testVerdictPartialWhenAvifPreferenceWrong(): void
     {
-        // avif enabled + served but ordering wrong => partial.
         $this->assertSame(
             SelfTestNginx::VERDICT_PARTIAL,
             SelfTestNginx::verdict([

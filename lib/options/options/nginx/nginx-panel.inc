@@ -1,18 +1,4 @@
 <?php
-/**
- * The nginx panel (Phase 3.2). Render-glue ONLY — every decision lives in NginxPanel / NginxRules.
- *
- * Capability: this partial is reached exclusively from lib/options/page.php, which calls
- * current_user_can('manage_options') and wp_die()s otherwise (confirmed at the top of page.php).
- * The on-page textareas are therefore populated server-side safely; an unprivileged user never
- * reaches this code. The Download buttons additionally re-check capability + a dedicated nonce in
- * NginxDownload::handle().
- *
- * Shown prominently when PlatformInfo::isNginx(); on htaccess-capable hosts it is collapsed
- * behind a "Running nginx?" <details> so it stays reachable but de-emphasized.
- *
- * Expects $config in scope (it is, from page.php).
- */
 
 use \MagicConvert\NginxPanel;
 use \MagicConvert\NginxRules;
@@ -26,19 +12,15 @@ if (!current_user_can('manage_options')) {
 
 $mc_isNginx = PlatformInfo::isNginx();
 
-// Generate both artifacts on the fly (NginxRules has no disk-writing method). These embed the
-// config hash; they are rendered into capability-gated read-only textareas only, never written.
 $mc_maps   = NginxRules::generateMapsFileFromPaths($config);
 $mc_server = NginxRules::generateServerFileFromPaths($config);
 $mc_single = NginxRules::generateSingleFileFromPaths($config);
 
-// Fingerprint / version line.
 $mc_state = State::getState('nginx-rules', null);
 $mc_fingerprint = is_array($mc_state) && isset($mc_state['fingerprint']) ? $mc_state['fingerprint'] : '';
 $mc_generatedAt = is_array($mc_state) && isset($mc_state['generated-at']) ? $mc_state['generated-at'] : '';
 $mc_shortFp = NginxPanel::shortFingerprint($mc_fingerprint);
 
-// Secure download URL builder (admin-post action + per-artifact whitelisted key + nonce).
 $mc_downloadNonce = wp_create_nonce(NginxDownload::NONCE_ACTION);
 $mc_downloadUrl = function ($artifactKey) use ($mc_downloadNonce) {
     return add_query_arg(
@@ -51,7 +33,6 @@ $mc_downloadUrl = function ($artifactKey) use ($mc_downloadNonce) {
     );
 };
 
-// A small renderer for one artifact card (textarea + Copy + Download).
 $mc_renderArtifactCard = function ($title, $whereGuidance, $textareaId, $body, $downloadKey)
         use ($mc_downloadUrl) {
     echo '<div class="magicconvert-nginx-card" style="border:1px solid #ccd0d4; border-radius:4px; '
@@ -71,7 +52,6 @@ $mc_renderArtifactCard = function ($title, $whereGuidance, $textareaId, $body, $
     echo '</div>';
 };
 
-// ---- The panel body (shared between the prominent and collapsed presentations) --------------
 $mc_renderPanelBody = function ()
         use ($mc_maps, $mc_server, $mc_single, $mc_shortFp, $mc_generatedAt,
              $mc_renderArtifactCard) {
@@ -101,7 +81,6 @@ $mc_renderPanelBody = function ()
     <h4>Choose your setup</h4>
 
     <?php
-    // Artifact A — the two-file standard setup.
     echo '<h4 style="margin-bottom:4px;">Standard (two files)</h4>';
     echo '<p style="margin-top:0; color:#50575e;">Recommended. One file declares the '
         . 'Accept-negotiation <code>map</code>s (http context); the other holds the location '
@@ -125,7 +104,6 @@ $mc_renderPanelBody = function ()
         'server'
     );
 
-    // Artifact B — the single-file control-panel setup.
     echo '<h4 style="margin-bottom:4px;">Single file (control panels)</h4>';
     echo '<p style="margin-top:0; color:#50575e;">For GridPane / RunCloud / Plesk-style hosts whose '
         . 'per-site include slot only accepts <strong>server-context</strong> directives (no http-context '
@@ -197,7 +175,6 @@ $mc_renderPanelBody = function ()
     <?php
 };
 
-// ---- Presentation: prominent when on nginx, collapsed otherwise ------------------------------
 ?>
 <fieldset class="block" id="magicconvert-nginx-panel">
 <?php if ($mc_isNginx) : ?>

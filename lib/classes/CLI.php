@@ -5,31 +5,22 @@ namespace MagicConvert;
 class CLI extends \WP_CLI_Command
 {
 
-    /** Minimum backlog size before automatic parallelism kicks in. Below this,
-     *  the per-process WP bootstrap overhead is not worth paying. */
     const PARALLEL_MIN_FILES = 50;
 
-    /** Hard cap on --procs, even if a power user asks for more. Coarse shards
-     *  only; more processes than this just thrash the disk and the scheduler. */
     const PROCS_HARD_CAP = 16;
 
-    /** Machine-readable per-shard summary line a child prints right before it
-     *  exits, so the parent can aggregate converted/failed counts and sizes.
-     *  Format: this prefix followed by a single JSON object. */
     const SUMMARY_PREFIX = '#MC-SUMMARY ';
 
     private static function printableSize($bytes) {
         return ($bytes < 10000) ? $bytes . " bytes" : round($bytes / 1024) . ' kb';
     }
 
-    /** Human label for a single format id (e.g. 'webp' => 'WebP'). */
     private static function formatLabel($id) {
         if ($id === 'webp') { return 'WebP'; }
         if ($id === 'avif') { return 'AVIF'; }
         return strtoupper((string) $id);
     }
 
-    /** Join format ids into a human phrase, e.g. ['webp','avif'] => 'WebP + AVIF'. */
     private static function formatsLabel(array $ids) {
         $labels = array_map(['\MagicConvert\CLI', 'formatLabel'], $ids);
         return implode(' + ', $labels);
@@ -102,14 +93,6 @@ class CLI extends \WP_CLI_Command
      */
     public function convert($args, $assoc_args)
     {
-        // ---------------------------------------------------------------------
-        // 0. Parse the two orchestration flags (--procs / --shard) up front and
-        //    decide which "mode" this invocation is running in:
-        //      - CHILD  : we were given --shard=i/n; convert only our shard.
-        //      - PARENT : no --shard; we may decide to spawn children.
-        //    --procs and --shard are mutually exclusive (a child is told its
-        //    shard explicitly; --procs only makes sense for the parent).
-        // ---------------------------------------------------------------------
         $shardSpec = isset($assoc_args['shard']) ? $assoc_args['shard'] : null;
         $procsArg  = isset($assoc_args['procs']) ? $assoc_args['procs'] : null;
 
@@ -129,15 +112,8 @@ class CLI extends \WP_CLI_Command
 
         $isChild = ($shardIndex !== null);
 
-        // A label printed in front of every progress line in a child, so
-        // interleaved child output in the parent's terminal stays readable.
         $logPrefix = $isChild ? ('[shard ' . $shardIndex . '/' . $shardTotal . '] ') : '';
 
-        // ---------------------------------------------------------------------
-        // 1. Build config + overrides (identical in parent and children, so the
-        //    file list they each derive is identical — a precondition for the
-        //    shard partition to be a correct, complete cover).
-        // ---------------------------------------------------------------------
         $config = Config::loadConfigAndFix();
         $override = [];
 
@@ -170,13 +146,6 @@ class CLI extends \WP_CLI_Command
 
         $config = array_merge($config, $override);
 
-        // ---------------------------------------------------------------------
-        // 1b. Resolve which output formats this run produces.
-        //     SINGLE SOURCE OF TRUTH: Config::enabledFormatIds() (webp always; avif when on).
-        //     An optional --format=<webp|avif> narrows it to one format; the value must be a
-        //     known format AND enabled (else we error). Parent and children resolve this
-        //     identically, so a shard converts the same formats per file as the parent would.
-        // ---------------------------------------------------------------------
         $enabledFormats = Config::enabledFormatIds($config);
         $activeFormats = $enabledFormats;
         if (isset($assoc_args['format']) && $assoc_args['format'] !== '') {
@@ -196,8 +165,6 @@ class CLI extends \WP_CLI_Command
             $activeFormats = [$requested];
         }
 
-        // The "settings" banner is noise when many children print it at once;
-        // only the parent / a plain sequential run prints it.
         if (!$isChild) {
             \WP_CLI::log('Converting with the following settings:');
             \WP_CLI::log('- Lossless quality: ' . $config['png-quality'] . ' for PNG, ' . $config['max-quality'] . " for jpeg");
@@ -215,13 +182,6 @@ class CLI extends \WP_CLI_Command
             \WP_CLI::log('');
         }
 
-        // ---------------------------------------------------------------------
-        // 2. Idempotency / "skip if fresh".
-        //    Sharded/parallel runs are idempotent resumes by default: a child
-        //    that re-encounters an already-fresh destination skips it cheaply.
-        //    --reconvert disables that (and also widens the file list to include
-        //    already-converted files).
-        // ---------------------------------------------------------------------
         $reconvert  = isset($assoc_args['reconvert']);
         $skipIfFresh = !$reconvert;
 
@@ -236,9 +196,6 @@ class CLI extends \WP_CLI_Command
             $listOptions['filter']['image-types'] = 1;
         }
 
-        // ---------------------------------------------------------------------
-        // 3. Build the file list (grouped by image root), exactly as before.
-        // ---------------------------------------------------------------------
         if (!isset($args[0])) {
           $groups = BulkConvert::getList($config, $listOptions);
           if (!$isChild) {
@@ -287,25 +244,10 @@ class CLI extends \WP_CLI_Command
           }
         }
 
-        // ---------------------------------------------------------------------
-        // 4. If we are a CHILD, keep only the files that belong to our shard.
-        //    The key fed to ShardFilter is the GROUP-QUALIFIED root-relative
-        //    path ("<groupName>/<file>"). Qualifying with the group name makes
-        //    the key globally unique across roots (two roots could otherwise
-        //    contain the same relative path) while remaining a stable,
-        //    location-independent string that the parent would compute the same
-        //    way. Files are kept in the SAME order in every process, so the
-        //    partition is identical everywhere.
-        // ---------------------------------------------------------------------
         if ($isChild) {
             foreach ($groups as &$group) {
                 $kept = [];
                 foreach ($group['files'] as $file) {
-                    // A list item is either a plain path string (webp-only fast
-                    // path) or a { path, formats:[...] } array (multi-format). The
-                    // shard key hashes the root-relative PATH, so unwrap it first —
-                    // otherwise an array $file coerces to the literal "Array" and
-                    // every file collapses into a single shard bucket.
                     $relPath = is_array($file) ? $file['path'] : $file;
                     $key = $group['groupName'] . '/' . $relPath;
                     if (ShardFilter::belongs($key, $shardIndex, $shardTotal)) {
@@ -317,40 +259,25 @@ class CLI extends \WP_CLI_Command
             unset($group);
         }
 
-        // Total backlog across all groups (post-shard-filtering).
         $totalFiles = 0;
         foreach ($groups as $group) {
             $totalFiles += count($group['files']);
         }
 
-        // ---------------------------------------------------------------------
-        // 5. PARENT decision: parallelize or run inline?
-        //    Only the parent (no --shard) ever fans out. A child always converts
-        //    its assigned files inline.
-        // ---------------------------------------------------------------------
         if (!$isChild) {
             $procs = self::decideProcs($procsArg, $totalFiles);
 
             if ($procs > 1) {
-                // Attempt the parallel fan-out. On any failure it returns false
-                // and we fall through to the inline sequential path below
-                // (GRACEFUL FALLBACK: a run must never fail merely because
-                // parallelism was impossible).
                 $exitCode = self::runParallel($procs, $totalFiles, $args, $assoc_args, $activeFormats);
                 if ($exitCode !== false) {
                     \WP_CLI::halt($exitCode);
                     return;
                 }
-                // else: fall through to inline sequential.
             } else {
                 self::announceSequential($totalFiles, $activeFormats);
             }
         }
 
-        // ---------------------------------------------------------------------
-        // 6. Inline sequential conversion (used by: every child, a forced
-        //    --procs=1 / small-batch parent, and the graceful fallback).
-        // ---------------------------------------------------------------------
         $converter = null;
         $convertOptions = null;
 
@@ -379,7 +306,6 @@ class CLI extends \WP_CLI_Command
         $webpTotalFilesize = 0;
         $convertedCount = 0;
         $failedCount = 0;
-        // Per-format tallies for the machine-readable summary + aggregate output.
         $perFormat = [];
         foreach ($activeFormats as $fmtId) {
             $perFormat[$fmtId] = ['converted' => 0, 'failed' => 0, 'org_bytes' => 0, 'out_bytes' => 0];
@@ -395,14 +321,6 @@ class CLI extends \WP_CLI_Command
             $files = array_reverse($group['files']);
             foreach($files as $key => $file)
             {
-                // A list item is either a plain path string (webp-only fast path)
-                // or a { path, formats:[...] } array (multi-format path). Unwrap
-                // the path; without this an array $file coerces to "Array" and the
-                // convert path becomes "<root>/Array" (does not exist => every file
-                // fails). For the formats, honor the per-file 'formats' (only the
-                // ones still missing for THIS file) intersected with the run's
-                // active formats; the plain-string fast path has no per-file
-                // formats, so it uses the full active set.
                 $relPath = is_array($file) ? $file['path'] : $file;
                 $fileFormats = (is_array($file) && isset($file['formats']) && is_array($file['formats']))
                     ? array_values(array_intersect($activeFormats, $file['formats']))
@@ -411,10 +329,6 @@ class CLI extends \WP_CLI_Command
                 $path = trailingslashit($group['root']) . $relPath;
                 \WP_CLI::log($logPrefix . 'Converting: ' . $relPath);
 
-                // A shard owns a WHOLE file: loop the formats this file still needs
-                // INSIDE the per-file iteration. The conversion core's skip-if-fresh
-                // already skips formats that are already up to date, so "every format
-                // that needs it" falls out for free.
                 foreach ($fileFormats as $fmtId) {
                     $formatTag = $multiFormat ? ('[' . self::formatLabel($fmtId) . '] ') : '';
 
@@ -423,7 +337,7 @@ class CLI extends \WP_CLI_Command
                     if ($result['success']) {
                         $convertedCount++;
                         $orgSize = $result['filesize-original'];
-                        $outSize = $result['filesize-webp'];   // destination size (any format)
+                        $outSize = $result['filesize-webp'];
 
                         $orgTotalFilesize += $orgSize;
                         $webpTotalFilesize += $outSize;
@@ -468,7 +382,6 @@ class CLI extends \WP_CLI_Command
                   ") "
               )
           );
-          // Per-format breakdown when more than one format was produced.
           if ($multiFormat) {
               foreach ($activeFormats as $fmtId) {
                   $f = $perFormat[$fmtId];
@@ -483,11 +396,6 @@ class CLI extends \WP_CLI_Command
           }
         }
 
-        // A child emits a machine-readable summary line as its very last output,
-        // so the parent can aggregate per-shard results without re-parsing the
-        // human log. (The parent itself never prints this.) The 'formats' block
-        // carries the per-format converted/failed/byte tallies for this shard so
-        // the parent can report per-format gains in its aggregate.
         if ($isChild) {
             $summary = [
                 'shard'     => $shardIndex,
@@ -507,14 +415,7 @@ class CLI extends \WP_CLI_Command
     }
 
     /**
-     * Aggregate the per-shard '#MC-SUMMARY' payloads into one totals structure.
-     *
-     * Pure (array in, array out): given a list of decoded summary arrays (each as
-     * emitted above, possibly missing the 'formats' block for an old/failed shard),
-     * it sums the overall counters and merges the per-format tallies. Factored out so
-     * the per-format aggregation is unit-testable without spawning processes.
-     *
-     * @param  array<int,array>  $summaries  Decoded #MC-SUMMARY payloads.
+     * @param  array<int,array>  $summaries
      * @return array{converted:int,failed:int,org_bytes:int,webp_bytes:int,formats:array<string,array>}
      */
     public static function aggregateSummaries(array $summaries)
@@ -545,18 +446,7 @@ class CLI extends \WP_CLI_Command
     }
 
     /**
-     *  Decide how many processes the parent should use.
-     *
-     *  - Explicit --procs wins (validated, capped at PROCS_HARD_CAP with a
-     *    warning, floored at 1). --procs=1 means "force sequential".
-     *  - Otherwise it is automatic: parallelize only when the backlog is large
-     *    enough to amortize the per-process WP bootstrap AND the resource-aware
-     *    ConcurrencyAdvisor (committed in Phase 1.2 — reused here, never
-     *    re-implemented) recommends more than one CLI proc. The recommended
-     *    proc count is itself capped at the backlog (no point spawning more
-     *    children than there are files).
-     *
-     *  @return int  >= 1. A return of 1 means "run sequentially inline".
+     *  @return int
      */
     private static function decideProcs($procsArg, $totalFiles)
     {
@@ -564,7 +454,6 @@ class CLI extends \WP_CLI_Command
             return 1;
         }
 
-        // Explicit override.
         if ($procsArg !== null) {
             $procs = (int) $procsArg;
             if ($procs < 1) {
@@ -580,7 +469,6 @@ class CLI extends \WP_CLI_Command
             return min($procs, max(1, $totalFiles));
         }
 
-        // Automatic.
         if ($totalFiles < self::PARALLEL_MIN_FILES) {
             return 1;
         }
@@ -593,7 +481,6 @@ class CLI extends \WP_CLI_Command
         return min($recommended, $totalFiles);
     }
 
-    /** Print the one-line "running sequentially" explanation (mentions the formats). */
     private static function announceSequential($totalFiles, $activeFormats = ['webp'])
     {
         if ($totalFiles <= 0) {
@@ -608,24 +495,7 @@ class CLI extends \WP_CLI_Command
     }
 
     /**
-     *  Spawn $procs child processes of THIS wp-cli command, one per shard, and
-     *  stream their output back with shard prefixes.
-     *
-     *  Each child is invoked as the same `wp magic-convert convert` command with
-     *  `--shard=i/n` added and every relevant user flag forwarded (see
-     *  buildChildArgs). The parent reads all children's stdout/stderr
-     *  non-blockingly in a select loop, line-buffers them, and re-emits each
-     *  line. When every child has exited it prints an aggregate summary parsed
-     *  from each child's '#MC-SUMMARY {json}' line and returns an exit code
-     *  (non-zero if any child failed or could not be parsed).
-     *
-     *  GRACEFUL FALLBACK: returns false (without having converted anything) when
-     *  proc_open is unavailable or the spawn machinery cannot be set up, so the
-     *  caller can run sequentially instead. A real conversion run must never be
-     *  blocked just because parallelism was impossible.
-     *
-     *  @return int|false  Exit code (0 ok, non-zero if a child failed), or false
-     *                     to signal "could not parallelize, fall back".
+     *  @return int|false
      */
     private static function runParallel($procs, $totalFiles, $args, $assoc_args, $activeFormats = ['webp'])
     {
@@ -653,7 +523,7 @@ class CLI extends \WP_CLI_Command
             2 => ['pipe', 'w'],
         ];
 
-        $children = [];   // shard index => ['proc'=>res, 'pipes'=>[], 'buf'=>['1'=>'', '2'=>'']]
+        $children = [];
         for ($i = 1; $i <= $procs; $i++) {
             $cmd = self::shellJoin(array_merge($childArgv, ['--shard=' . $i . '/' . $procs]));
 
@@ -661,7 +531,6 @@ class CLI extends \WP_CLI_Command
             $proc = @proc_open($cmd, $descriptors, $pipes);
             if (!is_resource($proc)) {
                 \WP_CLI::warning('Failed to spawn shard ' . $i . '/' . $procs . '; converting sequentially.');
-                // Tear down any children already started, then fall back.
                 self::reapChildren($children);
                 return false;
             }
@@ -675,11 +544,10 @@ class CLI extends \WP_CLI_Command
             ];
         }
 
-        // --- select loop: stream child output line-by-line ----------------------
         $open = true;
         while ($open) {
             $read = [];
-            $map = [];   // (int) stream id => [shard, fd]
+            $map = [];
             foreach ($children as $shard => &$child) {
                 foreach ([1, 2] as $fd) {
                     if (is_resource($child['pipes'][$fd])) {
@@ -691,18 +559,17 @@ class CLI extends \WP_CLI_Command
             unset($child);
 
             if (count($read) === 0) {
-                break;  // all pipes closed
+                break;
             }
 
             $write = null;
             $except = null;
-            // 200ms tick: long enough to avoid a busy spin, short enough to feel live.
             $ready = @stream_select($read, $write, $except, 0, 200000);
             if ($ready === false) {
-                break;  // interrupted; let the wait/reap below finish things off
+                break;
             }
             if ($ready === 0) {
-                continue;  // timeout, just loop and re-poll
+                continue;
             }
 
             foreach ($read as $stream) {
@@ -714,7 +581,6 @@ class CLI extends \WP_CLI_Command
                 $chunk = fread($stream, 65536);
                 if ($chunk === '' || $chunk === false) {
                     if (feof($stream)) {
-                        // Flush any trailing partial line, then close this pipe.
                         self::flushChildLines($children[$shard], $shard, $procs, $fd, true);
                         fclose($stream);
                         $children[$shard]['pipes'][$fd] = null;
@@ -725,7 +591,6 @@ class CLI extends \WP_CLI_Command
                 self::flushChildLines($children[$shard], $shard, $procs, $fd, false);
             }
 
-            // Are any pipes still open?
             $open = false;
             foreach ($children as $child) {
                 if (is_resource($child['pipes'][1]) || is_resource($child['pipes'][2])) {
@@ -735,12 +600,10 @@ class CLI extends \WP_CLI_Command
             }
         }
 
-        // --- wait for exit + aggregate -----------------------------------------
         $anyFailed = false;
         $summaries = [];
 
         foreach ($children as $shard => &$child) {
-            // Flush any leftover buffered output that didn't end in a newline.
             foreach ([1, 2] as $fd) {
                 if ($child['buf'][$fd] !== '') {
                     self::emitChildLine($shard, $procs, $fd, $child['buf'][$fd]);
@@ -754,14 +617,11 @@ class CLI extends \WP_CLI_Command
             if (is_array($child['summary'])) {
                 $summaries[] = $child['summary'];
             } else {
-                // No machine-readable summary => treat as a failed shard so we
-                // don't silently under-report.
                 $anyFailed = true;
             }
         }
         unset($child);
 
-        // Pure aggregation (overall + per-format) — unit-tested via aggregateSummaries().
         $agg = self::aggregateSummaries($summaries);
         if ($agg['failed'] > 0) {
             $anyFailed = true;
@@ -781,7 +641,6 @@ class CLI extends \WP_CLI_Command
             )
         );
 
-        // Per-format breakdown when more than one format was produced.
         if (count($activeFormats) > 1 && !empty($agg['formats'])) {
             foreach ($activeFormats as $fmtId) {
                 if (!isset($agg['formats'][$fmtId])) { continue; }
@@ -799,12 +658,6 @@ class CLI extends \WP_CLI_Command
         return $anyFailed ? 1 : 0;
     }
 
-    /**
-     *  Emit any complete (newline-terminated) lines currently buffered for one
-     *  child stream, capturing the machine-readable summary line and otherwise
-     *  re-printing each line with a shard prefix. When $final is true, the
-     *  trailing partial line (if any) is also flushed.
-     */
     private static function flushChildLines(&$child, $shard, $total, $fd, $final)
     {
         $buf = &$child['buf'][$fd];
@@ -813,7 +666,6 @@ class CLI extends \WP_CLI_Command
             $buf = substr($buf, $nl + 1);
             $line = rtrim($line, "\r");
 
-            // Capture and swallow the summary line (don't echo it to the user).
             if ($fd === 1 && strpos($line, self::SUMMARY_PREFIX) === 0) {
                 $json = substr($line, strlen(self::SUMMARY_PREFIX));
                 $decoded = json_decode($json, true);
@@ -825,7 +677,6 @@ class CLI extends \WP_CLI_Command
             self::emitChildLine($shard, $total, $fd, $line);
         }
         if ($final && $buf !== '') {
-            // Trailing line without newline.
             if (!($fd === 1 && strpos($buf, self::SUMMARY_PREFIX) === 0)) {
                 self::emitChildLine($shard, $total, $fd, $buf);
             } else {
@@ -838,11 +689,6 @@ class CLI extends \WP_CLI_Command
         }
     }
 
-    /**
-     *  Print one line of child output. Child lines already carry their own
-     *  "[shard i/n] " prefix (the child sets $logPrefix), so the parent passes
-     *  them through verbatim for stdout; stderr lines are routed to WP_CLI::warning.
-     */
     private static function emitChildLine($shard, $total, $fd, $line)
     {
         if ($line === '') {
@@ -856,7 +702,6 @@ class CLI extends \WP_CLI_Command
         \WP_CLI::log($line);
     }
 
-    /** Best-effort teardown of already-spawned children during a failed fan-out. */
     private static function reapChildren(&$children)
     {
         foreach ($children as $child) {
@@ -873,33 +718,10 @@ class CLI extends \WP_CLI_Command
     }
 
     /**
-     *  Build the argv for a child invocation (everything EXCEPT the --shard flag,
-     *  which runParallel appends per child).
-     *
-     *  ## How the wp binary + globals are derived (robustly)
-     *
-     *  A child must re-run *this exact* wp-cli command. We reconstruct it from:
-     *
-     *    1. The PHP binary + wp entry script the parent itself was launched with:
-     *       $GLOBALS['argv'][0] is wp-cli's own phar/entry path, and PHP_BINARY
-     *       is the interpreter. Invoking `<php> <wp-entry> ...` re-enters wp-cli
-     *       independently of how `wp` is aliased on PATH, which is the most
-     *       portable approach across phar installs, Composer-global installs and
-     *       distro packages.
-     *    2. The command path: `magic-convert convert`.
-     *    3. The user's positional <location> arg (if any) and the relevant
-     *       conversion flags, forwarded verbatim.
-     *    4. The WP-CLI *global* runtime args --path / --url when the parent was
-     *       given them, pulled from WP_CLI::get_runner()->config, so the child
-     *       bootstraps the SAME WordPress install (critical on multisite and on
-     *       installs where the cwd is not the WP root).
-     *
-     *  @return array<int,string>|false  Argv (string per element), or false if
-     *                                   the wp entry point cannot be determined.
+     *  @return array<int,string>|false
      */
     private static function buildChildCommand($args, $assoc_args)
     {
-        // --- 1. php binary + wp entry script ----------------------------------
         $wpEntry = isset($GLOBALS['argv'][0]) ? $GLOBALS['argv'][0] : null;
         if (!is_string($wpEntry) || $wpEntry === '') {
             return false;
@@ -911,46 +733,24 @@ class CLI extends \WP_CLI_Command
         return self::buildChildArgs($argv, $args, $assoc_args);
     }
 
-    /**
-     *  Append the forwarded positional arg, conversion flags and WP-CLI globals
-     *  to a child argv prefix. Split out from buildChildCommand so it is unit-
-     *  reviewable and so the flag-forwarding coverage is explicit in one place.
-     *
-     *  Forwarded:
-     *    - positional <location> (args[0]),
-     *    - --reconvert, --only-png, --only-jpeg               (boolean flags),
-     *    - --quality, --near-lossless, --alpha-quality,
-     *      --encoding, --converter, --format                   (value flags),
-     *    - WP-CLI globals --path / --url when present.
-     *  NOT forwarded:
-     *    - --procs (the parent already expanded it into a shard count),
-     *    - --shard (added per-child by runParallel).
-     */
     private static function buildChildArgs($argv, $args, $assoc_args)
     {
-        // Positional <location>.
         if (isset($args[0]) && $args[0] !== '') {
             $argv[] = (string) $args[0];
         }
 
-        // Boolean flags.
         foreach (['reconvert', 'only-png', 'only-jpeg'] as $flag) {
             if (isset($assoc_args[$flag]) && $assoc_args[$flag] !== false) {
                 $argv[] = '--' . $flag;
             }
         }
 
-        // Value flags.
         foreach (['quality', 'near-lossless', 'alpha-quality', 'encoding', 'converter', 'format'] as $flag) {
             if (isset($assoc_args[$flag]) && $assoc_args[$flag] !== '' && $assoc_args[$flag] !== false) {
                 $argv[] = '--' . $flag . '=' . $assoc_args[$flag];
             }
         }
 
-        // WP-CLI global runtime args (--path / --url) so the child bootstraps the
-        // identical WordPress install. Read from the runner config; fall back to
-        // whatever the parent received in $assoc_args (WP-CLI strips globals from
-        // $assoc_args, so the runner config is the reliable source).
         $globals = self::wpCliGlobalArgs();
         foreach (['path', 'url'] as $g) {
             if (isset($globals[$g]) && $globals[$g] !== '' && $globals[$g] !== false) {
@@ -962,11 +762,6 @@ class CLI extends \WP_CLI_Command
     }
 
     /**
-     *  Pull the WP-CLI global runtime config (--path, --url, ...) from the
-     *  runner. Defensive: if the runner / config is not introspectable in this
-     *  wp-cli version, return an empty array (the child then bootstraps from the
-     *  cwd, which is correct for the common single-site case).
-     *
      *  @return array<string,mixed>
      */
     private static function wpCliGlobalArgs()
@@ -985,11 +780,6 @@ class CLI extends \WP_CLI_Command
         return $runner->config;
     }
 
-    /**
-     *  Join an argv array into a single shell-safe command string. Every element
-     *  is escapeshellarg()'d so paths/URLs with spaces or shell metacharacters
-     *  survive the round-trip through proc_open's "string command" form.
-     */
     private static function shellJoin(array $argv)
     {
         return implode(' ', array_map('escapeshellarg', $argv));

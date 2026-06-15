@@ -5,19 +5,8 @@ namespace MagicConvert\Tests;
 use MagicConvert\RestApi;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for the WordPress-independent, format-aware REST helpers (Phase 2.5):
- *
- *   - resolveRequestedFormat()  validate/normalise the /convert 'format' param against BOTH the
- *                               known OutputFormat ids AND the enabled-formats allow-list.
- *   - flattenList()             grouped -> flat { root, path, formats:[...] } (both file shapes).
- *   - formatTotals()            per-format pending counts (work estimate / progress denominators).
- *   - formatsInList()           the formats present in a persisted list (paged re-derivation).
- */
 class RestApiFormatTest extends TestCase
 {
-    // --- resolveRequestedFormat ----------------------------------------------
-
     public function testAbsentFormatDefaultsToWebp(): void
     {
         $this->assertSame('webp', RestApi::resolveRequestedFormat(null, ['webp', 'avif']));
@@ -27,24 +16,21 @@ class RestApiFormatTest extends TestCase
     public function testEnabledKnownFormatIsAccepted(): void
     {
         $this->assertSame('avif', RestApi::resolveRequestedFormat('avif', ['webp', 'avif']));
-        $this->assertSame('avif', RestApi::resolveRequestedFormat('AVIF', ['webp', 'avif'])); // case-insensitive
-        $this->assertSame('webp', RestApi::resolveRequestedFormat(' webp ', ['webp', 'avif'])); // trimmed
+        $this->assertSame('avif', RestApi::resolveRequestedFormat('AVIF', ['webp', 'avif']));
+        $this->assertSame('webp', RestApi::resolveRequestedFormat(' webp ', ['webp', 'avif']));
     }
 
     public function testUnknownFormatIsRejected(): void
     {
         $this->assertNull(RestApi::resolveRequestedFormat('jpegxl', ['webp', 'avif']));
         $this->assertNull(RestApi::resolveRequestedFormat('../etc/passwd', ['webp', 'avif']));
-        $this->assertNull(RestApi::resolveRequestedFormat(['avif'], ['webp', 'avif'])); // non-scalar
+        $this->assertNull(RestApi::resolveRequestedFormat(['avif'], ['webp', 'avif']));
     }
 
     public function testKnownButDisabledFormatIsRejected(): void
     {
-        // 'avif' is a real OutputFormat, but it is not enabled here => rejected.
         $this->assertNull(RestApi::resolveRequestedFormat('avif', ['webp']));
     }
-
-    // --- flattenList ----------------------------------------------------------
 
     public function testFlattenLegacyStringItemsDefaultToEnabledFormats(): void
     {
@@ -62,8 +48,8 @@ class RestApiFormatTest extends TestCase
     {
         $groups = [
             ['groupName' => 'uploads', 'files' => [
-                ['path' => 'a.jpg', 'formats' => ['avif']],            // only avif missing
-                ['path' => 'b.jpg', 'formats' => ['webp', 'avif']],    // both missing
+                ['path' => 'a.jpg', 'formats' => ['avif']],
+                ['path' => 'b.jpg', 'formats' => ['webp', 'avif']],
             ]],
         ];
         $flat = RestApi::flattenList($groups, ['webp', 'avif']);
@@ -78,8 +64,6 @@ class RestApiFormatTest extends TestCase
         $this->assertSame([], RestApi::flattenList(null));
         $this->assertSame([], RestApi::flattenList([]));
     }
-
-    // --- formatTotals ---------------------------------------------------------
 
     public function testFormatTotalsCountsEachFormatIndependently(): void
     {
@@ -99,15 +83,12 @@ class RestApiFormatTest extends TestCase
         $this->assertSame(['webp' => 1, 'avif' => 0], RestApi::formatTotals($flat, ['webp', 'avif']));
     }
 
-    // --- formatsInList --------------------------------------------------------
-
     public function testFormatsInListReturnsRegistryOrderedUnion(): void
     {
         $flat = [
             ['root' => 'u', 'path' => 'a', 'formats' => ['avif']],
             ['root' => 'u', 'path' => 'b', 'formats' => ['webp']],
         ];
-        // Registry order is webp, then avif — regardless of first appearance.
         $this->assertSame(['webp', 'avif'], RestApi::formatsInList($flat));
     }
 

@@ -9,10 +9,6 @@ class BulkConvert
 
     public static function defaultListOptions($config)
     {
-        // Which output formats are enabled determines what the listing reports per file.
-        // SINGLE SOURCE OF TRUTH: Config::enabledFormatIds() (webp always; avif only when on).
-        // With AVIF disabled (the default) this is exactly ['webp'] and the scanner takes the
-        // byte-for-byte unchanged single-format fast path (see getListRecursively()).
         $enabledFormats = Config::enabledFormatIds($config);
 
         return [
@@ -23,9 +19,6 @@ class BulkConvert
             'uploadDirAbs' => Paths::getUploadDirAbs(),
             'useDocRootForStructuringCacheDir' => (($config['destination-structure'] == 'doc-root') && (Paths::canUseDocRootForStructuringCacheDir())),
             'imageRoots' => new ImageRoots(Paths::getImageRootsDefForSelectedIds($config['scope'])),   // (Paths::getImageRootsDef()
-            // The format ids the scanner should report per file. When this holds exactly
-            // ['webp'] the scanner emits plain path strings (the legacy fast path); when it
-            // holds more than webp it emits { path, formats:[...] } items (only-missing).
             'enabled-formats' => $enabledFormats,
             'filter' => [
                 'only-converted' => false,
@@ -37,16 +30,6 @@ class BulkConvert
         ];
     }
 
-    /**
-     * Is this listing run in the single-format WebP fast path?
-     *
-     * True when the only enabled format is webp (the default install). In that case the scanner
-     * keeps producing plain path strings and uses the exact same @file_exists check as upstream,
-     * so the default install pays ZERO overhead for the multi-format machinery.
-     *
-     * @param  array  $listOptions
-     * @return bool
-     */
     private static function isWebpOnlyFastPath($listOptions)
     {
         $formats = isset($listOptions['enabled-formats']) && is_array($listOptions['enabled-formats'])
@@ -56,29 +39,16 @@ class BulkConvert
     }
 
     /**
-     * Decide, for ONE source file, which of the enabled formats still need conversion.
-     *
-     * A format needs conversion when its destination is MISSING or STALE (destination older
-     * than the source). Staleness reuses the exact same idempotency rule the conversion core
-     * applies (ConvertHelperIndependent::isDestinationFresh) so the listing and the bulk pass
-     * agree on what "already done" means.
-     *
-     * Pure logic given the precomputed inputs: the caller passes the source mtime and a map of
-     * { formatId => destinationMtime|false }. This makes it trivially unit-testable with no
-     * filesystem (the recursive scanner does the @filemtime() stat'ing and hands the result in).
-     *
-     * @param  array<string,int|false>  $destinationMtimes  formatId => destination mtime (false if absent).
-     * @param  int|false                $sourceMtime        source mtime (false if unreadable).
-     * @param  string[]                 $enabledFormats     format ids to consider, in order.
-     * @return string[]  The subset of $enabledFormats whose destination is missing/stale, in order.
+     * @param  array<string,int|false>  $destinationMtimes
+     * @param  int|false                $sourceMtime
+     * @param  string[]                 $enabledFormats
+     * @return string[]
      */
     public static function formatsNeedingConversion(array $destinationMtimes, $sourceMtime, array $enabledFormats)
     {
         $needed = [];
         foreach ($enabledFormats as $formatId) {
             $destMtime = array_key_exists($formatId, $destinationMtimes) ? $destinationMtimes[$formatId] : false;
-            // Fresh => already converted for this format => skip it. Anything else (missing or
-            // stale) => still needs converting.
             if (!ConvertHelperIndependent::isDestinationFresh($destMtime, $sourceMtime)) {
                 $needed[] = $formatId;
             }
@@ -200,10 +170,6 @@ class BulkConvert
                         $webpOnlyFastPath = self::isWebpOnlyFastPath($listOptions);
 
                         if ($webpOnlyFastPath) {
-                            // --- WebP-only fast path (default install) -------------------
-                            // Byte-for-byte unchanged from upstream: a single getDestination()
-                            // for webp and a plain @file_exists() existence check. No mtime
-                            // stat'ing, no per-format loop, no array items — zero overhead.
                             $destination = ConvertHelperIndependent::getDestination(
                                 $sourcePath,
                                 $listOptions['destination-folder'],
@@ -214,15 +180,8 @@ class BulkConvert
                                 $listOptions['imageRoots']
                             );
                             $webpExists = @file_exists($destination);
-                            // In the fast path "needs conversion" is exactly "webp missing",
-                            // matching the legacy semantics precisely.
                             $missingFormats = $webpExists ? [] : [OutputFormat::DEFAULT_ID];
                         } else {
-                            // --- Multi-format path (AVIF and/or future formats enabled) --
-                            // Per file, work out which enabled formats still need conversion
-                            // (destination MISSING or STALE relative to the source). Files that
-                            // are fully converted in every enabled format get an empty list and
-                            // are excluded below (for only-unconverted).
                             $enabledFormats = $listOptions['enabled-formats'];
                             $sourceMtime = @filemtime($sourcePath);
                             $destinationMtimes = [];
@@ -244,8 +203,6 @@ class BulkConvert
                                 $sourceMtime,
                                 $enabledFormats
                             );
-                            // "converted" (for the only-converted/only-unconverted filters below)
-                            // means "nothing left to convert in any enabled format".
                             $webpExists = (count($missingFormats) === 0);
                         }
 
@@ -357,12 +314,8 @@ class BulkConvert
                             }
                             if ($listOptions['flattenList']) {
                               if ($webpOnlyFastPath) {
-                                  // Legacy shape: a plain path string. Unchanged for the
-                                  // default install (consumers that expect strings keep working).
                                   $results[] = $path;
                               } else {
-                                  // Multi-format shape: { path, formats:[...] } carrying ONLY the
-                                  // formats that still need conversion for this file.
                                   $results[] = [
                                       'path' => $path,
                                       'formats' => $missingFormats,

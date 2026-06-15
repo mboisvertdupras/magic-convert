@@ -22,13 +22,8 @@ class ConvertHelperIndependent
 {
 
     /**
-     *  Compute the path of the lock file guarding a given destination.
-     *
-     *  Pure string logic (no filesystem access) so it can be unit-tested.
-     *  The lock lives right next to the destination: '<destination>.lock'.
-     *
-     *  @param  string  $destination  The FINAL destination path.
-     *  @return string                The lock file path.
+     *  @param  string  $destination
+     *  @return string
      */
     public static function lockPathForDestination($destination)
     {
@@ -36,29 +31,10 @@ class ConvertHelperIndependent
     }
 
     /**
-     *  Compute the temp path the library converts INTO before we atomically
-     *  rename it onto the final destination.
-     *
-     *  The temp name is derived from the final destination and MUST still end in
-     *  the format extension (e.g. ".webp") so that both the plugin's own
-     *  '#\.<ext>$#' destination sanity check AND the underlying encode library's
-     *  destination validator accept it. We insert a per-process token before the
-     *  trailing extension so two concurrent writers (which should be serialized by
-     *  the lock anyway, but belt-and-suspenders) never collide on the temp file,
-     *  and a crash leaves an obviously-temporary artifact next to the destination
-     *  rather than a corrupt destination.
-     *
-     *  Example (webp):
-     *    /cache/logo.jpg.webp  ->  /cache/logo.jpg.<pid>.tmp.webp
-     *  Example (avif):
-     *    /cache/logo.jpg.avif  ->  /cache/logo.jpg.<pid>.tmp.avif
-     *
-     *  Pure string logic (no filesystem access) so it can be unit-tested.
-     *
-     *  @param  string                      $destination  The FINAL destination path (ends in .<ext>).
-     *  @param  int|null                    $pid          Process id token (defaults to getmypid()).
-     *  @param  OutputFormat|string|null    $format       Output format (defaults to webp).
-     *  @return string                                    The temp destination path (ends in .<ext>).
+     *  @param  string                      $destination
+     *  @param  int|null                    $pid
+     *  @param  OutputFormat|string|null    $format
+     *  @return string
      */
     public static function tempDestinationFor($destination, $pid = null, $format = null)
     {
@@ -66,26 +42,14 @@ class ConvertHelperIndependent
             $pid = function_exists('getmypid') ? getmypid() : 0;
         }
         $ext = OutputFormat::coerce($format)->extension();
-        // Strip a trailing ".<ext>" (case-insensitive) and re-append our token + ".<ext>",
-        // guaranteeing the result still matches '#\.<ext>$#'.
         $base = preg_replace('#\.' . preg_quote($ext, '#') . '$#i', '', $destination);
         return $base . '.' . $pid . '.tmp.' . $ext;
     }
 
     /**
-     *  Idempotency test: is an existing destination "fresh" relative to its source?
-     *
-     *  A destination is considered fresh when it exists and its mtime is greater
-     *  than or equal to the source's mtime (i.e. it was produced from the current
-     *  source and the source has not changed since). Used to skip re-encoding when
-     *  the caller opts in via the 'skip-if-fresh' option.
-     *
-     *  Pure logic (only stat-style numeric comparison); callers pass in the mtimes
-     *  so it is trivially unit-testable without touching the filesystem.
-     *
-     *  @param  int|false  $destinationMtime  mtime of destination, or false if missing.
-     *  @param  int|false  $sourceMtime       mtime of source, or false if missing.
-     *  @return bool                          True if destination is fresh (skip convert).
+     *  @param  int|false  $destinationMtime
+     *  @param  int|false  $sourceMtime
+     *  @return bool
      */
     public static function isDestinationFresh($destinationMtime, $sourceMtime)
     {
@@ -142,7 +106,7 @@ class ConvertHelperIndependent
      * @param  string                    $destinationFolder
      * @param  string                    $destinationExt
      * @param  boolean                   $inUploadFolder
-     * @param  OutputFormat|string|null  $format             Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder, $format = null)
     {
@@ -167,7 +131,7 @@ class ConvertHelperIndependent
      * @param  string   $uploadDirAbs
      * @param  boolean  $useDocRootForStructuringCacheDir
      * @param  ImageRoots  $imageRoots                An image roots object
-     * @param  OutputFormat|string|null  $format     Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      *
      * @return string|false   Returns path to destination corresponding to source, or false on failure
      */
@@ -324,7 +288,7 @@ class ConvertHelperIndependent
      * @param  string      $destinationStructure      "doc-root" or "image-roots"
      * @param  string      $webExpressContentDirAbs
      * @param  ImageRoots  $imageRoots                An image roots object
-     * @param  OutputFormat  $format                  Output format (already coerced).
+     * @param  OutputFormat  $format
      *
      * @return string|false   Returns path to source, if found. If not - or a path is not sane, false is returned
      */
@@ -372,9 +336,6 @@ class ConvertHelperIndependent
                     // 4. If it does, we could create a dummy file at the destination to get its real path, but we want to avoid that, so instead
                     //    we can create the containing directory.
                     // 5. We can now use realpath to get the resolved path of the containing directory. The rest is simple enough.
-                    // Tolerant of the concurrent-creation race (@mkdir then re-check):
-                    // a racer winning the create makes our mkdir fail with EEXIST, but
-                    // the dir then exists, which is all realpath() below needs.
                     if (!@is_dir($imageRoot)) {
                         @mkdir($imageRoot, 0777, true);
                     }
@@ -385,8 +346,7 @@ class ConvertHelperIndependent
                         $imageRootResolved = realpath($imageRoot);
                         if (strpos($closestExistingResolved . '/', $imageRootResolved . '/') === 0) {
 //                            echo $destination . '<br>' . $closestExistingResolved . '<br>' . $imageRootResolved . '/'; exit;
-                            // Create containing dir for destination (tolerant of the
-                            // concurrent-creation race: @mkdir then re-check is_dir()).
+                            // Create containing dir for destination
                             $containingDir = PathHelper::dirname($destination);
                             if (!@is_dir($containingDir)) {
                                 @mkdir($containingDir, 0777, true);
@@ -437,8 +397,7 @@ class ConvertHelperIndependent
                     $cacheRootResolved = realpath($cacheRoot);
                     if (strpos($closestExistingResolved . '/', $cacheRootResolved . '/') === 0) {
 
-                        // Create containing dir for destination (tolerant of the
-                        // concurrent-creation race: @mkdir then re-check is_dir()).
+                        // Create containing dir for destination
                         $containingDir = PathHelper::dirname($destination);
                         if (!@is_dir($containingDir)) {
                             @mkdir($containingDir, 0777, true);
@@ -476,7 +435,7 @@ class ConvertHelperIndependent
      * @param  string  $destination             Path to destination file (does not have to exist)
      * @param  string  $destinationExt          Extension ('append' or 'set')
      * @param  string  $destinationStructure    "doc-root" or "image-roots"
-     * @param  OutputFormat  $format             Output format (already coerced).
+     * @param  OutputFormat  $format
      *
      * @return string|false   Returns path to source, if found. If not - or a path is not sane, false is returned
      */
@@ -542,7 +501,7 @@ class ConvertHelperIndependent
      * @param  string  $destinationStructure      "doc-root" or "image-roots"
      * @param  string  $webExpressContentDirAbs
      * @param  ImageRoots  $imageRoots                An image roots object
-     * @param  OutputFormat|string|null  $format     Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      *
      * @return string|false  Returns path to source, if found. If not - or a path is not sane, false is returned
      */
@@ -580,17 +539,9 @@ class ConvertHelperIndependent
      *
      * @param  string                    $source  Path to source file
      * @param  string                    $logDir  The folder where log files are kept
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      *
      * @return string|false   Returns computed filename of log - or false if a path is not sane
-     *
-     * LOG LAYOUT (Phase 2.1): logs are stored per-format under
-     * '/log/conversions/<format-id>/doc-root/...'. The format-id subdir lets
-     * webp and avif conversions of the same source keep distinct logs instead of
-     * clobbering each other. This is an internal-only path change (no public
-     * compat needed in a fork); old webp logs are migrated by convention (see
-     * the migration note in the roadmap summary) and the log viewer
-     * (ConvertLog.php) is adjusted to the new layout.
      */
     public static function getLogFilename($source, $logDir, $format = null)
     {
@@ -609,7 +560,6 @@ class ConvertHelperIndependent
 
             // Compute and check log path
             // --------------------------
-            // Per-format subdir: /log/conversions/<format-id>/...
             $logDir .= '/conversions/' . $formatId;
 
             // We store relative to document root.
@@ -664,7 +614,7 @@ APACHE
      * @param  string                    $logDir   The folder where log files are kept
      * @param  string                    $text     Content of the log file
      * @param  string                    $msgTop   A message that is printed before the conversion log (containing version info)
-     * @param  OutputFormat|string|null  $format   Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      *
      *
      */
@@ -687,14 +637,10 @@ APACHE
         }
 
         $logFolder = @dirname($logFile);
-        // Tolerant of the concurrent-creation race: @mkdir then re-check is_dir().
         if (!@is_dir($logFolder)) {
             @mkdir($logFolder, 0777, true);
         }
         if (@is_dir($logFolder)) {
-            // Atomic write (temp + rename). The same-destination lock already
-            // serializes same-source log writes; temp+rename adds crash safety so
-            // a killed process never leaves a truncated .md log behind.
             FileHelper::atomicPutContents($logFile, $text);
         }
     }
@@ -709,25 +655,7 @@ APACHE
      * @param  array                     $convertOptions  Conversion options.
      * @param  string                    $logDir          The folder where log files are kept or null for no logging
      * @param  string                    $converter       (optional) Set it to convert with a specific converter.
-     * @param  OutputFormat|string|null  $format          (optional) Output format (defaults to webp). The
-     *                                                     encode dispatch is WebP-only for now; a non-webp
-     *                                                     format throws a clear "not yet supported" exception
-     *                                                     (the AVIF encoder lands in step 2.3).
-     *
-     * Concurrency / atomicity (Phase 1.1):
-     *  - A cross-process lock on '<destination>.lock' serializes writers of the
-     *    same destination (parallel FPM requests AND concurrent CLI procs). When
-     *    the lock is held by another live process this returns a structured,
-     *    non-fatal failure with 'status' => 'in-progress' so bulk callers can retry.
-     *  - Idempotency: when $convertOptions['skip-if-fresh'] === true and the
-     *    destination already exists and is newer than the source, the conversion
-     *    is skipped and 'status' => 'already-converted' is returned. Without the
-     *    flag the behaviour is exactly as before (always (re)convert) so explicit
-     *    reconvert from the UI and the wod path keep their semantics.
-     *  - Atomic write: the library converts into '<destination>.<pid>.tmp.webp'
-     *    and we rename() that onto the final destination on success. On any
-     *    failure/exception the temp file is removed in the finally block, so a
-     *    concurrent reader never sees a half-written destination.
+     * @param  OutputFormat|string|null  $format
      */
     public static function convert($source, $destination, $convertOptions, $logDir = null, $converter = null, $format = null) {
         include_once __DIR__ . '/../../vendor/autoload.php';
@@ -735,8 +663,6 @@ APACHE
         $format = OutputFormat::coerce($format);
         $extQuoted = preg_quote($format->extension(), '#');
 
-        // The 'skip-if-fresh' flag is a plugin-level option, not a webp-convert
-        // option. Pull it out so it never reaches the library.
         $skipIfFresh = false;
         if (is_array($convertOptions) && isset($convertOptions['skip-if-fresh'])) {
             $skipIfFresh = ($convertOptions['skip-if-fresh'] === true);
@@ -755,10 +681,6 @@ APACHE
 
             // Check that destination path is sane and is inside document root
             // -------------------------------------------------------
-            // NOTE: We validate the FINAL destination here. The temp file we hand
-            // to the library is derived from it and also ends in the format
-            // extension (e.g. ".webp"), so it satisfies both this check and the
-            // library's own validator.
             $destination = SanityCheck::absPathIsInDocRoot($destination);
             $destination = SanityCheck::pregMatch('#\.' . $extQuoted . '$#', $destination, 'Destination does not end with .' . $format->extension());
 
@@ -780,14 +702,9 @@ APACHE
             ];
         }
 
-        // Acquire the cross-process lock guarding this destination.
-        // -------------------------------------------------------
         $lockPath = self::lockPathForDestination($destination);
         $lockToken = FileLock::acquire($lockPath);
         if ($lockToken === false) {
-            // Another process is converting this exact destination right now.
-            // Surface a distinct, non-fatal status so callers can retry rather
-            // than treat it as a hard failure.
             return [
                 'success' => false,
                 'status' => 'in-progress',
@@ -796,15 +713,12 @@ APACHE
             ];
         }
 
-        // Everything from here MUST release the lock (and clean up the temp file).
         $tempDestination = self::tempDestinationFor($destination, null, $format);
         $success = false;
         $msg = '';
         $logger = new BufferLogger();
         try {
 
-            // Idempotency: skip re-encoding when the caller opted in and the
-            // destination is already fresh relative to the source.
             if ($skipIfFresh && self::isDestinationFresh(@filemtime($destination), @filemtime($source))) {
                 return [
                     'success' => true,
@@ -815,38 +729,19 @@ APACHE
             }
 
             try {
-                // Encode dispatch (Phase 2.3): WebP goes through webp-convert exactly
-                // as before; AVIF is routed to the AvifStack. The OutputFormat parameter
-                // is threaded everywhere (paths, temp names, logs, markers, cache dirs),
-                // and this dispatch sits INSIDE the already-hardened section — the same
-                // cross-process lock, '<dest>.<pid>.tmp.<ext>' temp+rename, skip-if-fresh
-                // idempotency and finally-cleanup apply identically to both formats. We
-                // always write to $tempDestination (already '.tmp.avif' for AVIF, see
-                // tempDestinationFor()) so the atomic rename below is format-agnostic.
                 if ($format->id() === 'avif') {
-                    // AVIF stack. Quality/speed come from the per-format options the
-                    // caller threaded in (formats.avif block); metadata follows the
-                    // global 'metadata' option already present in $convertOptions —
-                    // honouring it consistently with how the webp path treats metadata.
                     $avifOptions = self::deriveAvifOptions($convertOptions);
                     $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
                         . ', speed=' . $avifOptions['speed']
                         . ', metadata=' . $avifOptions['metadata'] . ')');
                     $logger->logLn('');
 
-                    // Build the AVIF stack from the configured converter list (order +
-                    // per-converter deactivation), threaded in under $convertOptions['avif']
-                    // ['converters'] by Convert.php. fromConverterList() falls back to the full
-                    // default stack when the list is empty/missing, so callers that don't thread
-                    // a list (legacy/on-demand) still get the complete stack — backward compatible.
                     $avifConverterList = (isset($convertOptions['avif']['converters']) && is_array($convertOptions['avif']['converters']))
                         ? $convertOptions['avif']['converters']
                         : [];
                     $stack = AvifStack::fromConverterList($avifConverterList);
                     $result = $stack->convert($source, $tempDestination, $avifOptions);
 
-                    // Surface the per-converter "tried/succeeded/why-failed" trail in the
-                    // same .md log the webp path produces.
                     $logger->logLn($result['log']);
                     $logger->logLn('');
                     $logger->logLn('Converted with: ' . $result['converter']);
@@ -862,10 +757,6 @@ APACHE
                     WebPConvert::convert($source, $tempDestination, $convertOptions, $logger);
                 }
 
-                // The library wrote (atomically, for the 'auto' path) into the temp
-                // file. Atomically move it onto the final destination. rename() within
-                // the same directory is atomic on POSIX, so a concurrent reader sees
-                // either the previous destination or the new one, never a partial file.
                 if (@file_exists($tempDestination)) {
                     if (@rename($tempDestination, $destination)) {
                         $success = true;
@@ -873,7 +764,6 @@ APACHE
                         $msg = 'Conversion succeeded but the converted file could not be moved into place';
                     }
                 } else {
-                    // Defensive: library reported success but produced no file.
                     $msg = 'Conversion did not produce an output file';
                 }
             } catch (\WebpConvert\Exceptions\WebPConvertException $e) {
@@ -896,32 +786,14 @@ APACHE
                 'log' => $logger->getMarkDown("\n"),
             ];
         } finally {
-            // Always clean up the temp file (it only lingers on failure/crash-before-rename)
-            // and always release the lock.
             if (@file_exists($tempDestination)) {
                 @unlink($tempDestination);
             }
-            // Release only OUR lock: release() verifies the token still matches,
-            // so if this conversion ran long and another process stole the lock
-            // as stale and re-acquired it, we will not delete their live lock.
             FileLock::release($lockPath, $lockToken);
         }
     }
 
     /**
-     *  Derive the AVIF stack options from the conversion options array.
-     *
-     *  The webp-convert options array ($convertOptions) is what the rest of the
-     *  core already threads around. For AVIF we read:
-     *    - quality / speed  : from the per-format block the caller injected under
-     *                         the 'avif' key (Config exposes formats.avif quality/
-     *                         speed; Convert.php copies them in). Falls back to the
-     *                         AVIF defaults (q30, speed6) when absent, so an
-     *                         out-of-band caller still gets sane encoding.
-     *    - metadata         : from the GLOBAL 'metadata' option already present in
-     *                         $convertOptions — the same value the webp path uses,
-     *                         so metadata handling is consistent across formats.
-     *
      *  @param  array  $convertOptions
      *  @return array{quality:int,speed:int,metadata:string,jobs:(int|null)}
      */
@@ -934,12 +806,10 @@ APACHE
         $quality = isset($avif['quality']) ? (int) $avif['quality'] : 30;
         $speed = isset($avif['speed']) ? (int) $avif['speed'] : 6;
 
-        // Global metadata option (webp path uses the same key). Default 'all' = keep.
         $metadata = (is_array($convertOptions) && isset($convertOptions['metadata']))
             ? $convertOptions['metadata']
             : 'all';
 
-        // Optional thread hint for multi-threaded encoders (e.g. avifenc --jobs).
         $jobs = isset($avif['jobs']) ? (int) $avif['jobs'] : null;
 
         return [
@@ -953,10 +823,7 @@ APACHE
     /**
      *  Serve a converted file (if it does not already exist, a conversion is triggered - all handled in webp-convert).
      *
-     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp). On-demand serving stays
-     *                                             WebP-only by default for now (on-demand AVIF is gated and
-     *                                             arrives in step 2.4); the parameter is threaded so the path
-     *                                             validation / inner convert() / log layout are format-aware.
+     *  @param  OutputFormat|string|null  $format
      */
     public static function serveConverted($source, $destination, $serveOptions, $logDir = null, $logMsgTop = '', $format = null)
     {
@@ -1000,37 +867,11 @@ APACHE
             exit;
         }
 
-        // Concurrency hardening of the on-demand (wod) serve-and-convert path
-        // (Phase 1.1).
-        // -------------------------------------------------------------------
-        // The library's serveConverted() converts directly into $destination when
-        // the file is missing — a non-atomic write that a second concurrent reader
-        // could observe half-finished. To avoid that, when the destination is
-        // missing we first run our OWN hardened convert() (cross-process lock +
-        // convert-into-temp + atomic rename + idempotency). On success the library
-        // call below simply finds and serves the now-existing, fully-written file.
-        //
-        // We only intervene when the destination is missing AND we have convert
-        // options to work with; everything else (serving an existing file, serving
-        // the original, header/redirect handling, serve-on-failure) is left to the
-        // library exactly as before.
-        //
-        // Residual race (acceptable): if our convert() reports 'in-progress' (a
-        // sibling process holds the lock for this exact destination), we fall
-        // through to the library serve. The sibling is writing atomically via our
-        // path, so the worst case is that this request's library call also tries to
-        // convert and writes $destination directly; because that only happens for
-        // the rare overlapping first-request-per-missing-file, and any file written
-        // by our path lands atomically, a corrupt file is never *served* from our
-        // path. This narrow window is documented in docs/development.md.
         if (!@file_exists($destination)
             && isset($serveOptions['convert'])
             && is_array($serveOptions['convert'])
         ) {
             $preConvertResult = self::convert($source, $destination, $serveOptions['convert'], $logDir, null, $format);
-            // If another process holds the lock ('in-progress'), do nothing special
-            // here — fall through and let the library serve/convert as a fallback.
-            // On our success the file now exists and the library just serves it.
         }
 
         $convertLogger = new BufferLogger();

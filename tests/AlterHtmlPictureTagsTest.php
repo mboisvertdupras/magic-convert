@@ -5,28 +5,8 @@ namespace MagicConvert\Tests;
 use PHPUnit\Framework\TestCase;
 use MagicConvert\AlterHtml\PictureTags;
 
-/**
- * Tests for the FORKED, multi-format PictureTags (MagicConvert\AlterHtml\PictureTags).
- *
- * Two groups:
- *
- *  1. PORTED from the donor library (rosell-dk/dom-util-for-webp, tests/PictureTagsTest.php, MIT).
- *     The pure HTML-transform cases are adapted verbatim where possible. They prove the fork is a
- *     faithful, behaviour-preserving port for the WebP-only case (the zero-config default). Cases
- *     that relied on the donor's pretender.inc (forcing DOMDocument/mb_* absence) and external
- *     encoding fixtures are intentionally not ported — they test the kub-at fallback parser, which
- *     is unchanged vendored code, not our fork.
- *
- *  2. NEW Magic Convert cases: avif+webp double-source ordering, avif-enabled-but-file-missing
- *     (webp source only), both-missing (img untouched), attribute preservation, malformed HTML.
- */
 class AlterHtmlPictureTagsTest extends TestCase
 {
-    // =====================================================================================
-    // Group 1 — ported donor cases (WebP-only; the default PictureTags::replaceUrlForFormat)
-    // =====================================================================================
-
-    /** Donor testUntouched(): the transform is needle-like; unrelated HTML is never altered. */
     public function testUntouched(): void
     {
         $untouched = [
@@ -34,7 +14,7 @@ class AlterHtmlPictureTagsTest extends TestCase
             'a<p></p>b<p></p>c',
             '',
             '<body!><p><!-- bad html here!--></p></a>',
-            '<img src="3.jpg.tiff">',                 // wrong ext (last part counts)
+            '<img src="3.jpg.tiff">',
             '<H1>hi</H1>',
             'blah<BR>blah<br>blah',
             "<pre>hello\nline</pre>",
@@ -44,7 +24,6 @@ class AlterHtmlPictureTagsTest extends TestCase
         }
     }
 
-    /** Donor testBasic(): simplest src-only conversion. */
     public function testBasicSrc(): void
     {
         $this->assertSame(
@@ -54,7 +33,6 @@ class AlterHtmlPictureTagsTest extends TestCase
         );
     }
 
-    /** Donor testSrcAndSrcSet(): both src and srcset present. */
     public function testSrcAndSrcSet(): void
     {
         $this->assertSame(
@@ -65,10 +43,6 @@ class AlterHtmlPictureTagsTest extends TestCase
     }
 
     /**
-     * Donor "testTheRest" — the pure DOMDocument-path cases. These cover sizes copying,
-     * data-* srcset, data: url skipping, class preservation, multi-size srcset, density
-     * descriptors, uppercase normalization, real WordPress markup and nested <picture>.
-     *
      * @dataProvider donorPureCases
      */
     public function testDonorPureCases(string $html, string $expected): void
@@ -147,8 +121,6 @@ class AlterHtmlPictureTagsTest extends TestCase
     }
 
     /**
-     * Donor "$theseShouldBeLeftUntouchedTests": wrong extensions, query strings, wrong tags.
-     *
      * @dataProvider donorUntouchedCases
      */
     public function testDonorUntouchedCases(string $html): void
@@ -173,21 +145,12 @@ class AlterHtmlPictureTagsTest extends TestCase
         ];
     }
 
-    /**
-     * Donor "#42": if ANY srcset entry has no converted variant, abort the whole image (don't
-     * produce a broken responsive set). Uses a webp-only subclass that rejects png.
-     */
     public function testAbortWhenAnySrcsetEntryMissing(): void
     {
         $input = '<img src="1.jpg" srcset="1.jpg 600w, 2.png 40w, 3.jpg 60w" sizes="(max-width: 600px) 100vw, 600px">';
         $this->assertSame($input, PictureTagsJpgOnly::replace($input));
     }
 
-    // =====================================================================================
-    // Group 2 — NEW multi-format cases (avif + webp)
-    // =====================================================================================
-
-    /** avif+webp double-source ordering: avif <source> MUST come before the webp <source>. */
     public function testAvifAndWebpDoubleSourceOrdering(): void
     {
         $out = PictureTagsAvifAndWebp::replace('<img src="1.jpg" alt="hi">');
@@ -200,7 +163,6 @@ class AlterHtmlPictureTagsTest extends TestCase
             '</picture>';
         $this->assertSame($expected, $out);
 
-        // Explicit ordering invariant.
         $avifPos = strpos($out, 'type="image/avif"');
         $webpPos = strpos($out, 'type="image/webp"');
         $this->assertNotFalse($avifPos);
@@ -208,7 +170,6 @@ class AlterHtmlPictureTagsTest extends TestCase
         $this->assertLessThan($webpPos, $avifPos, 'avif <source> must precede webp <source>');
     }
 
-    /** avif+webp on a responsive srcset: both sources fully populated, avif first. */
     public function testAvifAndWebpSrcset(): void
     {
         $this->assertSame(
@@ -221,10 +182,6 @@ class AlterHtmlPictureTagsTest extends TestCase
         );
     }
 
-    /**
-     * avif-enabled but the .avif file is missing for this image: only the webp <source> is
-     * emitted (avif silently skipped — it cannot fully cover the image). The img still falls back.
-     */
     public function testAvifMissingFallsBackToWebpSourceOnly(): void
     {
         $this->assertSame(
@@ -234,45 +191,38 @@ class AlterHtmlPictureTagsTest extends TestCase
         );
     }
 
-    /** Both formats missing: no <source> can be built, the original <img> is left untouched. */
     public function testBothMissingLeavesImgUntouched(): void
     {
         $input = '<img src="1.jpg" alt="x">';
         $this->assertSame($input, PictureTagsNone::replace($input));
     }
 
-    /** Attribute preservation: all original img attributes survive on the fallback <img>. */
     public function testAttributePreservation(): void
     {
         $out = PictureTagsAvifAndWebp::replace(
             '<img loading="lazy" width="100" height="80" src="p.jpg" alt="A & B" title="t" data-x="y">'
         );
-        // Every original attribute (plus the processed-marker class) is present on the img.
         foreach (['loading="lazy"', 'width="100"', 'height="80"', 'src="p.jpg"', 'alt="A & B"', 'title="t"', 'data-x="y"', 'class="webpexpress-processed"'] as $needle) {
             $this->assertStringContainsString($needle, $out, $needle);
         }
-        // And the avif source is still first.
         $this->assertStringContainsString('<source srcset="p.jpg.avif" type="image/avif">', $out);
     }
 
-    /** Malformed-HTML resilience: garbage in, no fatal, and unrelated text preserved. */
     public function testMalformedHtmlResilience(): void
     {
         $cases = [
-            '<img src="ok.jpg" <<< broken >>>',       // junk after attributes
-            '<<img src="ok.jpg">',                    // stray bracket
-            'text <img src="a.jpg" no-close',         // unterminated tag-ish
-            '<img src=unquoted.jpg>',                  // unquoted attr
-            '<div><img src="a.jpg"></div',            // unterminated wrapper
+            '<img src="ok.jpg" <<< broken >>>',
+            '<<img src="ok.jpg">',
+            'text <img src="a.jpg" no-close',
+            '<img src=unquoted.jpg>',
+            '<div><img src="a.jpg"></div',
         ];
         foreach ($cases as $html) {
-            // The only guarantee: it returns a string and never throws.
             $out = PictureTagsAvifAndWebp::replace($html);
             $this->assertIsString($out);
         }
     }
 
-    /** Idempotency: re-running over already-processed markup does not double-wrap. */
     public function testIdempotencyDoesNotReprocess(): void
     {
         $once = PictureTagsAvifAndWebp::replace('<img src="1.jpg">');
@@ -281,11 +231,6 @@ class AlterHtmlPictureTagsTest extends TestCase
     }
 }
 
-// ---------------------------------------------------------------------------------------
-// Test doubles: control which formats produce converted URLs, simulating file-exists logic.
-// ---------------------------------------------------------------------------------------
-
-/** WebP only, and only for jpg/jpeg (mirrors the donor's PictureTagsOnlyJpg). */
 class PictureTagsJpgOnly extends PictureTags
 {
     public function replaceUrlForFormat($url, $formatId)
@@ -300,7 +245,6 @@ class PictureTagsJpgOnly extends PictureTags
     }
 }
 
-/** avif + webp both available for jpg/png. */
 class PictureTagsAvifAndWebp extends PictureTags
 {
     public function enabledFormatsInPreferenceOrder()
@@ -316,7 +260,6 @@ class PictureTagsAvifAndWebp extends PictureTags
     }
 }
 
-/** avif enabled in preference list, but no .avif files exist (avif always denied). */
 class PictureTagsAvifMissing extends PictureTags
 {
     public function enabledFormatsInPreferenceOrder()
@@ -326,7 +269,7 @@ class PictureTagsAvifMissing extends PictureTags
     public function replaceUrlForFormat($url, $formatId)
     {
         if ($formatId === 'avif') {
-            return null;   // simulate missing .avif
+            return null;
         }
         if (!preg_match('#(png|jpe?g)$#', $url)) {
             return null;
@@ -335,7 +278,6 @@ class PictureTagsAvifMissing extends PictureTags
     }
 }
 
-/** Neither format available. */
 class PictureTagsNone extends PictureTags
 {
     public function enabledFormatsInPreferenceOrder()

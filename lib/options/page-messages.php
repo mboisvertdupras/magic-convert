@@ -127,12 +127,6 @@ if ($config['alter-html']['enabled'] && !$config['alter-html']['only-for-webps-t
     );
 }
 
-// This nudge only makes sense where the webp-realizer redirect actually works, i.e. on
-// Apache/LiteSpeed via .htaccess. On nginx the realizer redirect does NOTHING until the native
-// nginx rules are installed, so its advice — point Alter HTML at webps that don't exist yet — would
-// make Alter HTML emit references to files that 404. That is exactly the unsafe behavior the
-// zero-config nginx setup (only-for-webps-that-exists = true) is designed to avoid, so suppress it
-// on nginx.
 if (PlatformInfo::isApacheOrLiteSpeed() && $config['enable-redirection-to-webp-realizer'] && $config['alter-html']['enabled'] && $config['alter-html']['only-for-webps-that-exists']) {
     Messenger::printMessage(
         'warning',

@@ -8,28 +8,8 @@ use MagicConvert\OutputFormat;
 use ReflectionClass;
 use ReflectionMethod;
 
-/**
- * Snapshot / shape tests for the AVIF .htaccess rule generation (roadmap 2.4).
- *
- * HTAccessRules::generateHTAccessRulesFromConfigObj() as a whole is WordPress-bound
- * (Paths / Config / capability tests). But the redirect-to-existing rule strings are
- * produced by a format-parameterised builder — redirectToExistingRulesForFormat($fmt) —
- * whose "mingled" branches read ONLY static properties (no Paths:: calls). That is the
- * pure/static generation seam we snapshot here.
- *
- * We exercise the builder through reflection, setting the same private statics that
- * setInternalProperties() would, restricted to the mingled + uploads configuration
- * (which deliberately skips the cache-dir block that would otherwise hit Paths::).
- *
- * The central guarantee under test:
- *   - The WebP output of the refactored builder is BYTE-FOR-BYTE the fixture captured
- *     from the pre-change rule shapes (so existing installs see no churn).
- *   - The AVIF output mirrors the WebP shape with '.avif' / 'image/avif' substituted,
- *     every branch still guarded by a '-f' file-exists condition (clean fallthrough).
- */
 class HTAccessAvifRulesTest extends TestCase
 {
-    /** Invoke the private static builder for a given OutputFormat. */
     private function build(OutputFormat $fmt): string
     {
         $m = new ReflectionMethod(HTAccessRules::class, 'redirectToExistingRulesForFormat');
@@ -37,10 +17,6 @@ class HTAccessAvifRulesTest extends TestCase
         return $m->invoke(null, $fmt);
     }
 
-    /**
-     * Set the private statics the builder reads, for a pure (Paths-free) mingled+uploads
-     * configuration. $extension is 'append' or 'set'; $docRoot toggles the doc-root branch.
-     */
     private function setStatics(string $extension, bool $docRoot, bool $addVary): void
     {
         $ref = new ReflectionClass(HTAccessRules::class);
@@ -51,7 +27,7 @@ class HTAccessAvifRulesTest extends TestCase
         };
 
         $set('mingled', true);
-        $set('htaccessDir', 'uploads');        // mingled+uploads => cache-dir block skipped (Paths-free)
+        $set('htaccessDir', 'uploads');
         $set('useDocRootForStructuringCacheDir', $docRoot);
         $set('docRootString', '%{DOCUMENT_ROOT}');
         $set('fileExt', 'jpe?g|png');
@@ -63,8 +39,6 @@ class HTAccessAvifRulesTest extends TestCase
             'destination-folder' => 'mingled',
         ]);
     }
-
-    // --- WebP byte-identity (regression guard against the refactor) ---------------
 
     public function testWebpMingledDocRootAppendIsByteIdenticalToFixture(): void
     {
@@ -106,7 +80,6 @@ class HTAccessAvifRulesTest extends TestCase
 
     public function testWebpNonDocRootSetModeDropsTheExtensionGroup(): void
     {
-        // extension 'set' on a non-doc-root structure => appendWebP false => "%1\.webp" (no %2)
         $this->setStatics('set', false, false);
         $expected =
             "  # Redirect to existing converted image in same dir (if browser supports webp)\n" .
@@ -117,8 +90,6 @@ class HTAccessAvifRulesTest extends TestCase
 
         $this->assertSame($expected, $this->build(OutputFormat::webp()));
     }
-
-    // --- AVIF shape mirrors WebP, with .avif / image/avif -------------------------
 
     public function testAvifMingledDocRootAppendMirrorsWebpShape(): void
     {
@@ -145,12 +116,8 @@ class HTAccessAvifRulesTest extends TestCase
         $this->assertSame($expected, $this->build(OutputFormat::byId('avif')));
     }
 
-    // --- Cross-cutting invariants the fallthrough policy depends on ---------------
-
     public function testAvifRuleAlwaysGuardedByFileExistsCondition(): void
     {
-        // Every avif redirect must be preceded by a "-f" condition so a missing .avif
-        // falls through cleanly to the webp rules. (No converter route for avif.)
         foreach (['append', 'set'] as $ext) {
             foreach ([true, false] as $docRoot) {
                 $this->setStatics($ext, $docRoot, false);
@@ -165,12 +132,12 @@ class HTAccessAvifRulesTest extends TestCase
 
     public function testAvifUsesTMimeFlagAndHonoursVaryGate(): void
     {
-        $this->setStatics('append', true, false);   // addVary OFF
+        $this->setStatics('append', true, false);
         $rulesNoVary = $this->build(OutputFormat::byId('avif'));
         $this->assertStringContainsString('T=image/avif', $rulesNoVary);
         $this->assertStringNotContainsString('E=ADDVARY:1', $rulesNoVary);
 
-        $this->setStatics('append', true, true);    // addVary ON
+        $this->setStatics('append', true, true);
         $rulesVary = $this->build(OutputFormat::byId('avif'));
         $this->assertStringContainsString('E=ADDVARY:1', $rulesVary);
     }

@@ -5,16 +5,8 @@ namespace MagicConvert\Tests;
 use PHPUnit\Framework\TestCase;
 use MagicConvert\AlterHtml\ImageUrlReplacer;
 
-/**
- * Tests for the FORKED ImageUrlReplacer (MagicConvert\AlterHtml\ImageUrlReplacer).
- *
- * Ported from the donor library (rosell-dk/dom-util-for-webp, tests/ImageUrlReplacerTest.php, MIT),
- * adapted to the new namespace, plus a Magic Convert assertion that this mode stays WEBP-ONLY by
- * design (a plain URL swap cannot negotiate per-browser — avif belongs in picture-tag mode).
- */
 class AlterHtmlImageUrlReplacerTest extends TestCase
 {
-    /** Donor testUntouched (pure subset): unrelated HTML is never altered (pass-through replacer). */
     public function testUntouched(): void
     {
         $untouched = [
@@ -33,8 +25,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
     }
 
     /**
-     * Donor testBasic2 (append-webp): src / data-src / input / iframe / picture-source URL swaps.
-     *
      * @dataProvider appendWebpCases
      */
     public function testAppendWebp(string $html, string $expected): void
@@ -57,7 +47,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
         ];
     }
 
-    /** Donor testSrcSetDetection: looksLikeSrcSet() recognizes w/x descriptors. */
     public function testSrcSetDetection(): void
     {
         $iur = new ImageUrlReplacer();
@@ -67,9 +56,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
     }
 
     /**
-     * Donor testWholeEngine (pure subset): the real default ImageUrlReplacer with its webp
-     * replaceUrl + srcset handling + css handling.
-     *
      * @dataProvider wholeEngineCases
      */
     public function testWholeEngine(string $html, string $expected): void
@@ -84,12 +70,11 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
             ['<img data-x="2.jpg 1000w">', '<img data-x="2.jpg.webp 1000w">'],
             ['<img data-x="3.jpg 1000w, 4.jpg 2000w">', '<img data-x="3.jpg.webp 1000w, 4.jpg.webp 2000w">'],
             ['<img data-x="5.jpg 1000w, 6.jpg">', '<img data-x="5.jpg.webp 1000w, 6.jpg.webp">'],
-            ['<img data-x="7.gif 1000w, 8.jpg">', '<img data-x="7.gif 1000w, 8.jpg.webp">'],   // gif left alone
+            ['<img data-x="7.gif 1000w, 8.jpg">', '<img data-x="7.gif 1000w, 8.jpg.webp">'],
             ['<img SRC="10.jpg">', '<img SRC="10.jpg.webp">'],
             ['<img srcset="12a.jpg 1x, 12b.jpg 2x">', '<img srcset="12a.jpg.webp 1x, 12b.jpg.webp 2x">'],
             ['<img src="http://www.example.com/11.jpg">', '<img src="http://www.example.com/11.jpg.webp">'],
             ['<img src="https://www.example.com/12.jpg">', '<img src="https://www.example.com/12.jpg.webp">'],
-            // inline style background-image
             [
                 '<header style="background-image: url(https://cdn.example.com/banner.jpg); ">',
                 '<header style="background-image: url(https://cdn.example.com/banner.jpg.webp); ">',
@@ -97,7 +82,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
         ];
     }
 
-    /** Donor "leftUntouched": wrong ext / query string / wrong tag are never swapped. */
     public function testLeftUntouched(): void
     {
         $untouched = [
@@ -112,7 +96,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
         }
     }
 
-    /** Donor testCSS (pure subset): <style> background url() rewriting. */
     public function testCss(): void
     {
         $this->assertSame(
@@ -125,12 +108,6 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
         );
     }
 
-    // --- Magic Convert: webp-only-by-design assertion -----------------------------
-
-    /**
-     * URL-replacement mode is WEBP-ONLY by design. The default replaceUrl() must only ever
-     * produce ".webp" URLs — never ".avif" — because a plain swap cannot negotiate per-browser.
-     */
     public function testUrlModeIsWebpOnlyByDesign(): void
     {
         $iur = new ImageUrlReplacer();
@@ -143,14 +120,11 @@ class AlterHtmlImageUrlReplacerTest extends TestCase
         $this->assertStringNotContainsString('.avif', $out);
     }
 
-    /** Empty input returns empty (donor contract). */
     public function testEmptyInput(): void
     {
         $this->assertSame('', ImageUrlReplacer::replace(''));
     }
 }
-
-// --- Test doubles (mirror donor helper subclasses) ------------------------------------
 
 class IurPassThrough extends ImageUrlReplacer
 {

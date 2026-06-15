@@ -7,16 +7,8 @@ use MagicConvert\Avif\AvifStack;
 use MagicConvert\Avif\AbstractAvifConverter;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for AvifNotice::shouldShow() — the pure decision behind the persistent
- * "AVIF enabled but no AVIF-capable converter" admin notice (Phase 2.5).
- *
- * The operability decision is delegated to an injected AvifStack (the SAME detection the
- * conversion path uses), so here we drive it with a stack built from a fake converter.
- */
 class AvifNoticeTest extends TestCase
 {
-    /** An AvifStack whose single converter reports the given operability. */
     private function stackThatIs(bool $operational): AvifStack
     {
         $converter = new class($operational) extends AbstractAvifConverter {
@@ -51,7 +43,6 @@ class AvifNoticeTest extends TestCase
 
     public function testHiddenWhenAvifDisabled(): void
     {
-        // AVIF off => never relevant, even with no operational converter.
         $this->assertFalse(
             AvifNotice::shouldShow($this->avifEnabledConfig(false), $this->stackThatIs(false), false)
         );
@@ -66,9 +57,6 @@ class AvifNoticeTest extends TestCase
 
     public function testUnaffectedByPresenceOfAvifConverterList(): void
     {
-        // Regression guard: the notice decision must depend ONLY on formats.avif.enabled (+ the
-        // injected stack's operability + dismissed flag), NOT on the new formats.avif.converters
-        // list. A config carrying a custom converter list must yield the identical decision.
         $withList = [
             'formats' => [
                 'webp' => ['enabled' => true],
@@ -82,7 +70,6 @@ class AvifNoticeTest extends TestCase
             ],
         ];
 
-        // Same operability/dismissed inputs as testShownWhenAvifEnabledButNoConverterOperational.
         $this->assertTrue(AvifNotice::shouldShow($withList, $this->stackThatIs(false), false));
         $this->assertFalse(AvifNotice::shouldShow($withList, $this->stackThatIs(true), false));
     }

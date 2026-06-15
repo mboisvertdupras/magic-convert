@@ -7,13 +7,6 @@ use MagicConvert\NginxRules;
 
 require_once __DIR__ . '/NginxHarness.php';
 
-/**
- * Self-validation harness tests (dev-only, skip-gated for CI portability).
- *
- * Validates that BOTH artifacts (A: maps + server; B: single file) parse cleanly with
- * `nginx -t` across a representative slice of the config matrix, with avif on and off.
- * SKIPS when no nginx binary is present.
- */
 class NginxValidationTest extends TestCase
 {
     private function env(): array
@@ -48,9 +41,6 @@ class NginxValidationTest extends TestCase
     }
 
     /**
-     * Representative matrix points covering mingled/separate x doc-root/image-roots x
-     * append/set x jpeg/png/both x converter on/off.
-     *
      * @return array<string,array>
      */
     public static function matrixProvider(): array
@@ -101,14 +91,12 @@ class NginxValidationTest extends TestCase
                 }
                 $env = $this->env();
 
-                // Artifact A: maps (http) + server (server).
                 $maps = NginxRules::generateMapsFile($cfg, $env);
                 $server = NginxRules::generateServerFile($cfg, $env);
                 $harness->writeConf($maps, $server);
                 [$codeA, $outA] = $harness->test();
                 $this->assertSame(0, $codeA, "Artifact A failed nginx -t (avif=" . var_export($avif, true) . "):\n" . $outA);
 
-                // Artifact B: single file (server only, no maps include).
                 $single = NginxRules::generateSingleFile($cfg, $env);
                 $harness->writeConf('', $single);
                 [$codeB, $outB] = $harness->test();

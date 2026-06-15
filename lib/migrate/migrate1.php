@@ -149,9 +149,6 @@ function magicconvert_migrate1_migrateOptions()
 }
 
 function magicconvert_migrate1_deleteOldOptions() {
-    // These are legacy options persisted by WebP Express (the upstream plugin this fork
-    // migrates from). They are read above and removed here once migration is complete, so
-    // they must reference the upstream key names rather than the rebranded fork names.
     $optionsToDelete = [
         'webp_express_max_quality',
         'webp_express_image_types_to_convert',

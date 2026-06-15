@@ -74,9 +74,6 @@ class AdminInit
 
             add_action("admin_post_magicconvert_settings_submit", array('\MagicConvert\OptionsPageHooks', 'submitHandler'));
 
-            // Secure download of a generated nginx artifact (Phase 3.2). Capability + nonce are
-            // re-checked inside the handler; the artifact is chosen by a whitelisted key and
-            // generated on the fly (never read from a web-accessible file).
             add_action("admin_post_magicconvert_nginx_download", array('\MagicConvert\NginxDownload', 'handle'));
 
 
@@ -93,12 +90,6 @@ class AdminInit
             add_action('wp_ajax_magicconvert-wcfm-api', array('\MagicConvert\WCFMApi', 'processRequest'));
 
 
-            // Scheduled nginx drift nudge (Phase 3.3): on nginx hosts with a persisted rules
-            // fingerprint, do a throttled (~daily) cheap loopback check of the version endpoint and
-            // arm the "rules need updating" notice ONLY on a positive version-differs result. All
-            // failures are swallowed (loopback-blocked hosts never spam the notice). This method is
-            // itself an admin_init callback, so we invoke the nudge directly (it is internally
-            // throttled via a transient) rather than re-hooking admin_init from within it.
             NginxDriftNudge::maybeCheck();
 
             // Add settings link on the plugins list page
@@ -136,8 +127,6 @@ class AdminInit
 
         add_action("admin_notices", array('\MagicConvert\DismissableGlobalMessages', 'printMessages'));
 
-        // Persistent "AVIF enabled but no AVIF-capable converter" notice (detection failures are
-        // the dominant AVIF support generator). Dismissable; reappears on the next config save.
         add_action("admin_notices", array('\MagicConvert\AvifNotice', 'maybePrint'));
 
         if (Multisite::isNetworkActivated()) {

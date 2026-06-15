@@ -1,16 +1,5 @@
 <?php
 
-// Formats panel (schema v2 / Phase 2.2)
-// -------------------------------------
-// Compact, zero-config panel:
-//   - WebP is shown as the always-on baseline (its detailed quality/converter settings live in
-//     the existing Conversion section, so nothing is duplicated here).
-//   - AVIF is a single enable checkbox. Only when enabled, two tucked-away advanced knobs appear:
-//     Quality (default 30) and Encoding speed (0-10, default 6). No other AVIF knobs by design.
-//
-// Defaults come from Config::getDefaultFormats() via loadConfigAndFix(), so $config['formats'] is
-// always populated; we still read defensively.
-
 $mcFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
 $mcAvif = (isset($mcFormats['avif']) && is_array($mcFormats['avif'])) ? $mcFormats['avif'] : [];
 

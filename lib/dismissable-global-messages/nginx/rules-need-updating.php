@@ -2,16 +2,6 @@
 
 namespace MagicConvert;
 
-/*
- * Global dismissable message: the rule-affecting settings changed on an nginx host, so the
- * operator-installed nginx include is now stale and must be regenerated. Armed by
- * NginxRulesNotice::arm() from Config::saveConfigurationAndHTAccess() whenever the settings
- * fingerprint changes (re-armed on every change, so it reappears after a previous dismissal).
- *
- * The button takes the user straight to the settings page, where the nginx panel holds the
- * freshly generated artifacts (Copy / Download).
- */
-
 DismissableGlobalMessages::printDismissableMessage(
     'warning',
     '<strong>Magic Convert:</strong> your nginx rules need updating. ' .

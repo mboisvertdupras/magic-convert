@@ -4,9 +4,6 @@ namespace MagicConvert\Tests;
 
 use PHPUnit\Framework\TestCase;
 
-// The CLI command class extends \WP_CLI_Command, which only exists under WP-CLI. Provide a
-// minimal stub so the class is loadable here — we only exercise its PURE static aggregation
-// helper (aggregateSummaries), which touches no WP-CLI APIs.
 if (!class_exists('\WP_CLI_Command')) {
     class WP_CLI_Command {}
     \class_alias('MagicConvert\\Tests\\WP_CLI_Command', 'WP_CLI_Command');
@@ -14,11 +11,6 @@ if (!class_exists('\WP_CLI_Command')) {
 
 use MagicConvert\CLI;
 
-/**
- * Tests for CLI::aggregateSummaries() — the pure aggregation of per-shard '#MC-SUMMARY'
- * payloads into overall + per-format totals (Phase 2.5). Factored out of the proc_open
- * orchestration precisely so it can be unit-tested without spawning processes.
- */
 class CliAggregateSummariesTest extends TestCase
 {
     public function testAggregatesOverallCountersAcrossShards(): void
@@ -61,10 +53,8 @@ class CliAggregateSummariesTest extends TestCase
 
     public function testToleratesMissingFormatsBlockAndNonArrayEntries(): void
     {
-        // A legacy/old shard without a 'formats' block must not break aggregation; non-array
-        // entries (e.g. a shard that never emitted a summary) are skipped.
         $agg = CLI::aggregateSummaries([
-            ['converted' => 2, 'failed' => 0, 'org_bytes' => 100, 'webp_bytes' => 40],  // no 'formats'
+            ['converted' => 2, 'failed' => 0, 'org_bytes' => 100, 'webp_bytes' => 40],
             null,
             'garbage',
             ['converted' => 1, 'failed' => 0, 'org_bytes' => 50, 'webp_bytes' => 20, 'formats' => [

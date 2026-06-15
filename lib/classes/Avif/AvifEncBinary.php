@@ -4,25 +4,6 @@ namespace MagicConvert\Avif;
 
 use MagicConvert\ConcurrencyAdvisor;
 
-/**
- * AVIF via the libavif reference encoder 'avifenc'.
- *
- * This is a NEW converter (the donor image-convert has no dedicated avifenc
- * converter). It reuses the shared exec base (AbstractAvifExecConverter) for
- * discovery + exec, matching how cwebp is invoked.
- *
- * Flag mapping (libavif 1.x):
- *   - quality:  '-q <0..100>' / '--qcolor <0..100>' — libavif 1.x accepts -q on a
- *     0..100 quality scale (higher = better). We pass our clamped 0..100 directly.
- *   - speed:    '-s <0..10>'  — avifenc speed 0 (slowest/best) .. 10 (fastest),
- *     SAME direction as ours, so passed straight through (default 6).
- *   - jobs:     '--jobs <n>'  — encoder thread count. We take it from the
- *     ConcurrencyAdvisor's detected core count, capped at 4 so a parallel bulk run
- *     (which already spawns multiple PHP workers/procs) doesn't oversubscribe the CPU.
- *   - metadata: avifenc strips by default and only copies EXIF/XMP when asked. To
- *     KEEP metadata we pass nothing special (libavif carries ICC by default); to
- *     STRIP we explicitly drop exif/xmp via '--ignore-exif --ignore-xmp'.
- */
 class AvifEncBinary extends AbstractAvifExecConverter
 {
     public function id()
@@ -49,7 +30,7 @@ class AvifEncBinary extends AbstractAvifExecConverter
 
         $binary = $this->resolveBinary();
         $quality = $this->quality($options);
-        $speed = $this->speed($options);  // avifenc -s shares our 0..10 direction
+        $speed = $this->speed($options);
         $jobs = $this->jobs($options);
 
         $args = [];
@@ -77,13 +58,7 @@ class AvifEncBinary extends AbstractAvifExecConverter
     }
 
     /**
-     * Determine the --jobs thread count.
-     *
-     * Priority: an explicit options['jobs'] (so a parallel orchestrator can pin it),
-     * else the ConcurrencyAdvisor's detected cores, capped at 4.
-     *
-     * @param  array  $options
-     * @return int  >= 1
+     * @return int
      */
     private function jobs(array $options)
     {

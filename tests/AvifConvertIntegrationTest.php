@@ -5,18 +5,6 @@ namespace MagicConvert\Tests;
 use PHPUnit\Framework\TestCase;
 use MagicConvert\Avif\AvifStack;
 
-/**
- * Integration test: actually encode an AVIF with the real stack on this machine.
- *
- * This is the ONE test that performs real encoding. It SELF-SKIPS (markTestSkipped)
- * when no converter in the stack is operational, so CI on a host without AVIF
- * support stays green while a capable host genuinely validates the encode.
- *
- * On a machine WITH a converter, it asserts:
- *   - a real file is produced,
- *   - the bytes are a valid AVIF (getimagesize reports image/avif),
- *   - both a JPEG source and a PNG-with-alpha source encode.
- */
 class AvifConvertIntegrationTest extends TestCase
 {
     private function fixture(string $name): string
@@ -61,7 +49,6 @@ class AvifConvertIntegrationTest extends TestCase
             $this->assertIsArray($info, 'getimagesize should parse the output');
             $this->assertSame('image/avif', $info['mime'], 'output must be a valid AVIF');
 
-            // Report which converter actually did the work (visible with --debug / -v).
             fwrite(STDERR, "\n[AvifConvertIntegrationTest] JPEG encoded by: " . $result['converter']
                 . ' (' . filesize($dest) . " bytes)\n");
         } finally {
@@ -96,9 +83,7 @@ class AvifConvertIntegrationTest extends TestCase
 
     public function testConfigBuiltStackEncodesAValidAvif(): void
     {
-        // Prove the CONFIG-DRIVEN stack (AvifStack::fromConverterList, the path the conversion
-        // dispatch now uses) is a real, working stack — not just a correctly-ordered object.
-        $this->freshStackOrSkip(); // skip on hosts without any AVIF support
+        $this->freshStackOrSkip();
 
         $stack = AvifStack::fromConverterList(array_map(
             static fn ($id) => ['converter' => $id],
@@ -124,8 +109,6 @@ class AvifConvertIntegrationTest extends TestCase
 
     public function testDeactivatingTheWinningConverterRemovesItFromTheStack(): void
     {
-        // The exact bug the user reported: deactivating a converter must remove it from the AVIF
-        // stack. Machine-aware (adapts to whichever backend is operational here) but not flaky.
         $full = $this->freshStackOrSkip();
 
         $winner = null;
@@ -137,8 +120,6 @@ class AvifConvertIntegrationTest extends TestCase
         }
         $this->assertNotNull($winner, 'a freshly-operational stack must have at least one working converter');
 
-        // Build the list the UI produces when the user clicks "deactivate" on that converter:
-        // default order, all active EXCEPT the winner.
         $list = array_map(static function ($id) use ($winner) {
             $entry = ['converter' => $id];
             if ($id === $winner) {

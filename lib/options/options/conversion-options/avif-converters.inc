@@ -1,21 +1,5 @@
 <?php
 
-// AVIF section (schema v2)
-// ------------------------
-// The dedicated AVIF settings section — the SEPARATE counterpart to the WebP "Conversion" section.
-// It holds the AVIF quality/speed knobs (moved here from the Formats panel) and the AVIF converter
-// stack: a draggable, per-converter activate/deactivate/test list that mirrors the WebP converters
-// list but drives the SEPARATE formats.avif.converters config (AvifStack::fromConverterList()).
-//
-// Always rendered (in every conversion mode, alongside the WebP Conversion section). The settings
-// apply when AVIF is enabled in the Formats panel above; rendering it unconditionally keeps the
-// hidden avif-converters input present on every save (so a submit never wipes the stack) and lets
-// users configure AVIF before switching it on.
-//
-// The converter list itself is built client-side by js/avif-converters.js from window.avifConverters
-// (injected by enqueue_scripts.php from the status-annotated config). $config['formats'] is always
-// present (loadConfigAndFix guarantees it); we still read defensively.
-
 $mcFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
 $mcAvif = (isset($mcFormats['avif']) && is_array($mcFormats['avif'])) ? $mcFormats['avif'] : [];
 

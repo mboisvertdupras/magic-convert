@@ -44,14 +44,9 @@ class CacheMover
                 $uid = $stat['gid'];
             }
         }
-        // chmod converted artifacts of ALL registered formats (data-driven).
         FileHelper::chmod_r($dir, $dirPerm, $filePerm, $uid, $gid, '#\.' . self::formatExtAlternation() . '$#', ($alsoSetOnDirs ? null : '#^$#'));
     }
 
-    /**
-     *  Regex alternation (no delimiters) of every registered format extension,
-     *  e.g. "(?:webp|avif)". Data-driven from OutputFormat::all().
-     */
     private static function formatExtAlternation()
     {
         $exts = [];
@@ -95,9 +90,6 @@ class CacheMover
         $numFilesMovedTotal = 0;
         $numFilesFailedMovingTotal = 0;
 
-        // Move every registered format's cache tree (webp-images/, avif-images/, ...).
-        // With AVIF disabled the avif trees simply do not exist, so a webp-only
-        // install moves exactly what it did before.
         foreach (OutputFormat::all() as $format) {
             foreach ($rootIds as $rootId) {
 
@@ -158,24 +150,21 @@ class CacheMover
     }
 
     /**
-     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp).
-     *
+     *  @param  OutputFormat|string|null  $format
      *  @return [$numFilesMoved, $numFilesFailedMoving]
      */
     public static function moveRecursively($fromDir, $toDir, $srcDir, $fromExt, $toExt, $format = null)
     {
         $format = OutputFormat::coerce($format);
-        $dotExt = $format->dotExtension();        // e.g. ".webp"
-        $dotExtLen = strlen($dotExt);             // e.g. 5
+        $dotExt = $format->dotExtension();
+        $dotExtLen = strlen($dotExt);
         $extQuoted = preg_quote($format->extension(), '/');
 
         if (!@is_dir($fromDir)) {
             return [0, 0];
         }
         if (!@is_dir($toDir)) {
-            // Note: 0777 is default. Default umask is 0022, so the default result is 0755.
-            // Tolerant of the concurrent-creation race: @mkdir may fail because a
-            // racer already created the dir; treat "dir exists afterwards" as success.
+            // Note: 0777 is default. Default umask is 0022, so the default result is 0755
             @mkdir($toDir, 0777, true);
             if (!@is_dir($toDir)) {
                 return [0, 0];
@@ -210,7 +199,7 @@ class CacheMover
                     }
                 } else {
                     // its a file.
-                    // check if its a converted artifact of THIS format (e.g. .webp / .avif)
+                    // check if its a webp
                     if (strpos($filename, $dotExt, strlen($filename) - $dotExtLen) !== false) {
 
                         $filenameWithoutExt = substr($filename, 0, strlen($filename) - $dotExtLen);

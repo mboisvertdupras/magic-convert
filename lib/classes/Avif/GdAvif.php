@@ -2,27 +2,6 @@
 
 namespace MagicConvert\Avif;
 
-/**
- * AVIF via the GD extension's imageavif() (PHP 8.1+).
- *
- * Adapted from rosell-dk/image-convert (MIT) — its Gd converter calls
- * imageavif($im, $dest, $quality, $speed). The palette→truecolor + alpha handling
- * below mirrors the proven "dance" in rosell-dk/webp-convert's Gd.php (MIT):
- * imagecreatefrom*, then make-true-color-if-not, then for PNG sources set
- * alphablending(true)+savealpha(true) so transparency survives.
- *
- * DETECTION (critical): GD has a known core false-positive where IMG_AVIF /
- * gd_info()['AVIF Support'] alone, or imageavif() existing alone, can wrongly
- * imply support. Our research mandate: require BOTH
- *   function_exists('imageavif') AND !empty(gd_info()['AVIF Support']).
- * That combination is what actually predicts a working encode.
- *
- * imageavif() signature: imageavif($image, $file, $quality = -1, $speed = -1).
- *   - quality -1 => GD default 30 (we always pass an explicit clamped value).
- *   - speed   -1 => GD default 6. GD's speed is the SAME 0..10 direction as ours,
- *     so we pass it through. (The donor left speed hard-coded at -1; we wire ours in.)
- *   - 4:2:0 chroma subsampling is automatic in GD below quality 90.
- */
 class GdAvif extends AbstractAvifConverter
 {
     public function id()
@@ -46,9 +25,6 @@ class GdAvif extends AbstractAvifConverter
                 'reason' => 'GD has no imageavif() function (needs PHP 8.1+ with a GD built against an AVIF encoder).',
             ];
         }
-        // The required second half: imageavif() can exist while GD was compiled
-        // WITHOUT a working AVIF encoder. gd_info()['AVIF Support'] is the runtime
-        // truth. (Guards against the IMG_AVIF false-positive.)
         $info = function_exists('gd_info') ? gd_info() : [];
         if (empty($info['AVIF Support'])) {
             return [
@@ -69,11 +45,10 @@ class GdAvif extends AbstractAvifConverter
         }
 
         $quality = $this->quality($options);
-        $speed = $this->speed($options);  // GD speed: same 0..10 direction as ours
+        $speed = $this->speed($options);
 
         $image = $this->createImageResource($source);
 
-        // Palette → truecolor (AVIF needs RGB). Mirrors webp-convert Gd.php.
         if (!$this->tryToMakeTrueColorIfNot($image)) {
             @imagedestroy($image);
             throw new \Exception(
@@ -82,13 +57,11 @@ class GdAvif extends AbstractAvifConverter
             );
         }
 
-        // For PNG sources, preserve the alpha channel through the encode.
         $mime = $this->detectMime($source);
         if ($mime === 'image/png') {
             $this->trySettingAlphaBlending($image);
         }
 
-        // imageavif($image, $file, $quality, $speed)
         $success = @imageavif($image, $destination, $quality, $speed);
 
         @imagedestroy($image);
@@ -98,7 +71,6 @@ class GdAvif extends AbstractAvifConverter
             throw new \Exception('GD imageavif() failed to encode/write the AVIF file.');
         }
 
-        // Defensive: GD has historically reported success while writing nothing.
         if (!@file_exists($destination) || @filesize($destination) === 0) {
             @unlink($destination);
             throw new \Exception('GD imageavif() reported success but produced no output file.');
@@ -106,8 +78,6 @@ class GdAvif extends AbstractAvifConverter
     }
 
     /**
-     * Detect the source mime cheaply (getimagesize) for the alpha-handling branch.
-     *
      * @param  string  $source
      * @return string|null
      */
@@ -118,8 +88,6 @@ class GdAvif extends AbstractAvifConverter
     }
 
     /**
-     * Create a GD image resource from the source, dispatching on detected type.
-     *
      * @param  string  $source
      * @return \GdImage|resource
      * @throws \Exception
@@ -153,11 +121,8 @@ class GdAvif extends AbstractAvifConverter
     }
 
     /**
-     * Make the image truecolor if it is not already.
-     * Mirrors webp-convert Gd.php::tryToMakeTrueColorIfNot() (MIT).
-     *
-     * @param  \GdImage|resource  $image  (by reference — imagepalettetotruecolor mutates in place)
-     * @return bool  true if it is (now) truecolor.
+     * @param  \GdImage|resource  $image
+     * @return bool
      */
     private function tryToMakeTrueColorIfNot(&$image)
     {
@@ -167,14 +132,10 @@ class GdAvif extends AbstractAvifConverter
         if (function_exists('imagepalettetotruecolor')) {
             return imagepalettetotruecolor($image) !== false;
         }
-        // No way to convert; report failure so the caller aborts cleanly.
         return false;
     }
 
     /**
-     * Turn on alpha blending + save-alpha so PNG transparency survives the encode.
-     * Mirrors webp-convert Gd.php::trySettingAlphaBlending() (MIT).
-     *
      * @param  \GdImage|resource  $image
      * @return void
      */

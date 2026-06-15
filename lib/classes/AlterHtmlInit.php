@@ -51,7 +51,6 @@ class AlterHtmlInit
         }
 
         if (Option::getOption('magic-convert-alter-html-replacement') == 'picture') {
-            // vendor/autoload.php provides the kub-at HtmlDomParser fallback used by the forked classes.
             require_once __DIR__ . "/../../vendor/autoload.php";
             require_once __DIR__ . '/AlterHtmlHelper.php';
             require_once __DIR__ . '/AlterHtml/PictureTags.php';

@@ -7,55 +7,35 @@ use MagicConvert\Avif\AbstractAvifConverter;
 use MagicConvert\Avif\AvifStack;
 use MagicConvert\Avif\AvifStackException;
 
-/**
- * Pure-logic tests for the AVIF converter stack (Phase 2.3).
- *
- * These cover the parts that must be correct regardless of what is installed on
- * the machine:
- *   - speed → effort / cavif-speed mappings,
- *   - quality / speed clamps + defaults,
- *   - metadata-strip semantics,
- *   - stack ordering (first operational converter wins; failures fall through),
- *   - aggregate-failure message composition.
- *
- * Real backends are replaced with fakes (FakeAvifConverter), so nothing here
- * depends on GD/Imagick/avifenc being present.
- */
 class AvifStackTest extends TestCase
 {
-    // --- speed → effort / cavif mappings -------------------------------------
-
     public function testSpeedToVipsEffortIsInverted(): void
     {
-        // effort = 9 - speed, clamped to 0..9.
         $this->assertSame(9, AbstractAvifConverter::speedToVipsEffort(0));
-        $this->assertSame(3, AbstractAvifConverter::speedToVipsEffort(6)); // default
+        $this->assertSame(3, AbstractAvifConverter::speedToVipsEffort(6));
         $this->assertSame(0, AbstractAvifConverter::speedToVipsEffort(9));
-        $this->assertSame(0, AbstractAvifConverter::speedToVipsEffort(10)); // clamps at 0
+        $this->assertSame(0, AbstractAvifConverter::speedToVipsEffort(10));
     }
 
     public function testSpeedToVipsEffortClampsOutOfRangeInput(): void
     {
-        $this->assertSame(9, AbstractAvifConverter::speedToVipsEffort(-5)); // speed clamps to 0 -> effort 9
-        $this->assertSame(0, AbstractAvifConverter::speedToVipsEffort(99)); // speed clamps to 10 -> effort 0
+        $this->assertSame(9, AbstractAvifConverter::speedToVipsEffort(-5));
+        $this->assertSame(0, AbstractAvifConverter::speedToVipsEffort(99));
     }
 
     public function testSpeedToCavifSpeedFloorsAtOne(): void
     {
-        // cavif rejects 0; our 0 maps up to 1. Direction otherwise identical.
         $this->assertSame(1, AbstractAvifConverter::speedToCavifSpeed(0));
         $this->assertSame(1, AbstractAvifConverter::speedToCavifSpeed(1));
         $this->assertSame(6, AbstractAvifConverter::speedToCavifSpeed(6));
         $this->assertSame(10, AbstractAvifConverter::speedToCavifSpeed(10));
-        $this->assertSame(10, AbstractAvifConverter::speedToCavifSpeed(50)); // clamps
+        $this->assertSame(10, AbstractAvifConverter::speedToCavifSpeed(50));
     }
-
-    // --- option clamps / defaults (via a probe subclass) ----------------------
 
     public function testQualityDefaultsTo30AndClamps(): void
     {
         $probe = new OptionProbe();
-        $this->assertSame(30, $probe->q([]));            // default
+        $this->assertSame(30, $probe->q([]));
         $this->assertSame(55, $probe->q(['quality' => 55]));
         $this->assertSame(0, $probe->q(['quality' => -10]));
         $this->assertSame(100, $probe->q(['quality' => 9999]));
@@ -64,7 +44,7 @@ class AvifStackTest extends TestCase
     public function testSpeedDefaultsTo6AndClamps(): void
     {
         $probe = new OptionProbe();
-        $this->assertSame(6, $probe->s([]));             // default
+        $this->assertSame(6, $probe->s([]));
         $this->assertSame(3, $probe->s(['speed' => 3]));
         $this->assertSame(0, $probe->s(['speed' => -1]));
         $this->assertSame(10, $probe->s(['speed' => 42]));
@@ -75,15 +55,13 @@ class AvifStackTest extends TestCase
         $probe = new OptionProbe();
         $this->assertTrue($probe->strip(['metadata' => 'none']));
         $this->assertFalse($probe->strip(['metadata' => 'all']));
-        $this->assertFalse($probe->strip([]));                 // absent => keep
-        $this->assertFalse($probe->strip(['metadata' => 'exif'])); // anything else => keep
+        $this->assertFalse($probe->strip([]));
+        $this->assertFalse($probe->strip(['metadata' => 'exif']));
     }
-
-    // --- stack ordering -------------------------------------------------------
 
     public function testFirstOperationalConverterWinsAndOrderIsRespected(): void
     {
-        $a = new FakeAvifConverter('a', true, true);   // operational, succeeds
+        $a = new FakeAvifConverter('a', true, true);
         $b = new FakeAvifConverter('b', true, true);
         $stack = new AvifStack([$a, $b]);
 
@@ -109,7 +87,7 @@ class AvifStackTest extends TestCase
 
     public function testOperationalButFailingConverterFallsThroughToNext(): void
     {
-        $a = new FakeAvifConverter('a', true, false, '', 'a blew up');  // operational but convert() throws
+        $a = new FakeAvifConverter('a', true, false, '', 'a blew up');
         $b = new FakeAvifConverter('b', true, true);
         $stack = new AvifStack([$a, $b]);
 
@@ -118,12 +96,9 @@ class AvifStackTest extends TestCase
         $this->assertSame('b', $result['converter']);
         $this->assertTrue($a->convertCalled);
         $this->assertTrue($b->convertCalled);
-        // The log records the failed attempt AND the eventual success.
         $this->assertStringContainsString('a blew up', $result['log']);
         $this->assertStringContainsString('SUCCESS', $result['log']);
     }
-
-    // --- aggregate-failure message composition --------------------------------
 
     public function testAllConvertersFailingThrowsAggregateWithEveryReason(): void
     {
@@ -167,8 +142,6 @@ class AvifStackTest extends TestCase
         $this->assertStringContainsString('vips: reason two', $msg);
     }
 
-    // --- self-test surface ----------------------------------------------------
-
     public function testSelfTestReportsEachConverterRowWithReason(): void
     {
         $a = new FakeAvifConverter('a', true, true);
@@ -201,8 +174,6 @@ class AvifStackTest extends TestCase
         $this->assertFalse($stack->isOperational());
     }
 
-    // --- default stack composition / ordering --------------------------------
-
     public function testDefaultStackOrderMatchesPriority(): void
     {
         $ids = array_map(
@@ -217,7 +188,6 @@ class AvifStackTest extends TestCase
 
     public function testDefaultConverterIdsMatchPriorityOrder(): void
     {
-        // The id-only list (no instantiation) must mirror defaultConverters() exactly.
         $this->assertSame(
             ['imagick', 'vips', 'gd', 'magick-binary', 'avifenc', 'cavif'],
             AvifStack::defaultConverterIds()
@@ -228,9 +198,6 @@ class AvifStackTest extends TestCase
         );
     }
 
-    // --- config-driven stack (formats.avif.converters) ------------------------
-
-    /** Helper: the ids of the converters a stack ended up with, in order. */
     private static function idsOf(AvifStack $stack): array
     {
         return array_map(static fn ($c) => $c->id(), $stack->converters());
@@ -238,13 +205,11 @@ class AvifStackTest extends TestCase
 
     public function testFromConverterListOrdersAndFiltersByConfig(): void
     {
-        // Reordered, with one converter explicitly deactivated.
         $stack = AvifStack::fromConverterList([
             ['converter' => 'avifenc'],
             ['converter' => 'imagick', 'deactivated' => true],
             ['converter' => 'gd'],
         ]);
-        // imagick is skipped (deactivated); the rest keep the configured order.
         $this->assertSame(['avifenc', 'gd'], self::idsOf($stack));
     }
 
@@ -263,7 +228,7 @@ class AvifStackTest extends TestCase
         $stack = AvifStack::fromConverterList([
             ['converter' => 'vips'],
             ['converter' => 'gd'],
-            ['converter' => 'vips'], // duplicate -> ignored
+            ['converter' => 'vips'],
         ]);
         $this->assertSame(['vips', 'gd'], self::idsOf($stack));
     }
@@ -272,12 +237,10 @@ class AvifStackTest extends TestCase
     {
         $defaults = AvifStack::defaultConverterIds();
 
-        // Empty / null / non-array => defensive full default stack.
         $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList([])));
         $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList(null)));
         $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList('nonsense')));
 
-        // A list that names NO recognisable converter is treated as malformed.
         $this->assertSame($defaults, self::idsOf(AvifStack::fromConverterList([
             ['converter' => 'bogus'],
             ['nope' => true],
@@ -286,9 +249,6 @@ class AvifStackTest extends TestCase
 
     public function testFromConverterListHonoursAllDeactivatedAsEmptyStack(): void
     {
-        // Known ids present but every one is deactivated: respect the user's choice.
-        // An empty stack yields the clear "No AVIF converters are configured" message
-        // (parity with the WebP path), rather than silently re-enabling everything.
         $stack = AvifStack::fromConverterList(
             array_map(
                 static fn ($id) => ['converter' => $id, 'deactivated' => true],
@@ -316,9 +276,6 @@ class AvifStackTest extends TestCase
 
     public function testEveryDefaultIdResolvesToANonNullConverter(): void
     {
-        // Maintenance guard: building the full default list must yield a converter object for EVERY
-        // id (no nulls slipping in). Catches the case where a new id is added to defaultConverterIds()
-        // but its makeById() mapping is forgotten — which would otherwise fatal at convert() time.
         $stack = AvifStack::fromConverterList(array_map(
             static fn ($id) => ['converter' => $id],
             AvifStack::defaultConverterIds()
@@ -335,9 +292,6 @@ class AvifStackTest extends TestCase
     }
 }
 
-/**
- * Fake converter for stack-logic tests — no real encoding.
- */
 class FakeAvifConverter extends AbstractAvifConverter
 {
     public $convertCalled = false;
@@ -372,13 +326,9 @@ class FakeAvifConverter extends AbstractAvifConverter
         if (!$this->succeeds) {
             throw new \Exception($this->failMessage);
         }
-        // Pretend to have written a file (no real I/O in unit tests).
     }
 }
 
-/**
- * Exposes the protected option helpers of AbstractAvifConverter for direct testing.
- */
 class OptionProbe extends AbstractAvifConverter
 {
     public function id()

@@ -41,7 +41,7 @@ APACHE
     }
 
     /**
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function pathToDummyFile($source, $basedir, $imageRoots, $destinationFolder, $destinationExt, $format = null)
     {
@@ -99,14 +99,7 @@ APACHE
      * Otherwise, it is removed (if exists)
      *
      * @param  string                    $source   Path to the source file that was converted
-     * @param  OutputFormat|string|null  $format   Output format (defaults to webp).
-     *
-     * MARKER DESIGN (Phase 2.1): per-format marker base dir named
-     * '<cacheDirName>-bigger-than-source' (webp -> 'webp-images-bigger-than-source',
-     * unchanged; avif -> 'avif-images-bigger-than-source'). Inside it the marker
-     * filename carries the format extension, so webp and avif markers for the same
-     * source never collide. Webp markers are byte-for-byte compatible with existing
-     * ones (no migration needed).
+     * @param  OutputFormat|string|null  $format
      */
     public static function updateStatus($source, $destination, $webExpressContentDirAbs, $imageRoots, $destinationFolder, $destinationExt, $format = null)
     {
@@ -125,14 +118,11 @@ APACHE
         if ($bigWebP === true) {
             // place dummy file, which marks that webp is bigger than source
 
-            // Tolerant of the concurrent-creation race: @mkdir then re-check is_dir().
             $folder = @dirname($file);
             if (!@is_dir($folder)) {
                 @mkdir($folder, 0777, true);
             }
             if (@is_dir($folder)) {
-                // The dummy file is empty; a partial/racing write is harmless (its
-                // mere existence is the signal), so a plain write is fine here.
                 @file_put_contents($file, '');
             }
 

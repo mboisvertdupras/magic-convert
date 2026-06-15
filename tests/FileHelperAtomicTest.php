@@ -5,19 +5,6 @@ namespace MagicConvert\Tests;
 use MagicConvert\FileHelper;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for MagicConvert\FileHelper::atomicPutContents() — the write-to-temp +
- * rename helper used for every config/options/state JSON write and the
- * conversion log files.
- *
- * The "never partial" guarantee comes from rename() within one directory being
- * atomic on POSIX; we cannot easily force a torn write in a unit test, so we
- * assert the observable contract instead:
- *  - the final file ends up with exactly the new content,
- *  - an existing file is replaced wholesale (old-or-new, never a mix),
- *  - no stray ".tmp" files are left behind on success,
- *  - the original is untouched when the destination dir is unwritable (failure).
- */
 class FileHelperAtomicTest extends TestCase
 {
     /** @var string */
@@ -44,7 +31,6 @@ class FileHelperAtomicTest extends TestCase
         }
     }
 
-    /** Names of any leftover ".tmp" files in the temp dir. */
     private function leftoverTempFiles(): array
     {
         $found = [];
@@ -74,7 +60,6 @@ class FileHelperAtomicTest extends TestCase
         $new = 'NEW';
         $this->assertTrue(FileHelper::atomicPutContents($path, $new));
 
-        // Must be exactly the new content — not a concatenation or a prefix of old.
         $this->assertSame($new, file_get_contents($path));
         $this->assertSame([], $this->leftoverTempFiles());
     }
@@ -110,8 +95,6 @@ class FileHelperAtomicTest extends TestCase
         if (FileHelper::isWindows()) {
             $this->markTestSkipped('chmod-based unwritable-dir simulation is unreliable on Windows');
         }
-        // Some environments (root in CI/containers) ignore directory write bits.
-        // Skip rather than report a false failure if we can still write.
         if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
             $this->markTestSkipped('running as root: directory permission enforcement is bypassed');
         }
@@ -119,14 +102,11 @@ class FileHelperAtomicTest extends TestCase
         $path = $this->tmpDir . '/locked.json';
         file_put_contents($path, 'ORIGINAL');
 
-        // Make the directory read+execute only (no write) so the temp file cannot
-        // be created. atomicPutContents must fail cleanly and not touch the original.
         chmod($this->tmpDir, 0555);
         clearstatcache();
 
         $result = FileHelper::atomicPutContents($path, 'SHOULD-NOT-APPEAR');
 
-        // Restore write so we can inspect/cleanup.
         chmod($this->tmpDir, 0775);
         clearstatcache();
 

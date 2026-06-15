@@ -99,62 +99,21 @@ class Config
         return FileHelper::loadJSONOptions(Paths::getConfigFileName());
     }
 
-    /**
-     * The current config schema version.
-     *
-     * v1 = upstream WebP Express era (no explicit version key, single implicit WebP format).
-     * v2 = Magic Convert multi-format era: adds an explicit 'config-version' and a per-format
-     *      'formats' section (see getDefaultFormats() / migrateToV2()).
-     */
     const CONFIG_VERSION = 2;
 
     /**
-     * Default per-format section (schema v2).
-     *
-     * IMPORTANT — WHY WEBP'S QUALITY/CONVERTER SETTINGS ARE *NOT* HERE:
-     * --------------------------------------------------------------------
-     * The WebP format's quality, converter stack, jpeg/png encoding, metadata, etc. deliberately
-     * REMAIN at the existing top level of the config ('quality-auto', 'converters', 'jpeg-encoding',
-     * ...). Those keys are read directly by dozens of consumers (HTAccessRules, the wod scripts,
-     * generateWodOptionsFromConfigObj(), the options UI partials, CacheMover, ...). Moving them
-     * under formats.webp would churn every one of those call sites for zero functional gain.
-     *
-     * So formats.webp carries ONLY an `enabled` flag (always true today — WebP is the baseline
-     * output and cannot be turned off). Its real encoding settings stay top-level.
-     *
-     * formats.avif, by contrast, is a brand-new format with no legacy consumers, so it owns its
-     * own settings here: `enabled` (false by default — see the zero-config / byte-for-byte
-     * equivalence requirement), `quality` (30, "AVIF Q30 ≈ JPEG Q75"), `speed` (0-10 encoding
-     * effort, 6 = good balance), and `converters` (the per-format AVIF converter stack — an ordered,
-     * per-converter activate/deactivate list, mirroring the top-level WebP config['converters']).
-     * The AVIF converter stack (Phase 2.3) reads quality/speed; the conversion dispatch reads
-     * `converters` to honour the user's order + deactivations (AvifStack::fromConverterList()).
-     *
-     * NOTE — formats.avif.converters is DISTINCT from the top-level config['converters'] (the WebP
-     * stack). They share some names ('vips', 'gd', 'imagick') but are different id spaces and
-     * different code paths: deactivating WebP's 'vips' must NOT touch AVIF, and vice-versa.
-     *
      * @return array<string,array<string,mixed>>
      */
     public static function getDefaultFormats()
     {
         return [
             'webp' => [
-                // WebP is the baseline format and is always enabled. Its quality / converter /
-                // encoding settings live at the top level of config (see note above), NOT here.
                 'enabled' => true,
             ],
             'avif' => [
-                // Disabled by default: with AVIF off, behaviour must be byte-for-byte equivalent
-                // to today (zero-config requirement).
                 'enabled' => false,
-                'quality' => 30,    // AVIF Q30 looks similar to JPEG Q75.
-                'speed' => 6,       // Encoding effort 0-10. Lower = smaller but much slower; 6 balances.
-                // The AVIF converter stack, in priority (try) order, all active by default. Seeded
-                // DRY from AvifStack::defaultConverterIds() (which returns plain id strings WITHOUT
-                // instantiating any converter object, so building defaults stays cheap and never
-                // loads the heavy Avif\* / exec-helper classes). Each entry is {converter:<id>} and
-                // gains an optional 'deactivated' => true when the user turns it off in the UI.
+                'quality' => 30,
+                'speed' => 6,
                 'converters' => array_map(
                     static function ($id) {
                         return ['converter' => $id];
@@ -166,21 +125,8 @@ class Config
     }
 
     /**
-     * The ids of the output formats that are ENABLED in this config, in registry order.
-     *
-     * SINGLE SOURCE OF TRUTH for "which formats does a bulk/CLI/REST run produce?". WebP is
-     * always present (it is the baseline output and cannot be turned off); AVIF is present only
-     * when formats.avif.enabled === true. Reads defensively from $config['formats'] (which
-     * fix()/migrateToV2 guarantee) and falls back to webp-only so a malformed config never
-     * produces a broken or empty list.
-     *
-     * ZERO-CONFIG / BYTE-FOR-BYTE: with AVIF disabled (the default) this returns exactly
-     * ['webp'], so every consumer takes its existing single-format path unchanged.
-     *
-     * Pure & static (no WordPress, no filesystem) so it is trivially unit-testable.
-     *
      * @param  array  $config
-     * @return string[]  e.g. ['webp'] or ['webp','avif'].
+     * @return string[]
      */
     public static function enabledFormatIds($config)
     {
@@ -188,7 +134,6 @@ class Config
         $enabled = [];
         foreach (OutputFormat::ids() as $id) {
             if ($id === OutputFormat::DEFAULT_ID) {
-                // WebP is the baseline output and is always enabled.
                 $enabled[] = $id;
                 continue;
             }
@@ -197,7 +142,6 @@ class Config
                 $enabled[] = $id;
             }
         }
-        // Defensive: never return an empty list (webp is always valid).
         if (empty($enabled)) {
             $enabled[] = OutputFormat::DEFAULT_ID;
         }
@@ -213,11 +157,8 @@ class Config
 
         return [
 
-            // Schema version marker (introduced in Magic Convert; absent => legacy v1, see migrateToV2()).
             'config-version' => self::CONFIG_VERSION,
 
-            // Per-format section (schema v2). See getDefaultFormats() for the important note on why
-            // WebP's quality/converter settings stay top-level rather than moving under formats.webp.
             'formats' => self::getDefaultFormats(),
 
             'operation-mode' => 'varied-image-responses',
@@ -302,39 +243,15 @@ class Config
         ];
     }
 
-    /**
-     * Migrate a v1-shaped config array up to schema v2.
-     *
-     * v1 configs (everything saved by upstream WebP Express, and by Magic Convert before this
-     * step) have no 'config-version' key and no 'formats' section. This injects the per-format
-     * section from defaults (WebP enabled, AVIF disabled) and stamps 'config-version' = 2.
-     *
-     * Pure & static: no WordPress, no filesystem, no side effects — just array in, array out.
-     * Idempotent: running it on an already-v2 config (or repeatedly) leaves it unchanged. Any
-     * format keys the caller already has are preserved; only MISSING per-format keys are filled
-     * from defaults (so a partially-migrated config doesn't lose a user's AVIF quality choice).
-     *
-     * Note: this only handles the structural v1 -> v2 lift. The fuller merge-with-defaults that
-     * fix() performs still runs afterwards; calling this first guarantees the version stamp and
-     * formats skeleton exist before anything else looks at them.
-     *
-     * @param  array  $config  A config array (typically freshly loaded from disk).
-     * @return array  The same array, guaranteed to be at config-version 2.
-     */
     public static function migrateToV2(array $config)
     {
-        // Already v2 (or newer): nothing structural to do. Still defensively ensure 'formats'
-        // exists, in case a future hand-edited file set the version but dropped the section.
         $alreadyVersioned = isset($config['config-version']) && ($config['config-version'] >= 2);
 
         $defaultFormats = self::getDefaultFormats();
 
         if (!isset($config['formats']) || !is_array($config['formats'])) {
-            // v1 (or corrupt): no formats section at all -> take defaults wholesale.
             $config['formats'] = $defaultFormats;
         } else {
-            // Some formats present already: fill in only the per-format keys that are missing,
-            // preserving anything the user/config already specified (idempotent + non-destructive).
             foreach ($defaultFormats as $formatId => $formatDefaults) {
                 if (!isset($config['formats'][$formatId]) || !is_array($config['formats'][$formatId])) {
                     $config['formats'][$formatId] = $formatDefaults;
@@ -354,60 +271,12 @@ class Config
         return $config;
     }
 
-    /**
-     * Decide the platform-aware config overrides applied on FIRST activation (zero-config setup).
-     *
-     * This is the only place that knows "what should a fresh install look like on this platform?".
-     * It is pure & static (no WordPress, no filesystem, no $_SERVER) — the caller passes in the
-     * already-fixed default config and a single boolean for the platform — so it is trivially
-     * unit-testable (see tests/FirstActivationDefaultsTest.php).
-     *
-     * Apache / LiteSpeed ($isNginx === false):
-     *   Returns the config UNCHANGED. The default operation mode ('varied-image-responses') plus
-     *   the .htaccess rules that saveConfigurationAndHTAccess() writes already serve converted
-     *   images with zero further configuration. Nothing to override.
-     *
-     * nginx ($isNginx === true):
-     *   nginx does NOT read .htaccess, and the generated nginx rewrite rules are NOT installed yet
-     *   on a fresh activation — so redirection-to-converter / redirection-to-realizer cannot serve
-     *   anything. The only mechanism that works with ZERO server configuration is HTML alteration:
-     *   we rewrite <img> references to already-converted files. So we enable Alter HTML and pick the
-     *   one safe combination:
-     *     - 'enabled'                      => true   — turn HTML alteration on.
-     *     - 'replacement'                  => 'picture' — emit <picture> with a <source> for the
-     *                                         converted file and the original <img> as fallback, so
-     *                                         browsers without webp/avif still get a working image.
-     *     - 'only-for-webps-that-exists'   => true   — CRITICAL: only reference a converted file when
-     *                                         it actually exists on disk (AlterHtmlHelper /
-     *                                         DestinationUrl honour this flag). Without the nginx
-     *                                         rules there is no realizer to create a missing file on
-     *                                         request, so we must never emit a reference to a file
-     *                                         that does not exist.
-     *     - 'only-for-webp-enabled-browsers' => false — irrelevant in 'picture' mode (the <picture>
-     *                                         element handles capability negotiation), and matching
-     *                                         submit.php's own picture-mode choice keeps the value
-     *                                         stable across a settings round-trip.
-     *
-     *   Why these survive a round-trip through loadConfigAndFix() -> fix() -> applyOperationMode():
-     *   the default operation mode is 'varied-image-responses', and applyOperationMode() does NOT
-     *   touch any 'alter-html' key for that mode (only 'no-conversion' forces
-     *   only-for-webps-that-exists = true). fix() merges alter-html with
-     *   array_replace_recursive($defaultConfig['alter-html'], $config['alter-html']), which keeps
-     *   the caller's values. So on the next settings-page visit these exact flags reload intact.
-     *
-     * @param  array  $config    A fixed config array (typically Config::loadConfigAndFix(true)).
-     * @param  bool   $isNginx   Whether the server is nginx.
-     * @return array  The config with platform-aware first-activation overrides applied.
-     */
     public static function applyFirstActivationPlatformDefaults(array $config, bool $isNginx)
     {
         if (!$isNginx) {
-            // Apache / LiteSpeed: defaults are already zero-config; htaccess redirection is written
-            // by saveConfigurationAndHTAccess(). Nothing to override.
             return $config;
         }
 
-        // nginx: serve converted images immediately via HTML alteration, with zero server config.
         if (!isset($config['alter-html']) || !is_array($config['alter-html'])) {
             $config['alter-html'] = [];
         }
@@ -496,19 +365,9 @@ class Config
             // (note that this will not remove old unused properties, if some key should become obsolete)
             $config['alter-html'] = array_replace_recursive($defaultConfig['alter-html'], $config['alter-html']);
 
-            // Make sure the per-format section (schema v2) is present and its defaults are filled in.
-            // array_merge() above pulls 'formats' from $config when set (a v1 config that skipped
-            // migrateToV2 simply inherits $defaultConfig['formats']); this fills any missing per-format
-            // keys (e.g. a config that has formats.avif but no 'speed') without clobbering user values.
             if (!isset($config['formats']) || !is_array($config['formats'])) {
                 $config['formats'] = $defaultConfig['formats'];
             } else {
-                // formats.avif.converters is an ORDERED LIST, not a mergeable map.
-                // array_replace_recursive() merges lists index-wise, so a shorter (hand-edited)
-                // list would have the default's tail entries re-appended (producing duplicates).
-                // Capture the user's list first and restore it verbatim after the recursive merge,
-                // so the ordered stack is always taken wholesale (its membership is managed as a
-                // unit by submit.php). When the key is absent the merge fills it from defaults.
                 $userAvifConverters = (isset($config['formats']['avif']['converters'])
                     && is_array($config['formats']['avif']['converters']))
                     ? $config['formats']['avif']['converters']
@@ -521,7 +380,6 @@ class Config
                 }
             }
 
-            // Stamp the schema version if missing (e.g. a direct fix() caller bypassing loadConfigAndFix).
             if (!isset($config['config-version'])) {
                 $config['config-version'] = self::CONFIG_VERSION;
             }
@@ -628,11 +486,6 @@ class Config
         // PS: Yes, loadConfig may return false. "fix" handles this by returning default config
         $config = Config::loadConfig();
 
-        // Schema migration: lift a legacy v1 config (no 'config-version', no 'formats' section)
-        // up to v2 BEFORE fix() merges defaults, so the version stamp and per-format skeleton
-        // are present for everything downstream. Idempotent — a v2 config passes through
-        // untouched. (loadConfig() may return false on first run; skip migration in that case,
-        // fix() will then return the default config which is already v2.)
         if (is_array($config)) {
             $config = self::migrateToV2($config);
         }
@@ -741,28 +594,6 @@ class Config
         return $config;
     }
 
-    /**
-     * Annotate each formats.avif.converters entry with live operational status for the options UI.
-     *
-     * The AVIF section shows a per-converter ✓/✗ exactly like the WebP list. Rather than a live
-     * AJAX probe, we run ONE capability detection over the FULL default AVIF stack
-     * (AvifStack::selfTest() — "what CAN this machine encode AVIF with"), index it by converter id,
-     * and stamp each saved-list entry with:
-     *   - 'working' => bool   (true when this backend is operational on this host right now)
-     *   - 'error'   => string (the precise reason when NOT operational — e.g. "GD compiled without
-     *                          AVIF support"; omitted when operational).
-     *
-     * These are TRANSIENT, render-only fields: they are computed here for getConfigForOptionsPage()
-     * (which feeds both the page and window.avifConverters), and the submit sanitizer strips them,
-     * so they are never persisted to config.json. selfTest() only inspects extensions/binaries (no
-     * encoding), so this is cheap — on par with the WebP status probe already running just above.
-     *
-     * Defensive: a config without an avif converters list (shouldn't happen post-fix()) is returned
-     * untouched.
-     *
-     * @param  array  $config
-     * @return array
-     */
     private static function annotateAvifConverterStatus($config)
     {
         if (
@@ -772,8 +603,6 @@ class Config
             return $config;
         }
 
-        // Full default stack: capability detection (what is POSSIBLE), independent of the user's
-        // order/deactivation — the status of a deactivated converter is still meaningful to show.
         $rows = [];
         foreach ((new \MagicConvert\Avif\AvifStack())->selfTest() as $row) {
             $rows[$row['id']] = $row;
@@ -787,7 +616,6 @@ class Config
                     $entry['error'] = $rows[$id]['reason'];
                 }
             } else {
-                // Unknown id (hand-edited config) — show as not operational rather than omit.
                 $entry['working'] = false;
             }
         }
@@ -835,9 +663,6 @@ class Config
         $obj['scope'] = $config['scope'];
         $obj['image-types'] = $config['image-types'];   // 0=none,1=jpg, 2=png, 3=both
         $obj['prevent-using-webps-larger-than-original'] = $config['prevent-using-webps-larger-than-original'];
-        // Whether AVIF serving is enabled, so the front-end picture-tag replacer can decide to emit an
-        // <source type="image/avif"> without loading the full config on every request. Defaults to false
-        // (avif disabled => picture-tag output is byte-identical to today's webp-only output).
         $obj['avif-enabled'] = (
             isset($config['formats']['avif']['enabled']) &&
             ($config['formats']['avif']['enabled'] === true)
@@ -864,8 +689,6 @@ class Config
             if ($success) {
                 State::setState('configured', true);
                 self::updateAutoloadedOptions($config);
-                // Re-arm the "AVIF enabled but inoperable" admin notice on every save, so a
-                // user who just changed settings is reminded again if AVIF still can't encode.
                 AvifNotice::resetDismissal();
             }
 
@@ -1029,12 +852,6 @@ class Config
         ];
 
 
-        // Per-format block (schema v2)
-        // -------------
-        // Expose the per-format enabled flags + AVIF quality/speed so the non-WordPress wod
-        // scripts and future serving logic can read them WITHOUT WordPress or the full config.
-        // Read defensively from $config['formats'] (which fix()/migrateToV2 guarantee), falling
-        // back to defaults so a malformed config never produces a broken wod-options.json.
         $formatDefaults = self::getDefaultFormats();
         $cfgFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
 
@@ -1043,16 +860,12 @@ class Config
 
         $formats = [
             'webp' => [
-                // WebP is the baseline output and is always on.
                 'enabled' => isset($webpFmt['enabled']) ? (bool) $webpFmt['enabled'] : true,
             ],
             'avif' => [
                 'enabled' => isset($avifFmt['enabled']) ? (bool) $avifFmt['enabled'] : false,
                 'quality' => isset($avifFmt['quality']) ? intval($avifFmt['quality']) : $formatDefaults['avif']['quality'],
                 'speed' => isset($avifFmt['speed']) ? intval($avifFmt['speed']) : $formatDefaults['avif']['speed'],
-                // The configured AVIF converter stack (order + per-converter deactivation) so the
-                // wod scripts honour the user's selection without loading the full WordPress config.
-                // array_values() guarantees a clean JSON list. Falls back to the default stack.
                 'converters' => (isset($avifFmt['converters']) && is_array($avifFmt['converters']))
                     ? array_values($avifFmt['converters'])
                     : $formatDefaults['avif']['converters'],
@@ -1161,22 +974,12 @@ class Config
         }
 
         if (self::saveConfigurationFile($config)) {
-            // Persist the nginx rules state (fingerprint + generated-at + plugin-version) on
-            // every config save, mirroring the .htaccess regeneration flow. We store ONLY the
-            // non-secret triple — never the rule body (which embeds the config hash and must
-            // never touch disk in a web-accessible place). Phase 3.2 (UI) and 3.3 (drift
-            // detection) read this back to compare without regenerating. Wrapped defensively so
-            // a failure here can never block a config save.
             try {
-                // Read the PREVIOUS record BEFORE overwriting it, so we can detect a
-                // rule-affecting fingerprint change and (on nginx) arm the "rules need updating"
-                // notice. The new record is then persisted as the baseline for the next save.
                 $oldNginxRecord = State::getState('nginx-rules', null);
                 $newNginxRecord = NginxRules::stateRecordFromPaths($config);
                 NginxRulesNotice::arm($oldNginxRecord, $newNginxRecord);
                 State::setState('nginx-rules', $newNginxRecord);
             } catch (\Throwable $e) {
-                // non-fatal: nginx state is advisory only
             }
 
             $options = self::generateWodOptionsFromConfigObj($config);

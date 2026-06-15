@@ -184,8 +184,6 @@ class WebPOnDemand extends WodConfigLoader
         // Check destination path
         // --------------------------------------------
         self::$checking = 'destination path';
-        // On-demand serving is WebP-only by default (on-demand AVIF is gated and
-        // arrives in step 2.4). Pass the format explicitly to make that intent clear.
         $outputFormat = OutputFormat::webp();
         $destination = ConvertHelperIndependent::getDestination(
             $source,

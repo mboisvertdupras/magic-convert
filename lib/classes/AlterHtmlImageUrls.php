@@ -2,26 +2,12 @@
 
 namespace MagicConvert;
 
-/**
- * Class AlterHtmlImageUrls - convert image urls to webp.
- *
- * As of Phase 2.4 this extends the FORKED ImageUrlReplacer (MagicConvert\AlterHtml\ImageUrlReplacer)
- * instead of the vendored dom-util-for-webp class.
- *
- * URL-REPLACEMENT MODE IS WEBP-ONLY BY DESIGN: a plain URL swap rewrites the markup that every
- * browser receives, so it cannot negotiate per-browser between avif and webp from the same cached
- * HTML. WebP (near-universal support) is therefore the only safe single-format choice here. To also
- * serve AVIF, use picture-tag mode (AlterHtmlPicture). This is surfaced to the admin in the
- * alter-html options UI.
- */
-
 use \MagicConvert\AlterHtmlHelper;
 use \MagicConvert\AlterHtml\ImageUrlReplacer;
 
 class AlterHtmlImageUrls extends ImageUrlReplacer
 {
     public function replaceUrl($url) {
-        // WEBP-ONLY by design (see class docblock).
         return AlterHtmlHelper::getWebPUrl($url, null);
     }
 

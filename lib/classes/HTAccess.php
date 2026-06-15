@@ -413,9 +413,6 @@ class HTAccess
             );
         }
 
-        // Honest messaging on nginx: the .htaccess files WERE written (Magic Convert always writes
-        // them, e.g. for a possible Apache front-end or future migration), but nginx does not read
-        // them, so they have no effect on serving. Point the user at the nginx panel instead.
         if (PlatformInfo::isNginx()) {
             Messenger::addMessage(
                 'warning',

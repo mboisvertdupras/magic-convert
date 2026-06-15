@@ -5,9 +5,6 @@ namespace MagicConvert\AlterHtml;
 use KubAT\PhpSimple\HtmlDomParser;
 
 /**
- * Class PictureTags - convert an <img> tag to a <picture> tag and add converted (webp / avif) versions.
- *
- * ---------------------------------------------------------------------------------------------------
  * ATTRIBUTION (MIT)
  *
  * This is a fork of rosell-dk/dom-util-for-webp (src/PictureTags.php), MIT-licensed:
@@ -22,40 +19,10 @@ use KubAT\PhpSimple\HtmlDomParser;
  *
  * The donor library's own attribution: "Code is based on code from the ShortPixel plugin, which in
  * turn used code from Responsify WP plugin."
- *
- * WHY FORKED (not wrapped): the donor library hardcodes a single WebP <source>. Magic Convert needs
- * to emit MULTIPLE <source> tags (avif first, then webp) in browser-preference order, each gated on
- * whether the corresponding converted file actually exists. That is a structural change to
- * replaceCallback(), so we fork rather than subclass. Per the fork rules, vendor/ is never modified.
- * ---------------------------------------------------------------------------------------------------
- *
- * It works like this:
- *
- * 1. Remove existing <picture> tags and their content - replace with tokens in order to reinsert later
- * 2. Process <img> tags.
- *    - The tags are found with regex.
- *    - The attributes are parsed with DOMDocument if it exists, otherwise with the Simple Html Dom library.
- * 3. Re-insert the existing <picture> tags
- *
- * This procedure is very gentle and needle-like. No need for a complete parse - so invalid HTML is no big issue.
- *
- * GENERALIZATION (vs. donor):
- *  - replaceUrl($url) is replaced by replaceUrlForFormat($url, $formatId): subclasses map a source URL to
- *    the converted URL for a SPECIFIC format ('webp' / 'avif'), or null if that format isn't available.
- *  - enabledFormatsInPreferenceOrder() lists the formats to try, most-preferred first (avif before webp).
- *  - replaceCallback() emits one <source type="image/<fmt>"> per format that produced a full set of URLs,
- *    keeping the original <img> as the fallback and preserving all original attributes.
  */
 class PictureTags
 {
 
-    /**
-     * Empty constructor for preventing child classes from creating constructors.
-     *
-     * We do this because otherwise the "new static()" call inside the ::replace() method
-     * would be unsafe. (donor library, see #21)
-     * @return  void
-     */
     final public function __construct()
     {
         $this->existingPictureTags = [];
@@ -64,16 +31,12 @@ class PictureTags
     private $existingPictureTags;
 
     /**
-     * Map a source URL to the converted URL for a given output format.
-     *
-     * @param  string  $url       source image url
-     * @param  string  $formatId  'webp' | 'avif'
-     * @return string|null  converted url, or null if not available for this format
+     * @param  string  $url
+     * @param  string  $formatId
+     * @return string|null
      */
     public function replaceUrlForFormat($url, $formatId)
     {
-        // Default behaviour mirrors the donor (webp-only, append ".webp"). Subclasses override
-        // this to consult the real cache + per-format file-exists logic.
         if ($formatId !== 'webp') {
             return null;
         }
@@ -84,12 +47,6 @@ class PictureTags
     }
 
     /**
-     * The output formats to emit <source> tags for, MOST-PREFERRED FIRST.
-     *
-     * Browser preference order: a browser that accepts several formats picks the first matching
-     * <source>, so avif must precede webp. Default is webp-only (zero-config baseline); the Magic
-     * Convert subclass returns ['avif', 'webp'] when avif serving is enabled.
-     *
      * @return string[]
      */
     public function enabledFormatsInPreferenceOrder()
@@ -98,8 +55,6 @@ class PictureTags
     }
 
     /**
-     * Mime type for a format id. Kept tiny + dependency-free so this class stays portable.
-     *
      * @param  string  $formatId
      * @return string
      */
@@ -115,11 +70,9 @@ class PictureTags
     }
 
     /**
-     * Look for attribute such as "src", but also with prefixes such as "data-lazy-src" and "data-src".
-     *
-     * @param  array  $attributes  an array of all attributes for the element
-     * @param  string  $attrName    ie "src", "srcset" or "sizes"
-     * @return array  attrName => value, for each prefix that is present
+     * @param  array  $attributes
+     * @param  string  $attrName
+     * @return array
      */
     private static function findAttributesWithNameOrPrefixed($attributes, $attrName)
     {
@@ -135,9 +88,7 @@ class PictureTags
     }
 
     /**
-     * Look for attributes such as "data-lazy-src" and "data-src" and prefer them over "src".
-     *
-     * @return array  ['value' => ..., 'attrName' => ...]
+     * @return array
      */
     private static function lazyGet($attributes, $attrName)
     {
@@ -158,9 +109,6 @@ class PictureTags
         );
     }
 
-    /**
-     *  Convert to UTF-8 and encode chars outside of ascii-range.
-     */
     private static function textToUTF8WithNonAsciiEncoded($html)
     {
         if (function_exists("mb_convert_encoding")) {
@@ -176,7 +124,7 @@ class PictureTags
             $dom = new \DOMDocument();
 
             if (function_exists("mb_encode_numericentity")) {
-                $html = mb_encode_numericentity($html, array (0x7f, 0xffff, 0, 0xffff));  // (donor #41)
+                $html = mb_encode_numericentity($html, array (0x7f, 0xffff, 0, 0xffff));
             }
 
             @$dom->loadHTML($html);
@@ -203,9 +151,6 @@ class PictureTags
         }
     }
 
-    /**
-     * Makes a string with all attributes.
-     */
     private static function createAttributes($attribute_array)
     {
         $attributes = '';
@@ -215,32 +160,24 @@ class PictureTags
         if ($attributes == '') {
             return '';
         }
-        // Removes the extra space after the last attribute. Add space before
         return ' ' . substr($attributes, 0, -1);
     }
 
     /**
-     * Build the <source> attribute set for ONE format, given the img's src/srcset attributes.
-     *
-     * Returns null if this format cannot fully cover the image (we require ALL srcset entries to
-     * have a converted variant — see donor #42 — otherwise the responsive set would be broken).
-     *
      * @param  string  $formatId
-     * @param  array   $srcSetAttributes  attrName => value (from findAttributesWithNameOrPrefixed)
-     * @param  array   $srcAttributes     attrName => value
-     * @return array|null  source-tag attributes (without the type attribute), or null
+     * @param  array   $srcSetAttributes
+     * @param  array   $srcAttributes
+     * @return array|null
      */
     private function buildSourceAttributesForFormat($formatId, $srcSetAttributes, $srcAttributes)
     {
         $atLeastOne = false;
         $sourceTagAttributes = [];
 
-        // Process srcset (also data-srcset etc)
         foreach ($srcSetAttributes as $attrName => $attrValue) {
             $srcsetArr = explode(', ', $attrValue);
             $srcsetArrConverted = [];
             foreach ($srcsetArr as $i => $srcSetEntry) {
-                // $srcSetEntry is ie "http://example.com/image.jpg 520w"
                 $result = preg_split('/\s+/', trim($srcSetEntry));
                 $src = trim($srcSetEntry);
                 $width = null;
@@ -250,8 +187,6 @@ class PictureTags
 
                 $convertedUrl = $this->replaceUrlForFormatOr($src, $formatId, false);
                 if ($convertedUrl == false) {
-                    // We want ALL of the sizes in this format. If we cannot have that, this format
-                    // is not usable for this image (donor #42).
                     return null;
                 } else {
                     if (substr($src, 0, 5) != 'data:') {
@@ -265,10 +200,8 @@ class PictureTags
 
         foreach ($srcAttributes as $attrName => $attrValue) {
             if (substr($attrValue, 0, 5) == 'data:') {
-                // ignore tags with data urls
                 return null;
             }
-            // Make sure not to override existing srcset with src
             if (!isset($sourceTagAttributes[$attrName . 'set'])) {
                 $converted = $this->replaceUrlForFormatOr($attrValue, $formatId, false);
                 if ($converted === false) {
@@ -285,17 +218,10 @@ class PictureTags
         return $sourceTagAttributes;
     }
 
-    /**
-     *  Replace <img> tag with <picture> tag (emitting one <source> per available format).
-     */
     private function replaceCallback($match)
     {
         $imgTag = $match[0];
 
-        // Do nothing with images that have the 'webpexpress-processed' class (idempotency guard).
-        // NOTE: the marker string is deliberately kept as the donor's 'webpexpress-processed' (NOT
-        // rebranded) so the webp-only <picture> output stays byte-for-byte identical to today's,
-        // and so content already processed by the previously-vendored library is still recognised.
         if (strpos($imgTag, 'webpexpress-processed')) {
             return $imgTag;
         }
@@ -307,16 +233,12 @@ class PictureTags
         $srcAttributes = self::findAttributesWithNameOrPrefixed($imgAttributes, 'src');
 
         if ((!isset($srcSetAttributes['srcset'])) && (!isset($srcAttributes['src']))) {
-            // better not mess with this html...
             return $imgTag;
         }
 
-        // add the exclude class so if this content is processed again in another filter,
-        // the img is not converted again into a picture
         $imgAttributes['class'] = (isset($imgAttributes['class']) ? $imgAttributes['class'] . " " : "") .
             "webpexpress-processed";
 
-        // Build one <source> per enabled format (most-preferred first => avif before webp).
         $sourceTags = '';
         foreach ($this->enabledFormatsInPreferenceOrder() as $formatId) {
             $sourceTagAttributes = $this->buildSourceAttributesForFormat($formatId, $srcSetAttributes, $srcAttributes);
@@ -331,7 +253,6 @@ class PictureTags
         }
 
         if ($sourceTags === '') {
-            // No converted variants in any format -> no reason to create a <picture> tag.
             return $imgTag;
         }
 
@@ -364,23 +285,19 @@ class PictureTags
 
         $this->existingPictureTags = [];
 
-        // Temporarily remove existing <picture> tags (their <img> children must NOT be re-wrapped).
         $content = preg_replace_callback(
             '/<picture[^>]*>.*?<\/picture>/is',
             array($this, 'removePictureTagsTemporarily'),
             $content
         );
 
-        // Replace "<img>" tags
         $content = preg_replace_callback('/<img[^>]*>/i', array($this, 'replaceCallback'), $content);
 
-        // Re-insert <picture> tags that were removed
         $content = preg_replace_callback('/PICTURE_TAG_(\d+)_/', array($this, 'insertPictureTagsBack'), $content);
 
         return $content;
     }
 
-    /* Main replacer function */
     public static function replace($html)
     {
         $pt = new static();

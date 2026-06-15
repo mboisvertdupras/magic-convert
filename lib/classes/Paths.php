@@ -502,8 +502,6 @@ APACHE
         // Why not simply use wp_mkdir_p ? - it sets the permissions to same as parent. Isn't that better?
         // or perhaps not... - Because we need write permissions in the config dir.
         if (!is_dir($configDir)) {
-            // Tolerant of the concurrent-creation race (two requests/CLI procs
-            // creating the config dir at once): @mkdir then re-check is_dir().
             @mkdir($configDir, 0775, true);
             @chmod($configDir, 0775);
         }
@@ -547,9 +545,7 @@ APACHE
     // ------------ Cache Dir -------------
 
     /**
-     * Absolute path of the per-format cache dir.
-     *
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp -> 'webp-images').
+     * @param  OutputFormat|string|null  $format
      */
     public static function getCacheDirAbs($format = null)
     {
@@ -562,7 +558,7 @@ APACHE
     }
 
     /**
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function getCacheDirForImageRoot($destinationFolder, $destinationStructure, $imageRootId, $format = null)
     {
@@ -595,17 +591,7 @@ APACHE
     // ------------ Bigger-than-source  dir -------------
 
     /**
-     * Absolute path of the per-format "bigger than source" marker dir.
-     *
-     * MARKER DESIGN (Phase 2.1): markers live in a per-format base dir named
-     * '<cacheDirName>-bigger-than-source'. The webp dir stays
-     * 'webp-images-bigger-than-source' (byte-for-byte compatible with existing
-     * markers — no migration needed); avif gets 'avif-images-bigger-than-source'.
-     * Inside the dir, the marker filename already carries the format extension
-     * (the path is built with appendOrSetExtension), so a source can have an
-     * independent webp marker and avif marker without collision.
-     *
-     * @param  OutputFormat|string|null  $format  Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function getBiggerThanSourceDirAbs($format = null)
     {
@@ -701,8 +687,6 @@ APACHE
             ];
         } else {
 
-            // Per-format cache dir name (webp -> 'webp-images', avif -> 'avif-images').
-            // The format travels on the DestinationOptions (defaults to webp).
             $cacheDirName = OutputFormat::coerce(
                 isset($destinationOptions->format) ? $destinationOptions->format : null
             )->cacheDirName();
@@ -761,7 +745,7 @@ APACHE
      * @param  string                    $destinationFolder
      * @param  string                    $destinationExt
      * @param  boolean                   $inUploadFolder
-     * @param  OutputFormat|string|null  $format             Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function appendOrSetExtension($path, $destinationFolder, $destinationExt, $inUploadFolder, $format = null)
     {

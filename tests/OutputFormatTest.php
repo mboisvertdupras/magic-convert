@@ -5,16 +5,8 @@ namespace MagicConvert\Tests;
 use MagicConvert\OutputFormat;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Unit tests for the MagicConvert\OutputFormat value object + registry
- * introduced in Phase 2.1 (multi-format core).
- *
- * Pure logic, no filesystem / WordPress dependency.
- */
 class OutputFormatTest extends TestCase
 {
-    // --- registry lookups ----------------------------------------------------
-
     public function testByIdReturnsWebpFormat(): void
     {
         $webp = OutputFormat::byId('webp');
@@ -47,8 +39,6 @@ class OutputFormatTest extends TestCase
         OutputFormat::byId('');
     }
 
-    // --- registry enumeration ------------------------------------------------
-
     public function testIdsContainsBothRegisteredFormats(): void
     {
         $ids = OutputFormat::ids();
@@ -63,19 +53,14 @@ class OutputFormatTest extends TestCase
         foreach ($all as $format) {
             $this->assertInstanceOf(OutputFormat::class, $format);
         }
-        // Same cardinality as ids().
         $this->assertCount(count(OutputFormat::ids()), $all);
     }
 
     public function testWebpIsTheFirstRegisteredFormat(): void
     {
-        // webp must come first so data-driven consumers default to it and so the
-        // default convert path is unchanged.
         $ids = OutputFormat::ids();
         $this->assertSame('webp', $ids[0]);
     }
-
-    // --- default / convenience accessors -------------------------------------
 
     public function testWebpAccessorReturnsDefaultFormat(): void
     {
@@ -88,8 +73,6 @@ class OutputFormatTest extends TestCase
     {
         $this->assertSame('webp', OutputFormat::DEFAULT_ID);
     }
-
-    // --- coerce --------------------------------------------------------------
 
     public function testCoerceNullReturnsWebpDefault(): void
     {
@@ -113,12 +96,8 @@ class OutputFormatTest extends TestCase
         OutputFormat::coerce('heic');
     }
 
-    // --- identity / immutability ---------------------------------------------
-
     public function testByIdReturnsTheSameSingletonInstance(): void
     {
-        // The registry hands out the same instance for a given id, so identity
-        // comparison is safe.
         $this->assertSame(OutputFormat::byId('webp'), OutputFormat::byId('webp'));
         $this->assertNotSame(OutputFormat::byId('webp'), OutputFormat::byId('avif'));
     }

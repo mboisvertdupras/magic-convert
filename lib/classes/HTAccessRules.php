@@ -30,9 +30,7 @@ class HTAccessRules
     private static $docRootString;
 
     /**
-     * @var bool  Whether AVIF serving is enabled (config formats.avif.enabled). When false
-     *            (the default), NO avif rules / AddType lines are emitted and the generated
-     *            .htaccess is byte-for-byte identical to before Phase 2.4.
+     * @var bool
      */
     private static $avifEnabled;
 
@@ -300,11 +298,6 @@ class HTAccessRules
 
     /**
      *  @return  string  rules for redirecting to existing
-     *
-     *  This is the WebP entry point. It is kept as a zero-argument method so the WebP
-     *  output is produced by exactly the same code path as before — byte-for-byte
-     *  identical — while the actual rule strings are now built by the format-parameterised
-     *  builder below (called with the default 'webp' OutputFormat).
      */
     private static function redirectToExistingRules()
     {
@@ -312,20 +305,6 @@ class HTAccessRules
     }
 
     /**
-     *  AVIF redirect-to-existing rules.
-     *
-     *  Mirrors the WebP redirect-to-existing rule shapes exactly (same mingled / separate
-     *  branches, same capability-gated T= mime flag, Vary handling and E= flags), but for
-     *  the avif cache structure ('avif-images', '.avif', 'image/avif').
-     *
-     *  IMPORTANT — fallthrough policy (per roadmap 2.4): there is deliberately NO converter
-     *  (wod) route for avif. These rules ONLY ever match when the corresponding .avif file
-     *  EXISTS (every branch is guarded by a `-f` file-exists RewriteCond). When a browser
-     *  sends `Accept: image/avif` but no .avif file is present, none of these rules match and
-     *  Apache falls through CLEANLY to the WebP redirect-to-existing rules (which run next),
-     *  then to the WebP converter, then to the original image. Ordering this block BEFORE the
-     *  WebP block is what makes avif preferred when present.
-     *
      *  @return  string
      */
     private static function avifRedirectToExistingRules()
@@ -334,26 +313,15 @@ class HTAccessRules
     }
 
     /**
-     *  Format-parameterised builder for the redirect-to-existing rules.
-     *
-     *  Extracted from the original (WebP-only) redirectToExistingRules() so a second format
-     *  (avif) can reuse the identical rule shapes. The ONLY per-format substitutions are the
-     *  destination extension ('.webp' / '.avif'), the mime flag (`T=image/webp` / `T=image/avif`)
-     *  and the cache-dir name ('webp-images' / 'avif-images', supplied by the format-aware
-     *  Paths helpers). All capability gating (Vary E= flags, doc-root vs image-root structure,
-     *  mingled vs separate) is shared verbatim.
-     *
      *  @param  OutputFormat  $fmt
      *  @return string
      */
     private static function redirectToExistingRulesForFormat($fmt)
     {
-        // Per-format literals. dot+ext is regex-escaped exactly as the original '.webp' literal
-        // was written ("\.webp"). mime is the value of the T= flag.
-        $ext = $fmt->extension();          // 'webp' | 'avif'
-        $dotExt = '\.' . $ext;             // '\.webp' | '\.avif'
-        $mime = $fmt->mimeType();          // 'image/webp' | 'image/avif'
-        $tFlag = 'T=' . $mime;             // 'T=image/webp' | 'T=image/avif'
+        $ext = $fmt->extension();
+        $dotExt = '\.' . $ext;
+        $mime = $fmt->mimeType();
+        $tFlag = 'T=' . $mime;
         $varyFlag = (self::$setAddVaryEnvInRedirect ? 'E=ADDVARY:1,' : '');
 
         $rules = '';
@@ -432,7 +400,6 @@ class HTAccessRules
             $rules .= "  RewriteCond %{HTTP_ACCEPT} " . $mime . "\n";
 
             if (self::$useDocRootForStructuringCacheDir) {
-                // Per-format cache dir ('webp-images' | 'avif-images'); Paths is format-aware (2.1).
                 $cacheDirRel = Paths::getCacheDirRelToDocRoot($fmt) . '/doc-root';
 
                 $rules .= "  RewriteCond %{REQUEST_FILENAME} -f\n";
@@ -946,8 +913,6 @@ class HTAccessRules
             self::$alterHtmlEnabled = true;
         }
 
-        // AVIF serving gate. Read defensively: a v1 config (pre-2.2) has no 'formats' section,
-        // and we must treat that exactly like avif-disabled so the output stays byte-identical.
         self::$avifEnabled = (
             isset($config['formats']['avif']['enabled']) &&
             ($config['formats']['avif']['enabled'] === true)
@@ -1181,11 +1146,6 @@ class HTAccessRules
             // RewriteRule ^uploads/2021/06/ - [L]
 
             if (self::$config['redirect-to-existing-in-htaccess']) {
-                // AVIF redirect-to-existing MUST come before the WebP rules so that, for a browser
-                // that accepts both, an existing .avif wins over an existing .webp. There is no
-                // avif converter route: if no .avif exists these rules don't match and Apache falls
-                // through cleanly to the webp rules below. Gated on formats.avif.enabled, so with
-                // avif disabled (the default) nothing is emitted and output stays byte-identical.
                 if (self::$avifEnabled) {
                     $rules .= self::avifRedirectToExistingRules();
                 }
@@ -1193,8 +1153,6 @@ class HTAccessRules
             }
 
             if (self::$config['enable-redirection-to-converter']) {
-                // NB: webp-only on purpose. AVIF is bulk-only (encode cost makes on-demand AVIF
-                // dangerous, per roadmap 2.4) — there is deliberately no avif converter route here.
                 $rules .= self::webpOnDemandRules();
             }
 
@@ -1264,8 +1222,6 @@ class HTAccessRules
             $rules .= "\n# Register webp mime type \n";
             $rules .= "<IfModule mod_mime.c>\n";
             $rules .= "  AddType image/webp .webp\n";
-            // Register the avif mime type alongside webp (gated; with avif disabled this line is
-            // not emitted, keeping the block byte-identical to before).
             if (self::$avifEnabled) {
                 $rules .= "  AddType image/avif .avif\n";
             }

@@ -9,27 +9,12 @@ use MagicConvert\DismissableGlobalMessages;
 
 require_once __DIR__ . '/NginxPanelWpStubs.php';
 
-/**
- * Pure-part tests for the Phase 3.2 nginx admin experience:
- *   - the artifact-key WHITELIST + normalization (the only gate between request input and
- *     artifact dispatch in NginxDownload),
- *   - download filenames,
- *   - the fingerprint-CHANGE decision that drives the update notice,
- *   - the gating of NginxRulesNotice::arm() (nginx + changed).
- *
- * UI partials (nginx-panel.inc) are render-glue and deliberately untested here — all logic lives
- * in these pure methods. WordPress is stubbed at the namespace seam (see NginxPanelWpStubs.php)
- * so the armed-notice path can be exercised without bootstrapping WordPress.
- */
 class NginxPanelTest extends TestCase
 {
     protected function setUp(): void
     {
-        // Reset the in-memory option store the WP stubs back, so each test starts clean.
         \MagicConvert\Tests\reset_wp_stub_options();
     }
-
-    // --- artifact-key whitelist --------------------------------------------------------------
 
     public function testResolvesCanonicalKeys(): void
     {
@@ -40,7 +25,6 @@ class NginxPanelTest extends TestCase
 
     public function testResolvesRequestAliases(): void
     {
-        // 'a' (the two-file standard) defaults to the server file; 'b' is the single file.
         $this->assertSame('server', NginxPanel::resolveArtifactKey('a'));
         $this->assertSame('single', NginxPanel::resolveArtifactKey('b'));
     }
@@ -71,14 +55,11 @@ class NginxPanelTest extends TestCase
         }
     }
 
-    // --- download filenames ------------------------------------------------------------------
-
     public function testDownloadFilenames(): void
     {
         $this->assertSame('magic-convert-maps.conf', NginxPanel::downloadFilename('maps'));
         $this->assertSame('magic-convert-server.conf', NginxPanel::downloadFilename('server'));
         $this->assertSame('magic-convert.conf', NginxPanel::downloadFilename('single'));
-        // Unknown -> safe default (never an empty/odd name).
         $this->assertSame('magic-convert.conf', NginxPanel::downloadFilename('nope'));
     }
 
@@ -88,8 +69,6 @@ class NginxPanelTest extends TestCase
         NginxPanel::generateArtifactFromPaths('definitely-not-a-key', []);
     }
 
-    // --- fingerprint change decision ---------------------------------------------------------
-
     private function record(string $fp): array
     {
         return ['fingerprint' => $fp, 'generated-at' => '2026-06-12 00:00:00 UTC', 'plugin-version' => '0.1.0'];
@@ -97,7 +76,6 @@ class NginxPanelTest extends TestCase
 
     public function testFirstSaveIsNotAChange(): void
     {
-        // No prior state => nothing installed to drift from => not a "change".
         $this->assertFalse(NginxPanel::fingerprintChanged(null, $this->record('abc')));
         $this->assertFalse(NginxPanel::fingerprintChanged([], $this->record('abc')));
         $this->assertFalse(NginxPanel::fingerprintChanged(['generated-at' => 'x'], $this->record('abc')));
@@ -115,11 +93,8 @@ class NginxPanelTest extends TestCase
 
     public function testEmptyPreviousFingerprintErrsTowardChange(): void
     {
-        // A corrupt/empty previous fingerprint should surface the notice, not hide it.
         $this->assertTrue(NginxPanel::fingerprintChanged($this->record(''), $this->record('def')));
     }
-
-    // --- short fingerprint -------------------------------------------------------------------
 
     public function testShortFingerprint(): void
     {
@@ -127,39 +102,36 @@ class NginxPanelTest extends TestCase
         $this->assertSame('(none)', NginxPanel::shortFingerprint(''));
     }
 
-    // --- notice gating (NginxRulesNotice::arm) ------------------------------------------------
-
     public function testArmDoesNothingWhenNotNginx(): void
     {
-        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('def'), /* isNginx */ false);
+        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('def'), false);
         $this->assertFalse($armed);
         $this->assertNotContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
     }
 
     public function testArmDoesNothingWhenFingerprintUnchanged(): void
     {
-        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('abc'), /* isNginx */ true);
+        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('abc'), true);
         $this->assertFalse($armed);
         $this->assertNotContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
     }
 
     public function testArmDoesNothingOnFirstSaveEvenOnNginx(): void
     {
-        $armed = NginxRulesNotice::arm(null, $this->record('abc'), /* isNginx */ true);
+        $armed = NginxRulesNotice::arm(null, $this->record('abc'), true);
         $this->assertFalse($armed);
         $this->assertNotContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
     }
 
     public function testArmQueuesNoticeWhenNginxAndChanged(): void
     {
-        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('def'), /* isNginx */ true);
+        $armed = NginxRulesNotice::arm($this->record('abc'), $this->record('def'), true);
         $this->assertTrue($armed);
         $this->assertContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
     }
 
     public function testArmReappearsAfterDismissal(): void
     {
-        // Arm -> dismiss -> arm again on a NEW change: the stable id is re-queued (reappears).
         NginxRulesNotice::arm($this->record('abc'), $this->record('def'), true);
         DismissableGlobalMessages::dismissMessage(NginxRulesNotice::MESSAGE_ID);
         $this->assertNotContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
@@ -169,7 +141,6 @@ class NginxPanelTest extends TestCase
         $this->assertContains(NginxRulesNotice::MESSAGE_ID, $this->queuedGlobalMessageIds());
     }
 
-    /** Read the current global-message queue via the same State the production code uses. */
     private function queuedGlobalMessageIds(): array
     {
         return \MagicConvert\State::getState('dismissableGlobalMessageIds', []);

@@ -5,22 +5,9 @@ namespace MagicConvert\Tests;
 use MagicConvert\Config;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Unit tests for the config schema v1 -> v2 migration (Phase 2.2).
- *
- * Exercises the pure, WordPress-independent pieces of MagicConvert\Config:
- *   - Config::migrateToV2()       structural lift from v1 to v2
- *   - Config::getDefaultFormats() the per-format defaults
- *   - Config::CONFIG_VERSION      the schema version stamp
- *
- * These methods touch no filesystem, no WordPress, no database, so they run standalone.
- */
 class ConfigMigrationTest extends TestCase
 {
     /**
-     * A minimal v1-shaped config: how upstream WebP Express (and Magic Convert pre-2.2) wrote
-     * config.json — no 'config-version', no 'formats' section.
-     *
      * @return array<string,mixed>
      */
     private function v1Fixture(): array
@@ -35,8 +22,6 @@ class ConfigMigrationTest extends TestCase
             'scope' => ['themes', 'uploads'],
         ];
     }
-
-    // --- v1 -> v2 lift --------------------------------------------------------
 
     public function testV1FixtureGainsConfigVersion(): void
     {
@@ -62,7 +47,6 @@ class ConfigMigrationTest extends TestCase
     {
         $migrated = Config::migrateToV2($this->v1Fixture());
 
-        // WebP enabled, AVIF disabled — the zero-config, byte-for-byte-equivalent default.
         $this->assertTrue($migrated['formats']['webp']['enabled']);
         $this->assertFalse($migrated['formats']['avif']['enabled']);
         $this->assertSame(30, $migrated['formats']['avif']['quality']);
@@ -76,19 +60,14 @@ class ConfigMigrationTest extends TestCase
         $config = $this->v1Fixture();
         $migrated = Config::migrateToV2($config);
 
-        // Everything that was there before is still there, unchanged.
         foreach ($config as $key => $value) {
             $this->assertArrayHasKey($key, $migrated);
             $this->assertSame($value, $migrated[$key]);
         }
     }
 
-    // --- v2 passthrough -------------------------------------------------------
-
     public function testCompleteV2ConfigPassesThroughUntouched(): void
     {
-        // A FULLY-formed v2 config (already carrying every per-format key, including the AVIF
-        // converter stack) must pass through migrateToV2() byte-for-byte.
         $v2 = [
             'config-version' => 2,
             'formats' => [
@@ -108,8 +87,6 @@ class ConfigMigrationTest extends TestCase
 
     public function testV2ConfigBackfillsNewlyIntroducedPerFormatKeys(): void
     {
-        // A v2 config saved BEFORE formats.avif.converters existed lacks that key. Migration must
-        // backfill it from defaults without disturbing the user's enable/quality/speed choices.
         $v2 = [
             'config-version' => 2,
             'formats' => [
@@ -121,13 +98,11 @@ class ConfigMigrationTest extends TestCase
 
         $migrated = Config::migrateToV2($v2);
 
-        // User-set keys preserved exactly...
         $this->assertSame(2, $migrated['config-version']);
         $this->assertSame('cdn-friendly', $migrated['operation-mode']);
         $this->assertTrue($migrated['formats']['avif']['enabled']);
         $this->assertSame(45, $migrated['formats']['avif']['quality']);
         $this->assertSame(3, $migrated['formats']['avif']['speed']);
-        // ...and the new per-format key is backfilled from defaults.
         $this->assertSame(
             Config::getDefaultFormats()['avif']['converters'],
             $migrated['formats']['avif']['converters']
@@ -153,8 +128,6 @@ class ConfigMigrationTest extends TestCase
 
     public function testV2MigrationPreservesUserAvifConverterList(): void
     {
-        // A user who reordered + deactivated AVIF converters must keep that exact list through
-        // migration — it must NOT be clobbered by the default stack.
         $custom = [
             ['converter' => 'avifenc'],
             ['converter' => 'vips', 'deactivated' => true],
@@ -176,8 +149,6 @@ class ConfigMigrationTest extends TestCase
         $this->assertSame($custom, $migrated['formats']['avif']['converters']);
     }
 
-    // --- idempotency ----------------------------------------------------------
-
     public function testMigrationIsIdempotent(): void
     {
         $once = Config::migrateToV2($this->v1Fixture());
@@ -194,12 +165,8 @@ class ConfigMigrationTest extends TestCase
         $this->assertSame($once, $thrice);
     }
 
-    // --- partial / corrupt formats sections -----------------------------------
-
     public function testPartialFormatsSectionIsFilledFromDefaults(): void
     {
-        // A config that has an avif section missing 'speed' (e.g. an intermediate save) must get
-        // the missing key filled WITHOUT losing the user's quality choice.
         $config = [
             'config-version' => 2,
             'formats' => [
@@ -210,14 +177,13 @@ class ConfigMigrationTest extends TestCase
         $migrated = Config::migrateToV2($config);
 
         $this->assertTrue($migrated['formats']['avif']['enabled']);
-        $this->assertSame(25, $migrated['formats']['avif']['quality']);   // preserved
-        $this->assertSame(6, $migrated['formats']['avif']['speed']);      // filled from default
-        $this->assertTrue($migrated['formats']['webp']['enabled']);       // webp added
+        $this->assertSame(25, $migrated['formats']['avif']['quality']);
+        $this->assertSame(6, $migrated['formats']['avif']['speed']);
+        $this->assertTrue($migrated['formats']['webp']['enabled']);
     }
 
     public function testCorruptFormatsSectionIsReplacedWithDefaults(): void
     {
-        // 'formats' present but not an array -> treat as v1 and take defaults wholesale.
         $config = [
             'operation-mode' => 'varied-image-responses',
             'formats' => 'not-an-array',
@@ -229,25 +195,19 @@ class ConfigMigrationTest extends TestCase
         $this->assertSame(2, $migrated['config-version']);
     }
 
-    // --- defaults shape -------------------------------------------------------
-
     public function testGetDefaultFormatsShape(): void
     {
         $formats = Config::getDefaultFormats();
 
         $this->assertSame(['webp', 'avif'], array_keys($formats));
 
-        // WebP carries ONLY an enabled flag (its real settings stay top-level by design).
         $this->assertSame(['enabled' => true], $formats['webp']);
 
-        // AVIF owns its own settings, including its converter stack.
         $this->assertSame(
             ['enabled' => false, 'quality' => 30, 'speed' => 6],
             array_diff_key($formats['avif'], ['converters' => true])
         );
 
-        // The default AVIF converter stack: every backend, in priority order, all active
-        // (no 'deactivated' flag), seeded from AvifStack::defaultConverterIds().
         $expectedConverters = array_map(
             static fn ($id) => ['converter' => $id],
             \MagicConvert\Avif\AvifStack::defaultConverterIds()

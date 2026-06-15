@@ -11,21 +11,6 @@ use MagicConvert\Avif\MagickBinaryAvif;
 use MagicConvert\Avif\AvifEncBinary;
 use MagicConvert\Avif\CavifBinary;
 
-/**
- * Detection-logic tests for the real AVIF converters (Phase 2.3).
- *
- * Capability detection talks to the runtime (loaded extensions, gd_info(),
- * Imagick::queryFormats(), binaries on PATH) which a unit test cannot fully
- * control. What we CAN and MUST assert, on any machine:
- *
- *   1. isOperational() always returns a well-formed {operational:bool, reason:string}
- *      and, when NOT operational, the reason is a non-empty actionable string
- *      (the reason surface is the dominant support generator, so it must never be blank).
- *   2. The reason is SPECIFIC to the missing capability (mentions the extension /
- *      binary / support flag) rather than a generic failure.
- *   3. The binary-path override seam (MAGIC_CONVERT_*_PATH constant/env) is honoured —
- *      this is the one piece of detection we can inject deterministically.
- */
 class AvifDetectionTest extends TestCase
 {
     /**
@@ -87,20 +72,15 @@ class AvifDetectionTest extends TestCase
     {
         $op = (new GdAvif())->isOperational();
         if ($op['operational']) {
-            // GD AVIF is actually available here — detection passed, nothing to assert about the reason.
             $this->assertSame('', $op['reason']);
             $this->assertTrue(function_exists('imageavif'));
             return;
         }
-        // Not operational: the reason must name GD / imageavif / AVIF Support specifically,
-        // not a generic message.
         $this->assertMatchesRegularExpression('/gd|imageavif|avif support/i', $op['reason']);
     }
 
     public function testExecConverterReasonIsActionableWhenBinaryMissing(): void
     {
-        // At least one exec converter should be either operational OR give a reason
-        // about exec being disabled / the binary not being found.
         foreach ([new AvifEncBinary(), new CavifBinary(), new MagickBinaryAvif()] as $c) {
             $op = $c->isOperational();
             if ($op['operational']) {
@@ -116,13 +96,9 @@ class AvifDetectionTest extends TestCase
 
     public function testAvifEncHonoursPathOverrideConstant(): void
     {
-        // The override seam: a bogus constant path means the binary "resolves" to that
-        // path, so discovery does not silently fall back. We assert the resolver picks
-        // it up via reflection on the protected resolveBinary().
         if (defined('MAGIC_CONVERT_AVIFENC_PATH')) {
             $this->markTestSkipped('MAGIC_CONVERT_AVIFENC_PATH already defined in this process.');
         }
-        // Use the env-var arm of the override (constants cannot be undefined after the test).
         putenv('MAGIC_CONVERT_AVIFENC_PATH=/nonexistent/path/to/avifenc');
         $this->resetExecResolverCache();
         try {
@@ -132,7 +108,7 @@ class AvifDetectionTest extends TestCase
             $resolved = $ref->invoke($c);
             $this->assertSame('/nonexistent/path/to/avifenc', $resolved);
         } finally {
-            putenv('MAGIC_CONVERT_AVIFENC_PATH'); // unset
+            putenv('MAGIC_CONVERT_AVIFENC_PATH');
             $this->resetExecResolverCache();
         }
     }
@@ -144,7 +120,6 @@ class AvifDetectionTest extends TestCase
         }
         putenv('MAGIC_CONVERT_MAGICK_PATH=/custom/magick');
         try {
-            // MagickBinaryAvif memoizes on its own instance fields, so a fresh instance suffices.
             $c = new MagickBinaryAvif();
             $ref = new \ReflectionMethod($c, 'resolveBinary');
             $ref->setAccessible(true);
@@ -154,10 +129,6 @@ class AvifDetectionTest extends TestCase
         }
     }
 
-    /**
-     * Clear the static per-id binary-resolution cache on AbstractAvifExecConverter so an
-     * earlier real resolution in this process does not mask an override under test.
-     */
     private function resetExecResolverCache(): void
     {
         $prop = new \ReflectionProperty(

@@ -16,11 +16,6 @@ use MagicConvert\MediaLibraryHelper;
 class CachePurge
 {
 
-    /**
-     *  Build a regex (without delimiters) matching the file extension of ANY
-     *  registered output format. e.g. "(?:webp|avif)". Data-driven from
-     *  OutputFormat::all() so adding a format automatically extends purge coverage.
-     */
     private static function formatExtAlternation()
     {
         $exts = [];
@@ -31,10 +26,6 @@ class CachePurge
     }
 
     /**
-     *  Determine which OutputFormat a converted artifact filename belongs to, by
-     *  matching its trailing extension against the registry. Returns null when the
-     *  filename does not end in a known format extension.
-     *
      *  @return OutputFormat|null
      */
     private static function formatForFilename($filename)
@@ -47,16 +38,6 @@ class CachePurge
         return null;
     }
 
-    /**
-     *  - Removes cache dirs (one per output format, e.g. webp-images/ and avif-images/)
-     *  - Removes all converted artifacts (.webp AND .avif) in upload dir (if set to mingled)
-     *  - Removes the per-format bigger-than-source marker dirs
-     *
-     *  Multi-format note (Phase 2.1): cache dirs and marker dirs are iterated over
-     *  OutputFormat::all(); the file-extension filter matches any registered format
-     *  extension. With AVIF disabled, the avif dirs simply do not exist yet, so
-     *  behaviour for a webp-only install is unchanged.
-     */
     public static function purge($config, $onlyPng)
     {
         DismissableMessages::dismissMessage('0.14.0/suggest-wipe-because-lossless');
@@ -71,22 +52,18 @@ class CachePurge
         $numFailed = 0;
 
         foreach (OutputFormat::all() as $format) {
-            // Per-format cache dir (webp-images/, avif-images/, ...)
             $cacheDir = Paths::getCacheDirAbs($format);
             list($d, $f) = self::purgeConvertedFilesInDir($cacheDir, $filter, $config);
             $numDeleted += $d;
             $numFailed += $f;
             FileHelper::removeEmptySubFolders($cacheDir);
 
-            // Per-format bigger-than-source marker dir
             $markerDir = Paths::getBiggerThanSourceDirAbs($format);
             self::purgeConvertedFilesInDir($markerDir, $filter, $config);
             FileHelper::removeEmptySubFolders($markerDir);
         }
 
         if ($config['destination-folder'] == 'mingled') {
-            // The upload dir holds mingled artifacts of every format; the filename
-            // filter matches all registered format extensions in one pass.
             list($d, $f) = self::purgeConvertedFilesInDir(Paths::getUploadDirAbs(), $filter, $config);
 
             $numDeleted += $d;
@@ -152,8 +129,6 @@ class CachePurge
 
                     }
 
-                    // Detect the format of this artifact so source-mapping strips
-                    // the correct extension (.webp vs .avif).
                     $fileFormat = self::formatForFilename($filename);
 
                     // filter: only with corresponding original

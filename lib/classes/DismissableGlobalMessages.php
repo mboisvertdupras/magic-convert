@@ -56,14 +56,12 @@ class DismissableGlobalMessages
     {
         $ids = State::getState('dismissableGlobalMessageIds', []);
         foreach ($ids as $id) {
-            // $id comes from stored state - guard against path traversal before building a path from it
             if (str_contains($id, '..') || !preg_match('#^[A-Za-z0-9._/-]+$#', $id)) {
                 self::dismissMessage($id);
                 continue;
             }
             $messageFile = __DIR__ . '/../dismissable-global-messages/' . $id . '.php';
             if (!file_exists($messageFile)) {
-                // Stale id (the message file has been removed) - silently drop it from state
                 self::dismissMessage($id);
                 continue;
             }

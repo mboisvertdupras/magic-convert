@@ -154,13 +154,7 @@ class AlterHtmlHelper
 
 
     /**
-     *  Generalized Accept-header check: does the current request accept the given mime type?
-     *
-     *  This is the format-agnostic version of the historical `image/webp` strpos check.
-     *  Used by url-replacement mode's "only-for-webp-enabled-browsers" gate, and available for
-     *  any other dynamic per-browser decision (e.g. a future avif url-mode, were that ever safe).
-     *
-     *  @param  string  $mimeType  e.g. 'image/webp' or 'image/avif'
+     *  @param  string  $mimeType
      *  @return bool
      */
     public static function acceptsMimeType($mimeType)
@@ -168,11 +162,6 @@ class AlterHtmlHelper
         return isset($_SERVER['HTTP_ACCEPT']) && (strpos($_SERVER['HTTP_ACCEPT'], $mimeType) !== false);
     }
 
-    /**
-     * Get url for webp from source url (webp-only, backward-compatible wrapper).
-     *
-     * @see getConvertedUrlInImageRoot() — this delegates to it with the webp OutputFormat.
-     */
     public static function getWebPUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir)
     {
         return self::getConvertedUrlInImageRoot($sourceUrl, $rootId, $baseUrl, $baseDir, OutputFormat::webp());
@@ -311,12 +300,9 @@ class AlterHtmlHelper
     }
 
     /**
-     *  Get url for a converted image (any format).
-     *  returns second argument if not available.
-     *
      *  @param  string                    $sourceUrl
      *  @param  mixed                     $returnValueOnFail
-     *  @param  OutputFormat|string|null  $format             Output format (defaults to webp).
+     *  @param  OutputFormat|string|null  $format
      */
     public static function getConvertedUrl($sourceUrl, $returnValueOnFail, $format = null)
     {
@@ -326,8 +312,6 @@ class AlterHtmlHelper
         self::getOptions();
 
         // Fail for browsers that don't accept this format (when "only-for-webp-enabled-browsers" is set).
-        // NOTE: this gate is only meaningful in url-replacement mode (which is webp-only). In picture-tag
-        // mode the browser does the negotiating via <source type>, so the option is not consulted there.
         if (self::$options['only-for-webp-enabled-browsers']) {
             if (!self::acceptsMimeType($format->mimeType())) {
                 return $returnValueOnFail;

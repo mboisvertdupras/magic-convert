@@ -7,17 +7,6 @@ use MagicConvert\Avif\AvifStack;
 
 require_once dirname(__DIR__) . '/lib/options/avif-converters-sanitize.php';
 
-/**
- * Tests for magicconvert_sanitizeAvifConverters() — the pure sanitizer behind
- * $_POST['avif-converters'] in lib/options/submit.php.
- *
- * submit.php is a procedural admin-post handler that runs the save flow at file scope and so cannot
- * be require()'d here; the sanitizer therefore lives in its own side-effect-free file
- * (lib/options/avif-converters-sanitize.php), which both submit.php and this test include. This
- * tests the REAL function (no mirrored copy, no drift).
- *
- * The known id space is the AVIF converter stack: imagick, vips, gd, magick-binary, avifenc, cavif.
- */
 class AvifConvertersSanitizeTest extends TestCase
 {
     private function known(): array
@@ -44,7 +33,7 @@ class AvifConvertersSanitizeTest extends TestCase
     {
         $posted = [
             ['converter' => 'imagick'],
-            ['converter' => 'cwebp'],   // a WebP id — NOT valid for AVIF
+            ['converter' => 'cwebp'],
             ['converter' => 'bogus'],
             ['converter' => 'cavif'],
         ];
@@ -60,7 +49,7 @@ class AvifConvertersSanitizeTest extends TestCase
             ['converter' => 'imagick', 'deactivated' => true],
             ['converter' => 'vips', 'deactivated' => false],
             ['converter' => 'gd'],
-            ['converter' => 'avifenc', 'deactivated' => 'yes'], // truthy-but-not-strictly-true -> omitted
+            ['converter' => 'avifenc', 'deactivated' => 'yes'],
         ];
         $this->assertSame(
             [
@@ -78,7 +67,7 @@ class AvifConvertersSanitizeTest extends TestCase
         $posted = [
             ['converter' => 'vips'],
             ['converter' => 'gd'],
-            ['converter' => 'vips', 'deactivated' => true], // duplicate -> dropped entirely
+            ['converter' => 'vips', 'deactivated' => true],
         ];
         $this->assertSame(
             [['converter' => 'vips'], ['converter' => 'gd']],
@@ -107,8 +96,6 @@ class AvifConvertersSanitizeTest extends TestCase
 
     public function testExtraKeysAreStrippedFromEachEntry(): void
     {
-        // The UI may include transient fields (id/working/error) or stray options; only
-        // {converter[,deactivated]} survive.
         $posted = [
             [
                 'converter' => 'imagick',
@@ -139,8 +126,6 @@ class AvifConvertersSanitizeTest extends TestCase
 
     public function testFullDefaultListRoundTripsUnchanged(): void
     {
-        // The default stack (all active, priority order) must survive sanitization byte-for-byte,
-        // so saving an untouched AVIF section never mutates the config.
         $default = array_map(
             static fn ($id) => ['converter' => $id],
             AvifStack::defaultConverterIds()

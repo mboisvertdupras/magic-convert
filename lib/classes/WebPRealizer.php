@@ -174,7 +174,6 @@ class WebPRealizer extends WodConfigLoader
         } else {
             $destination = self::getDestinationNoDocRoot();
         }
-        // webp-realizer realizes WebP files only (on-demand AVIF arrives in step 2.4).
         $ext = OutputFormat::webp()->extension();
         SanityCheck::pregMatch('#\.' . $ext . '$#', $destination, 'Does not end with .' . $ext);
 
@@ -212,7 +211,6 @@ class WebPRealizer extends WodConfigLoader
 
         // Validate source path
         // --------------------------------------------
-        // webp-realizer realizes WebP files only (on-demand AVIF arrives in step 2.4).
         $outputFormat = OutputFormat::webp();
         $checking = 'source path';
         $source = ConvertHelperIndependent::findSource(

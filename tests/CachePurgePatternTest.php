@@ -6,18 +6,6 @@ use MagicConvert\CachePurge;
 use MagicConvert\OutputFormat;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Unit tests for the pure, data-driven pattern helpers in MagicConvert\CachePurge
- * (Phase 2.1). These are the bits of the purge logic that do NOT touch the
- * filesystem or WordPress and can be exercised in isolation via reflection.
- *
- *  - formatExtAlternation(): builds "(?:webp|avif)" from OutputFormat::all().
- *  - formatForFilename():    maps a converted-artifact filename to its OutputFormat.
- *
- * The point of these tests is to lock in that purge coverage is derived from the
- * OutputFormat registry rather than a hardcoded "\.webp$" — so registering a new
- * format automatically extends purge.
- */
 class CachePurgePatternTest extends TestCase
 {
     private static function invokePrivate(string $method, array $args = [])
@@ -26,8 +14,6 @@ class CachePurgePatternTest extends TestCase
         $ref->setAccessible(true);
         return $ref->invokeArgs(null, $args);
     }
-
-    // --- formatExtAlternation -----------------------------------------------
 
     public function testAlternationMatchesAllRegisteredExtensions(): void
     {
@@ -57,13 +43,10 @@ class CachePurgePatternTest extends TestCase
         $alt = self::invokePrivate('formatExtAlternation');
         $regex = '#\.' . $alt . '$#';
 
-        // Originals must never be matched by the purge artifact filter.
         $this->assertDoesNotMatchRegularExpression($regex, '/cache/logo.jpg');
         $this->assertDoesNotMatchRegularExpression($regex, '/cache/logo.png');
         $this->assertDoesNotMatchRegularExpression($regex, '/cache/logo.jpeg');
     }
-
-    // --- formatForFilename ---------------------------------------------------
 
     public function testFormatForFilenameDetectsWebp(): void
     {

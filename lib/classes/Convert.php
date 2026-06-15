@@ -24,9 +24,6 @@ class Convert
         if (is_null($config)) {
             $config = Config::loadConfigAndFix();
         }
-        // Phase 2.1: format is explicit here (defaults to webp). Single-format
-        // (webp) convert from the admin/test UI stays webp; multi-format bulk
-        // arrives in step 2.5.
         return ConvertHelperIndependent::getDestination(
             $source,
             $config['destination-folder'],
@@ -60,25 +57,12 @@ class Convert
     }
 
     /**
-     *  Convert a single source file.
-     *
-     *  @param  string      $source          Absolute path to the source image.
-     *  @param  array|null  $config          Config array (loaded if null).
-     *  @param  array|null  $convertOptions  webp-convert options (derived from
-     *                                       config if null).
-     *  @param  string|null $converter       Specific converter id, or null for the
-     *                                       configured converter stack.
-     *  @param  bool        $skipIfFresh     When true, the conversion core skips
-     *                                       re-encoding a destination that is
-     *                                       already newer than its source (Phase
-     *                                       1.1 idempotency). Used by the parallel
-     *                                       bulk path so re-runs are cheap; the
-     *                                       explicit "reconvert" UI action passes
-     *                                       false to force a fresh encode.
-     *  @param  OutputFormat|string|null $format  Output format (defaults to webp). Bulk/REST/CLI
-     *                                       keep the webp default for now; the encode core
-     *                                       throws a clear "not yet supported" error for non-webp
-     *                                       until the AVIF encoder lands (step 2.3).
+     *  @param  string      $source
+     *  @param  array|null  $config
+     *  @param  array|null  $convertOptions
+     *  @param  string|null $converter
+     *  @param  bool        $skipIfFresh
+     *  @param  OutputFormat|string|null $format
      */
     public static function convertFile($source, $config = null, $convertOptions = null, $converter = null, $skipIfFresh = false, $format = null)
     {
@@ -92,11 +76,6 @@ class Convert
             // PS: No need to check mime type as the WebPConvert library does that (it only accepts image/jpeg and image/png)
 
             // Check that source is within a valid image root
-            // ----------------------------------------------
-            // SECURITY-CRITICAL: this containment check is the guard that the
-            // plugin's history (CVE-2019-15330, arbitrary file disclosure) makes
-            // mandatory. It must run for EVERY conversion regardless of caller
-            // (admin-ajax OR the REST endpoint). Do not bypass it.
             $activeRootIds = Paths::getImageRootIds();  // Currently, root ids cannot be selected, so all root ids are active.
             $rootId = Paths::findImageRootOfPath($source, $activeRootIds);
             if ($rootId === false) {
@@ -127,17 +106,6 @@ class Convert
                 throw new SanityException('conversion options are missing');
             }
 
-            // AVIF per-format options (Phase 2.3).
-            // -------------------------------
-            // When converting to AVIF, thread the formats.avif quality/speed AND the configured
-            // AVIF converter stack (order + per-converter deactivation) into the options array
-            // under an 'avif' key so the (WordPress-independent) core can hand them to the
-            // AvifStack. The converter list is what makes deactivating/reordering AVIF converters
-            // in the settings actually affect AVIF conversion (AvifStack::fromConverterList()).
-            // Metadata is NOT duplicated here: the AVIF stack reads the global 'metadata' option
-            // already present in $convertOptions, keeping metadata handling consistent with the
-            // webp path. This block only runs for AVIF, so with AVIF disabled the options array is
-            // byte-for-byte unchanged.
             $formatObj = OutputFormat::coerce($format);
             if ($formatObj->id() === 'avif') {
                 $avifCfg = (isset($config['formats']['avif']) && is_array($config['formats']['avif']))
@@ -178,10 +146,6 @@ class Convert
             ];
         }
 
-        // Idempotency opt-in (Phase 1.1). The 'skip-if-fresh' flag is a
-        // plugin-level option that the conversion core consumes and strips before
-        // it reaches webp-convert. When set, an already-fresh destination is left
-        // untouched and reported as 'already-converted' rather than re-encoded.
         if ($skipIfFresh) {
             $convertOptions['skip-if-fresh'] = true;
         }
@@ -241,10 +205,7 @@ class Convert
      *  Additionally, it is tested if the source exists. If not, false is returned.
      *  The destination does not have to exist.
      *
-     *  @param  OutputFormat|string|null  $format  Output format (defaults to webp). When a
-     *                                              destination of a non-webp format (e.g. .avif)
-     *                                              is passed, supply the matching format so the
-     *                                              reverse extension-stripping is correct.
+     *  @param  OutputFormat|string|null  $format
      *
      *  @return  string|null  The source path corresponding to a destination path
      *                        - or false on failure (if the source does not exist or $destination is not sane)
@@ -311,9 +272,6 @@ class Convert
             // PS: No need to check mime version as webp-convert does that.
 
 
-            // Check output format (defaults to webp). The AVIF "test" link sends format=avif so a
-            // single AVIF converter can be exercised with a real encode.
-            // ---------------------
             $checking = '"format" argument';
             $format = OutputFormat::DEFAULT_ID;
             if (isset($_POST['format'])) {
@@ -330,10 +288,6 @@ class Convert
             if (isset($_POST['converter'])) {
                 $converterId = sanitize_text_field($_POST['converter']);
                 if ($format === 'avif') {
-                    // AVIF converter ids are a DIFFERENT id space than WebP (and may contain '-',
-                    // e.g. 'magick-binary'), so the WebP-oriented Validate::isConverterId() does not
-                    // apply. Accept only a known AVIF id; anything else is ignored, in which case the
-                    // test simply runs the full configured AVIF stack.
                     if (!in_array($converterId, AvifStack::defaultConverterIds(), true)) {
                         $converterId = null;
                     }
@@ -368,19 +322,7 @@ class Convert
 
         // Input has been processed, now lets get to work!
         // -----------------------------------------------
-        // The actual conversion (config-overrides handling, specific-converter
-        // option regeneration, and the final convertFile() call) lives in the
-        // shared runConversion() core so the REST endpoint executes the exact same
-        // code path. The AJAX path never opts into skip-if-fresh: a manual
-        // single-file convert from the test/convert UI should always re-encode.
         if ($format === 'avif') {
-            // AVIF per-converter "test": encode a sample image with the AVIF stack. When a known
-            // AVIF converter was requested, force the stack to JUST that converter so the test
-            // isolates it (otherwise the full configured stack runs). We go straight to the shared,
-            // security-hardened convertFile() rather than the WebP-shaped runConversion() path —
-            // config-overrides / specific-converter regeneration are WebP concepts that do not
-            // apply to AVIF (its converters take only quality/speed/metadata, not webp-convert
-            // options). convertFile() still runs the same path-containment guard for every caller.
             $config = Config::loadConfigAndFix();
             if (!is_null($converterId)) {
                 $config['formats']['avif']['converters'] = [['converter' => $converterId]];
@@ -412,33 +354,13 @@ class Convert
     }
 
     /**
-     *  Shared conversion core used by BOTH the admin-ajax endpoint
-     *  (processAjaxConvertFile) and the REST endpoint (RestApi::convert).
+     *  @param  string       $source
+     *  @param  string|null  $converterId
+     *  @param  array|null   $configOverrides
+     *  @param  bool         $skipIfFresh
+     *  @param  OutputFormat|string|null $format
      *
-     *  Given an already-sanitized absolute source path, it handles the
-     *  config-overrides / specific-converter option regeneration that used to live
-     *  inline in the AJAX handler and dispatches to convertFile(). Keeping this in
-     *  one place guarantees the security-critical path-containment validation
-     *  inside convertFile() (the CVE-2019-15330 guard) runs identically for every
-     *  caller — it is refactored, never reimplemented.
-     *
-     *  @param  string       $source           Absolute source path. Callers MUST
-     *                                          have already run it through the
-     *                                          relevant SanityCheck (the AJAX path
-     *                                          via wp_unslash + convertFile's
-     *                                          absPathExistsAndIsFile; the REST path
-     *                                          via resolveImageSourcePath()).
-     *  @param  string|null  $converterId      Specific converter id, or null.
-     *  @param  array|null   $configOverrides  Converter option overrides, or null.
-     *  @param  bool         $skipIfFresh      Pass true to skip already-fresh
-     *                                          destinations (bulk/REST default
-     *                                          unless the caller forces reconvert).
-     *  @param  OutputFormat|string|null $format  Output format (defaults to webp).
-     *                                          Threaded through to convertFile() so the
-     *                                          REST /convert endpoint can request a
-     *                                          specific format (e.g. 'avif').
-     *
-     *  @return array  The per-file result array from convertFile().
+     *  @return array
      */
     public static function runConversion($source, $converterId = null, $configOverrides = null, $skipIfFresh = false, $format = null)
     {
@@ -483,28 +405,12 @@ class Convert
     }
 
     /**
-     *  Resolve a REST {root, path} pair to a sanitized absolute source path.
+     *  @param  string  $rootId
+     *  @param  string  $relPath
      *
-     *  The REST endpoint receives an image-root id (e.g. "uploads") plus a path
-     *  RELATIVE to that root, instead of an absolute filename. This is the safer
-     *  shape: the absolute base is server-controlled and the only attacker-
-     *  influenced part is the relative path, which we explicitly reject for
-     *  directory traversal and stream wrappers before joining.
+     *  @return string
      *
-     *  Layered defenses (any one of which is sufficient on its own):
-     *    1. $rootId must be a known image-root id (whitelist).
-     *    2. $relPath is run through SanityCheck::path (no NUL, no control chars,
-     *       no stream wrappers) and noDirectoryTraversal (no "..").
-     *    3. After joining, findImageRootOfPath() (inside convertFile) re-asserts
-     *       containment — the same belt-and-suspenders check the AJAX path relies
-     *       on. This is the CVE-2019-15330 guard.
-     *
-     *  @param  string  $rootId   Image-root id.
-     *  @param  string  $relPath  Path relative to that root.
-     *
-     *  @return string  Sanitized absolute source path.
-     *
-     *  @throws SanityException  When the root id is unknown or the path is unsafe.
+     *  @throws SanityException
      */
     public static function resolveImageSourcePath($rootId, $relPath)
     {
@@ -518,8 +424,6 @@ class Convert
             throw new SanityException('Image root could not be resolved');
         }
 
-        // Sanitize the relative path: reject NUL/control chars, stream wrappers
-        // and any directory-traversal before we ever touch the filesystem.
         $relPath = SanityCheck::path($relPath);
         $relPath = SanityCheck::noDirectoryTraversal($relPath);
         $relPath = ltrim($relPath, '/');
@@ -529,9 +433,6 @@ class Convert
 
         $source = PathHelper::canonicalize($baseDir . '/' . $relPath);
 
-        // Final, authoritative containment + existence check. absPathExists
-        // confirms it is inside any restricted open_basedir; convertFile() will
-        // additionally re-run findImageRootOfPath() on it.
         return SanityCheck::absPathExistsAndIsFile($source);
     }
 

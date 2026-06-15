@@ -10,7 +10,7 @@ class DestinationOptions
     public $replaceExt;
     public $scope;
 
-    /** @var OutputFormat  Target output format. Defaults to webp for backward compat. */
+    /** @var OutputFormat */
     public $format;
 
     /**
@@ -20,7 +20,7 @@ class DestinationOptions
      * @param  boolean                   $useDocRoot
      * @param  boolean                   $replaceExt
      * @param  mixed                     $scope
-     * @param  OutputFormat|string|null  $format      Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public function __construct($mingled, $useDocRoot, $replaceExt, $scope, $format = null)
     {
@@ -35,7 +35,7 @@ class DestinationOptions
      * Set properties from config file
      *
      * @param  array                     $config   Magic Convert configuration object
-     * @param  OutputFormat|string|null  $format   Output format (defaults to webp).
+     * @param  OutputFormat|string|null  $format
      */
     public static function createFromConfig(&$config, $format = null)
     {
