@@ -52,6 +52,10 @@ class RestApi
      */
     public static function convertCallback($request)
     {
+        $requestStart = isset($_SERVER['REQUEST_TIME_FLOAT'])
+            ? (float) $_SERVER['REQUEST_TIME_FLOAT']
+            : microtime(true);
+
         $root = (string) $request->get_param('root');
         $path = (string) $request->get_param('path');
         $reconvert = self::truthy($request->get_param('reconvert'));
@@ -68,7 +72,7 @@ class RestApi
                 'success' => false,
                 'msg' => 'Invalid or disabled format',
                 'log' => '',
-            ], $advisor, 400);
+            ], $advisor, 400, $requestStart);
         }
 
         try {
@@ -79,14 +83,14 @@ class RestApi
                 'msg' => 'Invalid source: ' . $e->getMessage(),
                 'log' => '',
                 'format' => $formatId,
-            ], $advisor, 400);
+            ], $advisor, 400, $requestStart);
         } catch (\Exception $e) {
             return self::respond([
                 'success' => false,
                 'msg' => 'Invalid source',
                 'log' => '',
                 'format' => $formatId,
-            ], $advisor, 400);
+            ], $advisor, 400, $requestStart);
         }
 
         $skipIfFresh = !$reconvert;
@@ -96,7 +100,7 @@ class RestApi
             $result['format'] = $formatId;
         }
 
-        return self::respond($result, $advisor, 200);
+        return self::respond($result, $advisor, 200, $requestStart);
     }
 
     /**
@@ -197,14 +201,18 @@ class RestApi
      * @param  array              $result
      * @param  ConcurrencyAdvisor $advisor
      * @param  int                $status
+     * @param  float|null         $requestStart
      * @return \WP_REST_Response
      */
-    private static function respond($result, $advisor, $status)
+    private static function respond($result, $advisor, $status, $requestStart = null)
     {
         if (!is_array($result)) {
             $result = ['success' => false, 'msg' => 'Unexpected conversion result'];
         }
         $result['server_busy'] = $advisor->isBusy();
+        if ($requestStart !== null) {
+            $result['service_ms'] = round((microtime(true) - (float) $requestStart) * 1000, 1);
+        }
         $result['nonce'] = self::freshNonce();
         return new \WP_REST_Response($result, $status);
     }
