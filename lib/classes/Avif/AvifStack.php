@@ -7,13 +7,29 @@ class AvifStack
     /** @var AbstractAvifConverter[] */
     private $converters;
 
+    /** @var AvifSubprocessRunner|null */
+    private $runner;
+
     /**
-     * @param ?AbstractAvifConverter[] $converters
+     * @param ?AbstractAvifConverter[]  $converters
+     * @param ?AvifSubprocessRunner      $runner
      */
-    public function __construct(?array $converters = null)
+    public function __construct(?array $converters = null, ?AvifSubprocessRunner $runner = null)
     {
         self::ensureVendorAutoloader();
         $this->converters = ($converters === null) ? self::defaultConverters() : $converters;
+        $this->runner = $runner;
+    }
+
+    /**
+     * @return AvifSubprocessRunner
+     */
+    private function runner()
+    {
+        if ($this->runner === null) {
+            $this->runner = new AvifSubprocessRunner();
+        }
+        return $this->runner;
     }
 
     public static function ensureVendorAutoloader()
@@ -56,7 +72,7 @@ class AvifStack
      * @param  string  $id
      * @return AbstractAvifConverter|null
      */
-    private static function makeById($id)
+    public static function makeById($id)
     {
         switch ($id) {
             case 'imagick':       return new ImagickAvif();
@@ -153,7 +169,7 @@ class AvifStack
             }
 
             try {
-                $converter->convert($source, $destination, $options);
+                $this->executeConverter($converter, $source, $destination, $options);
                 $log[] = '- **' . $label . '**: SUCCESS';
                 return [
                     'converter' => $converter->id(),
@@ -170,6 +186,52 @@ class AvifStack
         }
 
         throw new AvifStackException(self::composeFailureMessage($reasons), $reasons);
+    }
+
+    /**
+     * @param  AbstractAvifConverter  $converter
+     * @param  string                 $source
+     * @param  string                 $destination
+     * @param  array                  $options
+     * @return void
+     * @throws \Throwable
+     */
+    private function executeConverter(AbstractAvifConverter $converter, $source, $destination, array $options)
+    {
+        if ($converter->reclaimsMemoryOnExit()) {
+            $converter->convert($source, $destination, $options);
+            return;
+        }
+
+        $runner = $this->runner();
+        if ($runner->isAvailable() && $runner->run($converter, $source, $destination, $options)) {
+            return;
+        }
+
+        $converter->convert($source, $destination, $options);
+    }
+
+    /**
+     * @return string  one of: binary, isolated, in-process, none
+     */
+    public function memorySafetyMode()
+    {
+        $selected = null;
+        foreach (self::orderPreferringOutOfProcess($this->converters) as $converter) {
+            $op = $converter->isOperational();
+            if (!empty($op['operational'])) {
+                $selected = $converter;
+                break;
+            }
+        }
+
+        if ($selected === null) {
+            return 'none';
+        }
+        if ($selected->reclaimsMemoryOnExit()) {
+            return 'binary';
+        }
+        return $this->runner()->isAvailable() ? 'isolated' : 'in-process';
     }
 
     /**

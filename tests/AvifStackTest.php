@@ -4,8 +4,10 @@ namespace MagicConvert\Tests;
 
 use PHPUnit\Framework\TestCase;
 use MagicConvert\Avif\AbstractAvifConverter;
+use MagicConvert\Avif\AbstractAvifExecConverter;
 use MagicConvert\Avif\AvifStack;
 use MagicConvert\Avif\AvifStackException;
+use MagicConvert\Avif\AvifSubprocessRunner;
 
 class AvifStackTest extends TestCase
 {
@@ -63,7 +65,7 @@ class AvifStackTest extends TestCase
     {
         $a = new FakeAvifConverter('a', true, true);
         $b = new FakeAvifConverter('b', true, true);
-        $stack = new AvifStack([$a, $b]);
+        $stack = new AvifStack([$a, $b], new FakeAvifRunner(false));
 
         $result = $stack->convert('/src', '/dst', ['quality' => 30, 'speed' => 6]);
 
@@ -76,7 +78,7 @@ class AvifStackTest extends TestCase
     {
         $a = new FakeAvifConverter('a', false, false, 'extension missing');
         $b = new FakeAvifConverter('b', true, true);
-        $stack = new AvifStack([$a, $b]);
+        $stack = new AvifStack([$a, $b], new FakeAvifRunner(false));
 
         $result = $stack->convert('/src', '/dst', []);
 
@@ -89,7 +91,7 @@ class AvifStackTest extends TestCase
     {
         $a = new FakeAvifConverter('a', true, false, '', 'a blew up');
         $b = new FakeAvifConverter('b', true, true);
-        $stack = new AvifStack([$a, $b]);
+        $stack = new AvifStack([$a, $b], new FakeAvifRunner(false));
 
         $result = $stack->convert('/src', '/dst', []);
 
@@ -105,7 +107,7 @@ class AvifStackTest extends TestCase
         $a = new FakeAvifConverter('imagick', false, false, 'imagick not loaded');
         $b = new FakeAvifConverter('gd', false, false, 'no AVIF support');
         $c = new FakeAvifConverter('avifenc', true, false, '', 'binary crashed');
-        $stack = new AvifStack([$a, $b, $c]);
+        $stack = new AvifStack([$a, $b, $c], new FakeAvifRunner(false));
 
         try {
             $stack->convert('/src', '/dst', []);
@@ -330,7 +332,7 @@ class AvifStackTest extends TestCase
     {
         $inProcess = new FakeAvifConverter('gd', true, true, '', 'x', false);
         $outOfProcess = new FakeAvifConverter('avifenc', true, false, '', 'binary blew up', true);
-        $stack = new AvifStack([$inProcess, $outOfProcess]);
+        $stack = new AvifStack([$inProcess, $outOfProcess], new FakeAvifRunner(false));
 
         $result = $stack->convert('/src', '/dst', []);
 
@@ -359,6 +361,157 @@ class AvifStackTest extends TestCase
         $this->assertTrue((new \MagicConvert\Avif\AvifEncBinary())->reclaimsMemoryOnExit());
         $this->assertTrue((new \MagicConvert\Avif\MagickBinaryAvif())->reclaimsMemoryOnExit());
         $this->assertTrue((new \MagicConvert\Avif\CavifBinary())->reclaimsMemoryOnExit());
+    }
+
+    public function testExtraSearchPathsCoverGeneralNonPathBinaryLocations(): void
+    {
+        $paths = AbstractAvifExecConverter::extraSearchPaths();
+        $this->assertContains('/usr/local/bin', $paths);
+        $this->assertContains('/snap/bin', $paths);
+        $this->assertNotContains('/opt/homebrew/bin', $paths, 'do not hardcode a single dev box; binary discovery is a perf nicety now, not a memory-safety dependency');
+    }
+
+    public function testCandidateBinaryPathsJoinsNameToEachDir(): void
+    {
+        $this->assertSame(
+            ['/opt/homebrew/bin/avifenc', '/snap/bin/avifenc'],
+            AbstractAvifExecConverter::candidateBinaryPaths('avifenc', ['/opt/homebrew/bin', '/snap/bin'])
+        );
+    }
+
+    public function testCandidateBinaryPathsStripTrailingSlashAndHandleEmpty(): void
+    {
+        $this->assertSame(['/a/magick'], AbstractAvifExecConverter::candidateBinaryPaths('magick', ['/a/']));
+        $this->assertSame([], AbstractAvifExecConverter::candidateBinaryPaths('x', []));
+    }
+
+    public function testBinaryConverterRunsDirectlyAndBypassesTheSubprocessRunner(): void
+    {
+        $binary = new FakeAvifConverter('avifenc', true, true, '', 'x', true);
+        $runner = new FakeAvifRunner(true, true);
+        $stack = new AvifStack([$binary], $runner);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('avifenc', $result['converter']);
+        $this->assertTrue($binary->convertCalled);
+        $this->assertSame([], $runner->runCalls, 'a binary encoder must never be routed through the subprocess runner');
+    }
+
+    public function testInProcessConverterIsRoutedThroughTheRunnerAndNotRunInProcess(): void
+    {
+        $gd = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $runner = new FakeAvifRunner(true, true);
+        $stack = new AvifStack([$gd], $runner);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('gd', $result['converter']);
+        $this->assertSame(['gd'], $runner->runCalls);
+        $this->assertFalse($gd->convertCalled, 'a leaky in-process encode must happen in the child, not this process');
+    }
+
+    public function testInProcessFallsBackToInProcessWhenRunnerUnavailable(): void
+    {
+        $gd = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $runner = new FakeAvifRunner(false, true);
+        $stack = new AvifStack([$gd], $runner);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('gd', $result['converter']);
+        $this->assertSame([], $runner->runCalls);
+        $this->assertTrue($gd->convertCalled, 'with no isolation available we must still produce the file in-process');
+    }
+
+    public function testInProcessFallsBackToInProcessWhenRunnerCannotRunHere(): void
+    {
+        $gd = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $runner = new FakeAvifRunner(true, false);
+        $stack = new AvifStack([$gd], $runner);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('gd', $result['converter']);
+        $this->assertSame(['gd'], $runner->runCalls);
+        $this->assertTrue($gd->convertCalled);
+    }
+
+    public function testIsolatedEncodeFailureFallsThroughToNextConverter(): void
+    {
+        $a = new FakeAvifConverter('gd', true, true, '', 'x', false);
+        $b = new FakeAvifConverter('vips', true, true, '', 'x', false);
+        $runner = new FakeAvifRunner(true, static fn ($id) => $id === 'gd' ? 'throw' : true);
+        $stack = new AvifStack([$a, $b], $runner);
+
+        $result = $stack->convert('/src', '/dst', []);
+
+        $this->assertSame('vips', $result['converter']);
+        $this->assertSame(['gd', 'vips'], $runner->runCalls);
+        $this->assertFalse($a->convertCalled, 'an isolated encode failure must not retry that converter in-process');
+    }
+
+    public function testMemorySafetyModeIsBinaryWhenAnOperationalBinaryExists(): void
+    {
+        $stack = new AvifStack([
+            new FakeAvifConverter('gd', true, true, '', 'x', false),
+            new FakeAvifConverter('avifenc', true, true, '', 'x', true),
+        ], new FakeAvifRunner(true, true));
+        $this->assertSame('binary', $stack->memorySafetyMode());
+    }
+
+    public function testMemorySafetyModeIsIsolatedWhenOnlyInProcessButRunnerAvailable(): void
+    {
+        $stack = new AvifStack(
+            [new FakeAvifConverter('gd', true, true, '', 'x', false)],
+            new FakeAvifRunner(true, true)
+        );
+        $this->assertSame('isolated', $stack->memorySafetyMode());
+    }
+
+    public function testMemorySafetyModeIsInProcessWhenOnlyInProcessAndNoRunner(): void
+    {
+        $stack = new AvifStack(
+            [new FakeAvifConverter('gd', true, true, '', 'x', false)],
+            new FakeAvifRunner(false, true)
+        );
+        $this->assertSame('in-process', $stack->memorySafetyMode());
+    }
+
+    public function testMemorySafetyModeIsNoneWhenNothingOperational(): void
+    {
+        $stack = new AvifStack(
+            [new FakeAvifConverter('gd', false, false, 'nope', 'x', false)],
+            new FakeAvifRunner(true, true)
+        );
+        $this->assertSame('none', $stack->memorySafetyMode());
+    }
+
+    public function testBuildCommandArgvCarriesPathsIdAndBase64Options(): void
+    {
+        $argv = AvifSubprocessRunner::buildCommandArgv(
+            '/usr/bin/php',
+            '/plugin/wod/avif-encode-worker.php',
+            '/in.jpg',
+            '/out.avif',
+            'gd',
+            ['quality' => 42, 'speed' => 6, 'metadata' => 'none']
+        );
+
+        $this->assertSame('/usr/bin/php', $argv[0]);
+        $this->assertSame('/plugin/wod/avif-encode-worker.php', $argv[1]);
+        $this->assertSame('/in.jpg', $argv[2]);
+        $this->assertSame('/out.avif', $argv[3]);
+        $this->assertSame('gd', $argv[4]);
+        $this->assertSame(
+            ['quality' => 42, 'speed' => 6, 'metadata' => 'none'],
+            json_decode(base64_decode($argv[5], true), true)
+        );
+    }
+
+    public function testWorkerScriptPathResolvesUnderWod(): void
+    {
+        $this->assertStringEndsWith('/wod/avif-encode-worker.php', (new AvifSubprocessRunner())->workerScriptPath());
     }
 }
 
@@ -402,6 +555,37 @@ class FakeAvifConverter extends AbstractAvifConverter
         if (!$this->succeeds) {
             throw new \Exception($this->failMessage);
         }
+    }
+}
+
+class FakeAvifRunner extends AvifSubprocessRunner
+{
+    /** @var string[] */
+    public $runCalls = [];
+
+    /**
+     * @param bool         $available
+     * @param bool|string|callable $outcome  true|false|'throw' or fn(string $id) => one of those
+     */
+    public function __construct(
+        private bool $available = true,
+        private $outcome = true
+    ) {
+    }
+
+    public function isAvailable()
+    {
+        return $this->available;
+    }
+
+    public function run(AbstractAvifConverter $converter, $source, $destination, array $options)
+    {
+        $this->runCalls[] = $converter->id();
+        $outcome = is_callable($this->outcome) ? ($this->outcome)($converter->id()) : $this->outcome;
+        if ($outcome === 'throw') {
+            throw new \Exception('isolated encode failed: ' . $converter->id());
+        }
+        return $outcome;
     }
 }
 

@@ -105,11 +105,57 @@ abstract class AbstractAvifExecConverter extends AbstractAvifConverter
         } catch (\Throwable $e) {
         }
 
+        $extra = self::locateInExtraSearchPaths($name);
+        if ($extra !== null) {
+            return $extra;
+        }
+
         ExecWithFallback::exec(escapeshellarg($name) . ' --version 2>&1', $out, $code);
         if ($code === 0) {
             return $name;
         }
 
+        return null;
+    }
+
+    /**
+     * @return string[]
+     */
+    public static function extraSearchPaths()
+    {
+        return [
+            '/usr/local/bin',
+            '/usr/local/sbin',
+            '/opt/bin',
+            '/snap/bin',
+        ];
+    }
+
+    /**
+     * @param  string    $name
+     * @param  string[]  $dirs
+     * @return string[]
+     */
+    public static function candidateBinaryPaths($name, array $dirs)
+    {
+        $paths = [];
+        foreach ($dirs as $dir) {
+            $paths[] = rtrim($dir, '/') . '/' . $name;
+        }
+        return $paths;
+    }
+
+    /**
+     * @param  string  $name
+     * @return string|null
+     */
+    protected static function locateInExtraSearchPaths($name)
+    {
+        foreach (self::candidateBinaryPaths($name, self::extraSearchPaths()) as $candidate) {
+            if (@is_file($candidate) && @is_executable($candidate)) {
+                return $candidate;
+            }
+        }
         return null;
     }
 

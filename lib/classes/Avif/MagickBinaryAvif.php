@@ -62,6 +62,10 @@ class MagickBinaryAvif extends AbstractAvifExecConverter
                 }
             } catch (\Throwable $e) {
             }
+            $extra = self::locateInExtraSearchPaths($name);
+            if ($extra !== null) {
+                return $this->resolved = $extra;
+            }
         }
 
         foreach (['magick', 'convert'] as $name) {

@@ -456,6 +456,19 @@ class SelfTestHelper
             $log[] = '**No AVIF-capable converter found.**{: .warn} See the per-converter reasons above.';
         }
 
+        $mode = $stack->memorySafetyMode();
+        if ($mode === 'binary') {
+            $log[] = '- Memory-safe bulk AVIF encoding?: yes — an out-of-process binary encoder is used.';
+        } elseif ($mode === 'isolated') {
+            $log[] = '- Memory-safe bulk AVIF encoding?: yes — the in-process encoder runs in a short-lived '
+                . 'subprocess that frees its memory after each image.';
+        } elseif ($mode === 'in-process') {
+            $log[] = '- Memory-safe bulk AVIF encoding?: **no**{: .warn} — only an in-process encoder is available '
+                . 'and subprocess isolation is unavailable here (exec/proc_open disabled, or no PHP CLI binary found). '
+                . 'Large bulk runs can accumulate native memory in php-fpm workers. Recycle them with the pool\'s '
+                . '`pm.max_requests`, install a binary encoder (avifenc or ImageMagick), or define `MAGIC_CONVERT_PHP_CLI`.';
+        }
+
         return $log;
     }
 
