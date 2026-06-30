@@ -9,21 +9,24 @@
 # Production vs. dev autoloader (the important bit)
 # ------------------------------------------------
 # This repo COMMITS its production vendor/ packages (standard WordPress-plugin
-# distribution convention) but the committed composer autoloader is kept in the
-# DEV state — i.e. it maps PHPUnit and its transitive packages. That is required
-# so a plain `composer install` + `composer test` works straight from a clean
-# checkout with no build step (see .gitignore / tests/bootstrap.php).
+# distribution convention) AND keeps the committed composer autoloader in the
+# no-dev (production) state. A raw source install — a release zip OR a
+# Composer/Bedrock `dev-master` checkout — therefore boots without a build step
+# and never eager-requires a dev-only package that isn't shipped. This invariant
+# is enforced in CI (.github/workflows/ci.yml boots the committed
+# vendor/autoload.php with NO `composer install`).
 #
-# A released zip, however, MUST ship the no-dev (production) autoloader: it must
-# NOT reference dev-only packages (phpunit, nikic/php-parser, myclabs/deep-copy,
-# …) because those packages are gitignored and never shipped — a dev autoloader
-# would fatal at runtime on a user's site.
+# Dev packages (phpunit, nikic/php-parser, myclabs/deep-copy, …) are gitignored
+# and never shipped. A local `composer install` pulls them in and regenerates the
+# autoloader in its DEV form, so the tracked autoload_*.php files will show as
+# modified afterwards — that is expected; do NOT commit them (CI rejects a
+# dev-state committed autoloader). `composer test` / phpunit run from that
+# post-install dev autoloader.
 #
-# Rather than committing a no-dev autoloader (which would break the test suite,
-# since phpunit's classes would no longer be mapped while phpunit is still on
-# disk locally), this script regenerates the no-dev autoloader TRANSIENTLY at
-# build time, archives it, and then restores the committed dev autoloader. The
-# working tree is left exactly as it was found.
+# This script still regenerates the no-dev autoloader TRANSIENTLY before
+# archiving — so a build started after `composer install` is correct regardless
+# of the working-tree state — and restores whatever autoloader it found on exit.
+# The working tree is left exactly as it was found.
 #
 # Reproducibility: the archive source is HEAD (committed content) overlaid with
 # the freshly generated no-dev autoloader. The build does NOT depend on any
@@ -59,12 +62,13 @@ mkdir -p dist
 
 echo "Building ${ZIP_PATH} (version ${VERSION})..."
 
-# The committed composer autoloader is in DEV state (so the test suite works from
-# a clean checkout). A release must ship the NO-DEV autoloader. We regenerate it
-# transiently here and restore the committed (dev) autoloader on exit, no matter
-# how the script terminates. Only the four generated autoloader files are touched;
-# autoload_files.php (generated only when dev deps with file-autoload are present)
-# is removed by --no-dev and restored too.
+# The committed composer autoloader is already in the no-dev (production) state,
+# but a build may be started after a local `composer install` has regenerated it
+# in DEV form. Regenerate the no-dev autoloader transiently here and restore
+# whatever autoloader was present on exit, no matter how the script terminates.
+# Only the four generated autoloader files are touched; autoload_files.php
+# (generated only when dev deps with file-autoload are present) is removed by
+# --no-dev and restored too.
 AUTOLOAD_FILES=(
     vendor/composer/autoload_classmap.php
     vendor/composer/autoload_psr4.php
@@ -85,7 +89,7 @@ for f in "${AUTOLOAD_FILES[@]}"; do
 done
 
 restore_autoloader() {
-    # Restore the dev autoloader exactly as it was found before the build.
+    # Restore the autoloader exactly as it was found before the build.
     for f in "${AUTOLOAD_FILES[@]}"; do
         if [[ -e "${RESTORE_DIR}/${f}" ]]; then
             cp -p "${RESTORE_DIR}/${f}" "${f}"
@@ -100,7 +104,7 @@ restore_autoloader() {
 
 TMP_ZIP="$(mktemp -t magic-convert-build)"
 VERIFY_DIR="$(mktemp -d)"
-# Clean up the temp artifacts AND always restore the committed dev autoloader.
+# Clean up the temp artifacts AND always restore the autoloader as it was found.
 trap 'rm -f "${TMP_ZIP}"; rm -rf "${VERIFY_DIR}"; restore_autoloader' EXIT
 
 # Regenerate the production (no-dev) autoloader in place. --optimize builds an
