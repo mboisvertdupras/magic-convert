@@ -102,7 +102,8 @@ restore_autoloader() {
     rm -rf "${RESTORE_DIR}"
 }
 
-TMP_ZIP="$(mktemp -t magic-convert-build)"
+# Explicit XXXXXX template (not `-t prefix`): portable across GNU and BSD mktemp.
+TMP_ZIP="$(mktemp "${TMPDIR:-/tmp}/magic-convert-build.XXXXXX")"
 VERIFY_DIR="$(mktemp -d)"
 # Clean up the temp artifacts AND always restore the autoloader as it was found.
 trap 'rm -f "${TMP_ZIP}"; rm -rf "${VERIFY_DIR}"; restore_autoloader' EXIT
