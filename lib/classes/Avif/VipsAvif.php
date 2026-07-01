@@ -4,6 +4,8 @@ namespace MagicConvert\Avif;
 
 class VipsAvif extends AbstractAvifConverter
 {
+    private static $operational;
+
     public function id()
     {
         return 'vips';
@@ -16,12 +18,16 @@ class VipsAvif extends AbstractAvifConverter
 
     public function isOperational()
     {
+        if (self::$operational !== null) {
+            return self::$operational;
+        }
+
         if (!extension_loaded('vips')) {
-            return ['operational' => false, 'reason' => 'The libvips (vips) PHP extension is not loaded.'];
+            return self::$operational = ['operational' => false, 'reason' => 'The libvips (vips) PHP extension is not loaded.'];
         }
         foreach (['vips_image_new_from_file', 'vips_call', 'vips_error_buffer'] as $fn) {
             if (!function_exists($fn)) {
-                return [
+                return self::$operational = [
                     'operational' => false,
                     'reason' => 'The vips extension is loaded but ' . $fn . '() is missing (broken/partial install).',
                 ];
@@ -29,18 +35,41 @@ class VipsAvif extends AbstractAvifConverter
         }
 
         vips_error_buffer();
-        $result = @vips_call('heifsave', null);
+        $probe = @vips_call('black', null, 1, 1);
+        if (!is_array($probe) || !isset($probe['out'])) {
+            return self::$operational = [
+                'operational' => false,
+                'reason' => 'libvips could not create a probe image: ' . vips_error_buffer(),
+            ];
+        }
+
+        $probeFile = tempnam(sys_get_temp_dir(), 'mc-vips-avif-');
+        if ($probeFile === false) {
+            return self::$operational = [
+                'operational' => false,
+                'reason' => 'Could not create a temporary file to probe libvips AVIF support.',
+            ];
+        }
+
+        vips_error_buffer();
+        $result = @vips_call('heifsave', $probe['out'], $probeFile, ['compression' => 'av1']);
+        $message = vips_error_buffer();
+        @unlink($probeFile);
+
         if ($result === -1) {
-            $message = vips_error_buffer();
             if (strpos($message, 'class "heifsave" not found') !== false) {
-                return [
+                return self::$operational = [
                     'operational' => false,
                     'reason' => 'libvips was compiled without HEIF/AVIF support (the "heifsave" operation is missing).',
                 ];
             }
+            return self::$operational = [
+                'operational' => false,
+                'reason' => 'libvips heifsave probe failed: ' . $message,
+            ];
         }
 
-        return ['operational' => true, 'reason' => ''];
+        return self::$operational = ['operational' => true, 'reason' => ''];
     }
 
     public function convert($source, $destination, array $options)
