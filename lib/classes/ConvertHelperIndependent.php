@@ -7,8 +7,6 @@ It is used by webp-on-demand.php. It is also used for bulk conversion.
 namespace MagicConvert;
 
 use \WebPConvert\WebPConvert;
-use \WebPConvert\Convert\ConverterFactory;
-use \WebPConvert\Exceptions\WebPConvertException;
 use \WebPConvert\Loggers\BufferLogger;
 
 use \MagicConvert\FileHelper;
@@ -16,7 +14,8 @@ use \MagicConvert\FileLock;
 use \MagicConvert\OutputFormat;
 use \MagicConvert\SanityCheck;
 use \MagicConvert\SanityException;
-use \MagicConvert\Avif\AvifStack;
+use \MagicConvert\Format\ProviderRegistry;
+use \MagicConvert\Format\FormatEncodeException;
 
 class ConvertHelperIndependent
 {
@@ -729,32 +728,11 @@ APACHE
             }
 
             try {
-                if ($format->id() === 'avif') {
-                    $avifOptions = self::deriveAvifOptions($convertOptions);
-                    $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
-                        . ', speed=' . $avifOptions['speed']
-                        . ', metadata=' . $avifOptions['metadata'] . ')');
-                    $logger->logLn('');
-
-                    $avifConverterList = (isset($convertOptions['avif']['converters']) && is_array($convertOptions['avif']['converters']))
-                        ? $convertOptions['avif']['converters']
-                        : [];
-                    $stack = AvifStack::fromConverterList($avifConverterList);
-                    $result = $stack->convert($source, $tempDestination, $avifOptions);
-
-                    $logger->logLn($result['log']);
-                    $logger->logLn('');
-                    $logger->logLn('Converted with: ' . $result['converter']);
-                } elseif (!is_null($converter)) {
-                //if (isset($convertOptions['converter'])) {
-                    //print_r($convertOptions);exit;
-                    $logger->logLn('Converter set to: ' . $converter);
-                    $logger->logLn('');
-                    $converterObj = ConverterFactory::makeConverter($converter, $source, $tempDestination, $convertOptions, $logger);
-                    $converterObj->doConvert();
+                $provider = ProviderRegistry::byId($format->id());
+                if (!is_null($converter)) {
+                    $provider->encodeWith($converter, $source, $tempDestination, $convertOptions, $logger);
                 } else {
-    //error_log('options:' . print_r(json_encode($convertOptions,JSON_PRETTY_PRINT), true));
-                    WebPConvert::convert($source, $tempDestination, $convertOptions, $logger);
+                    $provider->encode($source, $tempDestination, $convertOptions, $logger);
                 }
 
                 if (@file_exists($tempDestination)) {
@@ -766,13 +744,12 @@ APACHE
                 } else {
                     $msg = 'Conversion did not produce an output file';
                 }
-            } catch (\WebpConvert\Exceptions\WebPConvertException $e) {
+            } catch (FormatEncodeException $e) {
                 $msg = $e->getMessage();
-            } catch (\Exception $e) {
-                //$msg = 'An exception was thrown!';
-                $msg = $e->getMessage();
+                foreach ($e->perConverterReasons() as $converterId => $reason) {
+                    $logger->logLn('- **' . $converterId . '**: ' . $reason);
+                }
             } catch (\Throwable $e) {
-                //Executed only in PHP 7 and 8, will not match in PHP 5
                 $msg = $e->getMessage();
             }
 
@@ -791,33 +768,6 @@ APACHE
             }
             FileLock::release($lockPath, $lockToken);
         }
-    }
-
-    /**
-     *  @param  array  $convertOptions
-     *  @return array{quality:int,speed:int,metadata:string,jobs:(int|null)}
-     */
-    private static function deriveAvifOptions($convertOptions)
-    {
-        $avif = (is_array($convertOptions) && isset($convertOptions['avif']) && is_array($convertOptions['avif']))
-            ? $convertOptions['avif']
-            : [];
-
-        $quality = isset($avif['quality']) ? (int) $avif['quality'] : 30;
-        $speed = isset($avif['speed']) ? (int) $avif['speed'] : 6;
-
-        $metadata = (is_array($convertOptions) && isset($convertOptions['metadata']))
-            ? $convertOptions['metadata']
-            : 'all';
-
-        $jobs = isset($avif['jobs']) ? (int) $avif['jobs'] : null;
-
-        return [
-            'quality' => $quality,
-            'speed' => $speed,
-            'metadata' => $metadata,
-            'jobs' => $jobs,
-        ];
     }
 
     /**

@@ -322,20 +322,13 @@ class Convert
 
         // Input has been processed, now lets get to work!
         // -----------------------------------------------
-        if ($format === 'avif') {
-            $config = Config::loadConfigAndFix();
-            if (!is_null($converterId)) {
-                $config['formats']['avif']['converters'] = [['converter' => $converterId]];
-            }
-            $result = self::convertFile($filename, $config, null, null, false, 'avif');
-        } else {
-            $result = self::runConversion(
-                $filename,
-                $converterId,
-                $configOverrides,
-                false
-            );
-        }
+        $result = self::runConversion(
+            $filename,
+            $converterId,
+            $configOverrides,
+            false,
+            $format
+        );
 
         $nonceTick = wp_verify_nonce($_REQUEST['nonce'], 'magicconvert-ajax-convert-nonce');
         if ($nonceTick == 2) {
@@ -401,7 +394,7 @@ class Convert
             return self::convertFile($source, $config, null, null, $skipIfFresh, $format);
         }
 
-        return self::convertFile($source, null, null, null, $skipIfFresh, $format);
+        return self::convertFile($source, null, null, $converterId, $skipIfFresh, $format);
     }
 
     /**
