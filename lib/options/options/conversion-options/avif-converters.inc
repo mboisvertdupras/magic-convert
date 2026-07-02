@@ -3,8 +3,9 @@
 $mcFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
 $mcAvif = (isset($mcFormats['avif']) && is_array($mcFormats['avif'])) ? $mcFormats['avif'] : [];
 
-$mcAvifQuality = isset($mcAvif['quality']) ? intval($mcAvif['quality']) : 30;
-$mcAvifSpeed = isset($mcAvif['speed']) ? intval($mcAvif['speed']) : 6;
+$mcAvifDefaults = \MagicConvert\Format\ProviderRegistry::byId('avif')->optionDefaults();
+$mcAvifQuality = isset($mcAvif['quality']) ? intval($mcAvif['quality']) : $mcAvifDefaults['quality'];
+$mcAvifSpeed = isset($mcAvif['speed']) ? intval($mcAvif['speed']) : $mcAvifDefaults['speed'];
 ?>
 <fieldset class="block">
     <button onclick="MagicConvert.SelfTest.openPopup('avifInfo')" class="button button-secondary" type="button" style="position: absolute; right: 15px; top:15px">

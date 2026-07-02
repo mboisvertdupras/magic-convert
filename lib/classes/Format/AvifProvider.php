@@ -26,6 +26,29 @@ class AvifProvider implements FormatProvider
         ];
     }
 
+    public function normalizeOptions(array $options): array
+    {
+        $convertOptions = (isset($options['webp-convert']['convert']) && is_array($options['webp-convert']['convert']))
+            ? $options['webp-convert']['convert']
+            : [];
+
+        $avifCfg = (isset($options['formats']['avif']) && is_array($options['formats']['avif']))
+            ? $options['formats']['avif']
+            : [];
+
+        $defaults = $this->optionDefaults();
+
+        $convertOptions['avif'] = [
+            'quality' => isset($avifCfg['quality']) ? intval($avifCfg['quality']) : $defaults['quality'],
+            'speed' => isset($avifCfg['speed']) ? intval($avifCfg['speed']) : $defaults['speed'],
+            'converters' => (isset($avifCfg['converters']) && is_array($avifCfg['converters']))
+                ? $avifCfg['converters']
+                : [],
+        ];
+
+        return $convertOptions;
+    }
+
     public function memoryReserveBytes(): int
     {
         return self::ENCODE_RESERVE_BYTES;
@@ -38,7 +61,7 @@ class AvifProvider implements FormatProvider
 
     public function encode(string $source, string $destination, array $options, $logger): void
     {
-        $avifOptions = self::deriveAvifOptions($options);
+        $avifOptions = $this->deriveAvifOptions($options);
         $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
             . ', speed=' . $avifOptions['speed']
             . ', metadata=' . $avifOptions['metadata'] . ')');
@@ -57,7 +80,7 @@ class AvifProvider implements FormatProvider
 
     public function encodeWith(string $converterId, string $source, string $destination, array $options, $logger): void
     {
-        $avifOptions = self::deriveAvifOptions($options);
+        $avifOptions = $this->deriveAvifOptions($options);
         $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
             . ', speed=' . $avifOptions['speed']
             . ', metadata=' . $avifOptions['metadata'] . ')');
@@ -85,14 +108,15 @@ class AvifProvider implements FormatProvider
      * @param  array  $convertOptions
      * @return array{quality:int,speed:int,metadata:string,jobs:(int|null)}
      */
-    private static function deriveAvifOptions($convertOptions): array
+    private function deriveAvifOptions($convertOptions): array
     {
         $avif = (is_array($convertOptions) && isset($convertOptions['avif']) && is_array($convertOptions['avif']))
             ? $convertOptions['avif']
             : [];
 
-        $quality = isset($avif['quality']) ? (int) $avif['quality'] : 30;
-        $speed = isset($avif['speed']) ? (int) $avif['speed'] : 6;
+        $defaults = $this->optionDefaults();
+        $quality = isset($avif['quality']) ? (int) $avif['quality'] : $defaults['quality'];
+        $speed = isset($avif['speed']) ? (int) $avif['speed'] : $defaults['speed'];
 
         $metadata = (is_array($convertOptions) && isset($convertOptions['metadata']))
             ? $convertOptions['metadata']
