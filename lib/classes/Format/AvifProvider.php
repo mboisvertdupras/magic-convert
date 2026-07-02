@@ -3,10 +3,11 @@
 namespace MagicConvert\Format;
 
 use MagicConvert\Avif\AvifStack;
-use MagicConvert\ConcurrencyAdvisor;
 
 class AvifProvider implements FormatProvider
 {
+    private const ENCODE_RESERVE_BYTES = 1073741824;
+
     public function id(): string
     {
         return 'avif';
@@ -27,7 +28,7 @@ class AvifProvider implements FormatProvider
 
     public function memoryReserveBytes(): int
     {
-        return ConcurrencyAdvisor::reserveBytesForFormat('avif');
+        return self::ENCODE_RESERVE_BYTES;
     }
 
     public function concurrencyWeight(): int

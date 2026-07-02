@@ -102,6 +102,24 @@ class ConcurrencyAdvisorTest extends TestCase
         ];
     }
 
+    /**
+     * @dataProvider coreCountProvider
+     */
+    public function testRecommendedWebConcurrencySizesAgainstHeaviestFormat(int $cores): void
+    {
+        $advisor = new ConcurrencyAdvisor($cores, 0.0, self::AMPLE_MEMORY);
+        $this->assertSame(
+            $advisor->recommendedWebConcurrencyForFormat('avif'),
+            $advisor->recommendedWebConcurrency()
+        );
+    }
+
+    public function testReserveBytesAreTheProviderDeclaredLiterals(): void
+    {
+        $this->assertSame(self::GIB, ConcurrencyAdvisor::reserveBytesForFormat('avif'));
+        $this->assertSame(268435456, ConcurrencyAdvisor::reserveBytesForFormat('webp'));
+    }
+
     public function testWebTargetsMapsEachFormat(): void
     {
         $advisor = new ConcurrencyAdvisor(10, 0.0, self::AMPLE_MEMORY);

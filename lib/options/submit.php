@@ -2,10 +2,10 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-use \MagicConvert\Avif\AvifStack;
 use \MagicConvert\CacheMover;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
+use \MagicConvert\Format\ProviderRegistry;
 use \MagicConvert\DismissableMessages;
 use \MagicConvert\HTAccess;
 use \MagicConvert\HTAccessRules;
@@ -321,7 +321,7 @@ function magicconvert_getSanitizedAvifConverters() {
     $posted = isset($_POST['avif-converters']) ? $_POST['avif-converters'] : '[]';
     $posted = json_decode(wp_unslash($posted), true);
 
-    return magicconvert_sanitizeAvifConverters($posted, AvifStack::defaultConverterIds());
+    return magicconvert_sanitizeAvifConverters($posted, ProviderRegistry::byId('avif')->converterIds());
 }
 
 /**
