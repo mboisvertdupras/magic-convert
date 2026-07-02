@@ -17,6 +17,7 @@ use \MagicConvert\SanityException;
 use \MagicConvert\ValidateException;
 use \MagicConvert\Validate;
 use \MagicConvert\WodConfigLoader;
+use \MagicConvert\Format\ProviderRegistry;
 use WebPConvert\Loggers\EchoLogger;
 
 class WebPOnDemand extends WodConfigLoader
@@ -153,7 +154,7 @@ class WebPOnDemand extends WodConfigLoader
         $options = self::$options;
         $wodOptions = self::$wodOptions;
         $serveOptions = $options['webp-convert'];
-        $convertOptions = &$serveOptions['convert'];
+        $serveOptions['convert'] = ProviderRegistry::byId(OutputFormat::webp()->id())->normalizeOptions($options);
         //echo '<pre>' . print_r($wodOptions, true) . '</pre>'; exit;
 
 
