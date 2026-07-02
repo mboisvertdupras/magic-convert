@@ -2,17 +2,20 @@
 
 namespace MagicConvert\Avif;
 
-class AvifStackException extends \Exception
+use MagicConvert\Format\FormatEncodeException;
+
+class AvifStackException extends FormatEncodeException
 {
     /** @var array<string,string> */
     private $reasons;
 
     /**
-     * @param array<string,string> $reasons
+     * @param string                $message
+     * @param array<string,string>  $reasons
      */
     public function __construct($message, array $reasons = [])
     {
-        parent::__construct($message);
+        parent::__construct($message, $reasons);
         $this->reasons = $reasons;
     }
 
