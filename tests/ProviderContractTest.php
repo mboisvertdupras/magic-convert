@@ -113,6 +113,23 @@ class ProviderContractTest extends TestCase
         );
     }
 
+    public function testProvidersDeclareTheReserveByteLiterals(): void
+    {
+        $this->assertSame(1073741824, ProviderRegistry::byId('avif')->memoryReserveBytes());
+        $this->assertSame(268435456, ProviderRegistry::byId('webp')->memoryReserveBytes());
+    }
+
+    /**
+     * @dataProvider providerIds
+     */
+    public function testAdvisorReserveBytesComeFromProviders(string $id): void
+    {
+        $this->assertSame(
+            ProviderRegistry::byId($id)->memoryReserveBytes(),
+            ConcurrencyAdvisor::reserveBytesForFormat($id)
+        );
+    }
+
     /**
      * @dataProvider providerIds
      */

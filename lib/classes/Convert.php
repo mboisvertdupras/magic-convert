@@ -4,10 +4,10 @@ namespace MagicConvert;
 
 use \WebPConvert\Convert\Converters\Ewww;
 
-use \MagicConvert\Avif\AvifStack;
 use \MagicConvert\ConvertHelperIndependent;
 use \MagicConvert\Config;
 use \MagicConvert\ConvertersHelper;
+use \MagicConvert\Format\ProviderRegistry;
 use \MagicConvert\ImageRoots;
 use \MagicConvert\OutputFormat;
 use \MagicConvert\PathHelper;
@@ -288,7 +288,7 @@ class Convert
             if (isset($_POST['converter'])) {
                 $converterId = sanitize_text_field($_POST['converter']);
                 if ($format === 'avif') {
-                    if (!in_array($converterId, AvifStack::defaultConverterIds(), true)) {
+                    if (!in_array($converterId, ProviderRegistry::byId($format)->converterIds(), true)) {
                         $converterId = null;
                     }
                 } else {

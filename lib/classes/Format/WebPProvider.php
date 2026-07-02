@@ -2,11 +2,12 @@
 
 namespace MagicConvert\Format;
 
-use MagicConvert\ConcurrencyAdvisor;
 use MagicConvert\ConvertersHelper;
 
 class WebPProvider implements FormatProvider
 {
+    private const ENCODE_RESERVE_BYTES = 268435456;
+
     public function id(): string
     {
         return 'webp';
@@ -24,7 +25,7 @@ class WebPProvider implements FormatProvider
 
     public function memoryReserveBytes(): int
     {
-        return ConcurrencyAdvisor::reserveBytesForFormat('webp');
+        return self::ENCODE_RESERVE_BYTES;
     }
 
     public function concurrencyWeight(): int

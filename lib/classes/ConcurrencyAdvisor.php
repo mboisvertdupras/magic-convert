@@ -2,6 +2,8 @@
 
 namespace MagicConvert;
 
+use MagicConvert\Format\ProviderRegistry;
+
 class ConcurrencyAdvisor
 {
     const BUSY_LOAD_PER_CORE = 1.5;
@@ -11,10 +13,6 @@ class ConcurrencyAdvisor
     const WEB_MAX = 8;
 
     const CLI_MAX = 8;
-
-    const AVIF_ENCODE_RESERVE_BYTES = 1073741824;
-
-    const WEBP_ENCODE_RESERVE_BYTES = 268435456;
 
     const MEMORY_USABLE_PERCENT = 75;
 
@@ -179,9 +177,24 @@ class ConcurrencyAdvisor
      */
     public static function reserveBytesForFormat($formatId)
     {
-        return ($formatId === 'avif')
-            ? self::AVIF_ENCODE_RESERVE_BYTES
-            : self::WEBP_ENCODE_RESERVE_BYTES;
+        return ProviderRegistry::byId((string) $formatId)->memoryReserveBytes();
+    }
+
+    /**
+     * @return string
+     */
+    private static function heaviestFormatId()
+    {
+        $heaviestId = null;
+        $heaviestBytes = -1;
+        foreach (ProviderRegistry::all() as $id => $provider) {
+            $bytes = $provider->memoryReserveBytes();
+            if ($bytes > $heaviestBytes) {
+                $heaviestBytes = $bytes;
+                $heaviestId = (string) $id;
+            }
+        }
+        return (string) $heaviestId;
     }
 
     /**
@@ -211,10 +224,11 @@ class ConcurrencyAdvisor
      */
     public static function concurrencyForFormat($formatId, $cores, $availableBytes, $max)
     {
-        $weight = ($formatId === 'avif') ? 2 : 1;
+        $provider = ProviderRegistry::byId((string) $formatId);
+        $weight = max(1, $provider->concurrencyWeight());
         $cpu = (int) floor(max(1, (int) $cores) / $weight);
 
-        $budget = self::memoryBudget($availableBytes, self::reserveBytesForFormat($formatId));
+        $budget = self::memoryBudget($availableBytes, $provider->memoryReserveBytes());
         $n = ($budget === null) ? $cpu : min($cpu, $budget);
 
         return self::clamp($n, 1, $max);
@@ -265,7 +279,7 @@ class ConcurrencyAdvisor
 
     public function recommendedWebConcurrency()
     {
-        return $this->recommendedWebConcurrencyForFormat('avif');
+        return $this->recommendedWebConcurrencyForFormat(self::heaviestFormatId());
     }
 
     public function recommendedWebConcurrencyForFormat($formatId)
@@ -314,7 +328,7 @@ class ConcurrencyAdvisor
             $procs = max(1, $procs);
         }
 
-        $budget = self::memoryBudget($this->availableMemoryBytes(), self::AVIF_ENCODE_RESERVE_BYTES);
+        $budget = self::memoryBudget($this->availableMemoryBytes(), self::reserveBytesForFormat(self::heaviestFormatId()));
         if ($budget !== null) {
             $procs = min($procs, $budget);
         }
