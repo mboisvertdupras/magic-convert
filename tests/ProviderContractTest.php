@@ -86,20 +86,97 @@ class ProviderContractTest extends TestCase
         );
     }
 
-    public function testAvifOptionDefaultsMatchConfigSource(): void
+    public function testConfigAvifDefaultsAreBuiltFromProviderOptionDefaults(): void
     {
-        $avifDefaults = Config::getDefaultFormats()['avif'];
-        $expected = [
-            'quality' => $avifDefaults['quality'],
-            'speed' => $avifDefaults['speed'],
-        ];
-        $this->assertSame(['quality' => 30, 'speed' => 6], $expected);
-        $this->assertSame($expected, ProviderRegistry::byId('avif')->optionDefaults());
+        // The provider is now the single source of truth for the avif option
+        // defaults; Config::getDefaultFormats() consumes them.
+        $providerDefaults = ProviderRegistry::byId('avif')->optionDefaults();
+        $this->assertSame(['quality' => 30, 'speed' => 6], $providerDefaults);
+
+        $avifBlock = Config::getDefaultFormats()['avif'];
+        $this->assertSame($providerDefaults['quality'], $avifBlock['quality']);
+        $this->assertSame($providerDefaults['speed'], $avifBlock['speed']);
     }
 
     public function testWebpOptionDefaultsAreEmpty(): void
     {
         $this->assertSame([], ProviderRegistry::byId('webp')->optionDefaults());
+    }
+
+    public function testAbstractAvifConverterFallbacksMatchProviderDefaults(): void
+    {
+        // AbstractAvifConverter keeps its own last-resort clamp fallbacks because
+        // the Avif namespace must not depend on the Format namespace (that would be
+        // circular: Format\AvifProvider already depends on Avif\AvifStack). This test
+        // pins them equal to the single source so any drift fails CI.
+        $defaults = ProviderRegistry::byId('avif')->optionDefaults();
+        $this->assertSame($defaults['quality'], \MagicConvert\Avif\AbstractAvifConverter::DEFAULT_QUALITY);
+        $this->assertSame($defaults['speed'], \MagicConvert\Avif\AbstractAvifConverter::DEFAULT_SPEED);
+    }
+
+    public function testWebpNormalizeOptionsPassesThroughConvertSlice(): void
+    {
+        $convert = ['metadata' => 'all', 'converters' => [['converter' => 'cwebp']]];
+        $wodOptions = [
+            'wod' => ['enable-logging' => false],
+            'webp-convert' => ['fail' => 'original', 'convert' => $convert],
+            'formats' => ['webp' => ['enabled' => true], 'avif' => ['enabled' => false]],
+        ];
+        $this->assertSame($convert, ProviderRegistry::byId('webp')->normalizeOptions($wodOptions));
+    }
+
+    public function testWebpNormalizeOptionsReturnsEmptyWhenConvertSliceMissing(): void
+    {
+        $this->assertSame([], ProviderRegistry::byId('webp')->normalizeOptions(['formats' => []]));
+    }
+
+    public function testAvifNormalizeOptionsAppliesDefaultsWhenKeysMissing(): void
+    {
+        $convert = ['metadata' => 'all'];
+        $wodOptions = [
+            'webp-convert' => ['convert' => $convert],
+            'formats' => ['avif' => ['enabled' => true]],
+        ];
+        $result = ProviderRegistry::byId('avif')->normalizeOptions($wodOptions);
+
+        $this->assertSame('all', $result['metadata']);
+        $this->assertSame(30, $result['avif']['quality']);
+        $this->assertSame(6, $result['avif']['speed']);
+        $this->assertSame([], $result['avif']['converters']);
+    }
+
+    public function testAvifNormalizeOptionsMissingDefaultsComeFromOptionDefaults(): void
+    {
+        $wodOptions = [
+            'webp-convert' => ['convert' => []],
+            'formats' => ['avif' => []],
+        ];
+        $result = ProviderRegistry::byId('avif')->normalizeOptions($wodOptions);
+        $defaults = ProviderRegistry::byId('avif')->optionDefaults();
+
+        $this->assertSame($defaults['quality'], $result['avif']['quality']);
+        $this->assertSame($defaults['speed'], $result['avif']['speed']);
+    }
+
+    public function testAvifNormalizeOptionsUsesProvidedValuesWhenPresent(): void
+    {
+        $convert = ['metadata' => 'none'];
+        $converters = [['converter' => 'vips'], ['converter' => 'gd']];
+        $wodOptions = [
+            'webp-convert' => ['convert' => $convert],
+            'formats' => [
+                'avif' => ['enabled' => true, 'quality' => 45, 'speed' => 3, 'converters' => $converters],
+            ],
+        ];
+        $result = ProviderRegistry::byId('avif')->normalizeOptions($wodOptions);
+
+        $this->assertSame(
+            [
+                'metadata' => 'none',
+                'avif' => ['quality' => 45, 'speed' => 3, 'converters' => $converters],
+            ],
+            $result
+        );
     }
 
     /**

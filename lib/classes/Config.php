@@ -107,20 +107,18 @@ class Config
     public static function getDefaultFormats()
     {
         return [
-            'webp' => [
-                'enabled' => true,
-            ],
-            'avif' => [
-                'enabled' => false,
-                'quality' => 30,
-                'speed' => 6,
-                'converters' => array_map(
-                    static function ($id) {
-                        return ['converter' => $id];
-                    },
-                    \MagicConvert\Avif\AvifStack::defaultConverterIds()
-                ),
-            ],
+            'webp' => ['enabled' => OutputFormat::byId('webp')->isDefault()]
+                + \MagicConvert\Format\ProviderRegistry::byId('webp')->optionDefaults(),
+            'avif' => ['enabled' => OutputFormat::byId('avif')->isDefault()]
+                + \MagicConvert\Format\ProviderRegistry::byId('avif')->optionDefaults()
+                + [
+                    'converters' => array_map(
+                        static function ($id) {
+                            return ['converter' => $id];
+                        },
+                        \MagicConvert\Avif\AvifStack::defaultConverterIds()
+                    ),
+                ],
         ];
     }
 

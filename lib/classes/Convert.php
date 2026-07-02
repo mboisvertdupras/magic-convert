@@ -95,30 +95,18 @@ class Convert
             // Check convert options
             // -------------------------------
             $checking = 'configuration file (options)';
+            $wodOptions = Config::generateWodOptionsFromConfigObj($config);
             if (is_null($convertOptions)) {
-                $wodOptions = Config::generateWodOptionsFromConfigObj($config);
                 if (!isset($wodOptions['webp-convert']['convert'])) {
                     throw new SanityException('conversion options are missing');
                 }
-                $convertOptions = $wodOptions['webp-convert']['convert'];
+            } else {
+                if (!is_array($convertOptions)) {
+                    throw new SanityException('conversion options are missing');
+                }
+                $wodOptions['webp-convert']['convert'] = $convertOptions;
             }
-            if (!is_array($convertOptions)) {
-                throw new SanityException('conversion options are missing');
-            }
-
-            $formatObj = OutputFormat::coerce($format);
-            if ($formatObj->id() === 'avif') {
-                $avifCfg = (isset($config['formats']['avif']) && is_array($config['formats']['avif']))
-                    ? $config['formats']['avif']
-                    : [];
-                $convertOptions['avif'] = [
-                    'quality' => isset($avifCfg['quality']) ? intval($avifCfg['quality']) : 30,
-                    'speed' => isset($avifCfg['speed']) ? intval($avifCfg['speed']) : 6,
-                    'converters' => (isset($avifCfg['converters']) && is_array($avifCfg['converters']))
-                        ? $avifCfg['converters']
-                        : [],
-                ];
-            }
+            $convertOptions = ProviderRegistry::byId($format->id())->normalizeOptions($wodOptions);
 
 
             // Check destination

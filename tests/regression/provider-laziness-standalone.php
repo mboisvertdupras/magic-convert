@@ -61,6 +61,33 @@ $check(
     'fact methods did NOT pull in the vendor autoloader (ExecWithFallback still not loaded)'
 );
 
+$threwNormalize = null;
+try {
+    $fixture = [
+        'webp-convert' => ['convert' => ['metadata' => 'all']],
+        'formats' => [
+            'webp' => ['enabled' => true],
+            'avif' => ['enabled' => true, 'quality' => 40, 'speed' => 5],
+        ],
+    ];
+    foreach ($providers as $provider) {
+        $out = $provider->normalizeOptions($fixture);
+        if (!is_array($out)) {
+            throw new \RuntimeException('normalizeOptions did not return an array for ' . $provider->id());
+        }
+    }
+} catch (\Throwable $e) {
+    $threwNormalize = $e;
+}
+
+$check($threwNormalize === null, 'normalizeOptions (fact method) did NOT fatal'
+    . ($threwNormalize ? ' (got: ' . get_class($threwNormalize) . ': ' . $threwNormalize->getMessage() . ')' : ''));
+
+$check(
+    !class_exists('WebPConvert\\WebPConvert', false),
+    'normalizeOptions did NOT pull in the vendor autoloader (WebPConvert still not loaded)'
+);
+
 if ($failures) {
     fwrite(STDERR, "\nREGRESSION FAILED (" . count($failures) . "):\n - " . implode("\n - ", $failures) . "\n");
     exit(1);

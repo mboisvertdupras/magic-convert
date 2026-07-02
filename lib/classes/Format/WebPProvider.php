@@ -23,6 +23,14 @@ class WebPProvider implements FormatProvider
         return [];
     }
 
+    public function normalizeOptions(array $options): array
+    {
+        if (isset($options['webp-convert']['convert']) && is_array($options['webp-convert']['convert'])) {
+            return $options['webp-convert']['convert'];
+        }
+        return [];
+    }
+
     public function memoryReserveBytes(): int
     {
         return self::ENCODE_RESERVE_BYTES;
