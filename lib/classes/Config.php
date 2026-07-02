@@ -720,6 +720,39 @@ class Config
 
     }
 
+    /**
+     * @param  array  $config
+     * @return array<string,array<string,mixed>>
+     */
+    public static function buildWodFormatsProjection($config)
+    {
+        $formatDefaults = self::getDefaultFormats();
+        $cfgFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
+
+        $formats = [];
+        foreach (\MagicConvert\Format\ProviderRegistry::all() as $id => $provider) {
+            $fmt = (isset($cfgFormats[$id]) && is_array($cfgFormats[$id])) ? $cfgFormats[$id] : [];
+
+            $block = [
+                'enabled' => isset($fmt['enabled']) ? (bool) $fmt['enabled'] : OutputFormat::byId($id)->isDefault(),
+            ];
+
+            foreach ($provider->optionDefaults() as $key => $default) {
+                $block[$key] = isset($fmt[$key]) ? intval($fmt[$key]) : $formatDefaults[$id][$key];
+            }
+
+            if (array_key_exists('converters', $formatDefaults[$id])) {
+                $block['converters'] = (isset($fmt['converters']) && is_array($fmt['converters']))
+                    ? array_values($fmt['converters'])
+                    : $formatDefaults[$id]['converters'];
+            }
+
+            $formats[$id] = $block;
+        }
+
+        return $formats;
+    }
+
     public static function generateWodOptionsFromConfigObj($config)
     {
 
@@ -850,25 +883,7 @@ class Config
         ];
 
 
-        $formatDefaults = self::getDefaultFormats();
-        $cfgFormats = (isset($config['formats']) && is_array($config['formats'])) ? $config['formats'] : [];
-
-        $webpFmt = (isset($cfgFormats['webp']) && is_array($cfgFormats['webp'])) ? $cfgFormats['webp'] : [];
-        $avifFmt = (isset($cfgFormats['avif']) && is_array($cfgFormats['avif'])) ? $cfgFormats['avif'] : [];
-
-        $formats = [
-            'webp' => [
-                'enabled' => isset($webpFmt['enabled']) ? (bool) $webpFmt['enabled'] : true,
-            ],
-            'avif' => [
-                'enabled' => isset($avifFmt['enabled']) ? (bool) $avifFmt['enabled'] : false,
-                'quality' => isset($avifFmt['quality']) ? intval($avifFmt['quality']) : $formatDefaults['avif']['quality'],
-                'speed' => isset($avifFmt['speed']) ? intval($avifFmt['speed']) : $formatDefaults['avif']['speed'],
-                'converters' => (isset($avifFmt['converters']) && is_array($avifFmt['converters']))
-                    ? array_values($avifFmt['converters'])
-                    : $formatDefaults['avif']['converters'],
-            ],
-        ];
+        $formats = self::buildWodFormatsProjection($config);
 
 
         // Put it all together
