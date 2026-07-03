@@ -15,7 +15,7 @@ The cheap, pure value object naming an output format's identity facts: id, exten
 _Avoid_: format object, format descriptor
 
 **FormatProvider**:
-The per-format adapter behind the encode seam. One per output format; answers cheap facts (converter ids, option defaults, memory reserve, concurrency weight) and performs heavy work (encode, encode-with-one-converter, self-test).
+The per-format adapter behind the encode seam. One per output format. Seven vendor-free, WordPress-free fact methods (`id`, `converterIds`, `optionDefaults`, `memoryReserveBytes`, `concurrencyWeight`, `normalizeOptions`, `converterEntryFromConfig`) and four work methods that may load heavy code (`encode`, `encodeWith`, `selfTest`, `memorySafetyMode`). `selfTest()` returns config-independent capability rows, or `[]` when the format has no config-blind probe — WebP returns `[]`, its authoritative converter status staying with the config-aware test-run path.
 _Avoid_: encoder (that's a converter's job), format handler, format service
 
 **ProviderRegistry**:
@@ -23,7 +23,7 @@ The static, WordPress-free map from format id to FormatProvider. Hardcoded like 
 _Avoid_: provider factory
 
 **Laziness invariant**:
-The rule that constructing a FormatProvider and calling its fact methods must work without the vendor autoloader or WordPress; only its work methods may pull in heavy code.
+The rule that constructing a FormatProvider and calling any of its seven fact methods (`id`, `converterIds`, `optionDefaults`, `memoryReserveBytes`, `concurrencyWeight`, `normalizeOptions`, `converterEntryFromConfig`) must work without the vendor autoloader or WordPress; only the four work methods (`encode`, `encodeWith`, `selfTest`, `memorySafetyMode`) may pull in heavy code.
 _Avoid_: lazy loading (too generic)
 
 ### Conversion

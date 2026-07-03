@@ -65,6 +65,23 @@ jobs:
       - name: Run PHPUnit
         run: vendor/bin/phpunit
 
+      # Standalone regressions run OUTSIDE phpunit: its bootstrap loads
+      # vendor/autoload and would mask the preconditions these guard. One step
+      # per script so a failure names the script. They need vendor/ (installed
+      # above) but never WordPress; GD/vips/proc_open-dependent ones SKIP (exit 0)
+      # when the capability is absent.
+      - name: Regression - AVIF lazy vendor-autoloader
+        run: php tests/regression/avif-autoloader-standalone.php
+
+      - name: Regression - FormatProvider laziness
+        run: php tests/regression/provider-laziness-standalone.php
+
+      - name: Regression - AVIF subprocess isolation
+        run: php tests/regression/avif-subprocess-isolation.php
+
+      - name: Regression - VipsAvif isOperational (no segfault)
+        run: php tests/regression/avif-vips-isoperational-standalone.php
+
   committed-autoloader:
     # The committed vendor/ is consumed AS-IS by source installs — a release zip
     # or a Composer/Bedrock `dev-master` checkout — with NO `composer install`.
