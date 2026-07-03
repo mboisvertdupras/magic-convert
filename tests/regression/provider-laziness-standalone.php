@@ -36,12 +36,17 @@ $threw = null;
 $providers = [];
 try {
     $providers = \MagicConvert\Format\ProviderRegistry::all();
+    $factConfig = [
+        'converters' => [['converter' => 'cwebp']],
+        'formats' => ['avif' => ['converters' => [['converter' => 'vips']]]],
+    ];
     foreach ($providers as $provider) {
         $provider->id();
         $provider->converterIds();
         $provider->optionDefaults();
         $provider->memoryReserveBytes();
         $provider->concurrencyWeight();
+        $provider->converterEntryFromConfig($factConfig, 'cwebp');
     }
 } catch (\Throwable $e) {
     $threw = $e;

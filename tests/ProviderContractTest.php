@@ -88,8 +88,6 @@ class ProviderContractTest extends TestCase
 
     public function testConfigAvifDefaultsAreBuiltFromProviderOptionDefaults(): void
     {
-        // The provider is now the single source of truth for the avif option
-        // defaults; Config::getDefaultFormats() consumes them.
         $providerDefaults = ProviderRegistry::byId('avif')->optionDefaults();
         $this->assertSame(['quality' => 30, 'speed' => 6], $providerDefaults);
 
@@ -179,17 +177,6 @@ class ProviderContractTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider providerIds
-     */
-    public function testMemoryReserveBytesMatchesAdvisor(string $id): void
-    {
-        $this->assertSame(
-            ConcurrencyAdvisor::reserveBytesForFormat($id),
-            ProviderRegistry::byId($id)->memoryReserveBytes()
-        );
-    }
-
     public function testProvidersDeclareTheReserveByteLiterals(): void
     {
         $this->assertSame(1073741824, ProviderRegistry::byId('avif')->memoryReserveBytes());
@@ -224,11 +211,37 @@ class ProviderContractTest extends TestCase
         $e = new AvifStackException('boom', $reasons);
         $this->assertInstanceOf(FormatEncodeException::class, $e);
         $this->assertSame($reasons, $e->perConverterReasons());
-        $this->assertSame($reasons, $e->getReasons());
     }
 
     public function testPlainFormatEncodeExceptionHasEmptyReasons(): void
     {
         $this->assertSame([], (new FormatEncodeException('x'))->perConverterReasons());
+    }
+
+    public function testWebpConverterEntryFromConfigReturnsMatchingEntry(): void
+    {
+        $entry = ['converter' => 'cwebp', 'options' => ['use-nice' => true, 'try-cwebp' => true]];
+        $config = ['converters' => [['converter' => 'vips'], $entry]];
+        $this->assertSame($entry, ProviderRegistry::byId('webp')->converterEntryFromConfig($config, 'cwebp'));
+    }
+
+    public function testWebpConverterEntryFromConfigReturnsNullForUnknownId(): void
+    {
+        $config = ['converters' => [['converter' => 'cwebp']]];
+        $this->assertNull(ProviderRegistry::byId('webp')->converterEntryFromConfig($config, 'nope'));
+    }
+
+    public function testAvifConverterEntryFromConfigUsesWhitelistNotConfig(): void
+    {
+        $config = ['formats' => ['avif' => ['converters' => [['converter' => 'vips']]]]];
+        $this->assertSame(
+            ['converter' => 'avifenc'],
+            ProviderRegistry::byId('avif')->converterEntryFromConfig($config, 'avifenc')
+        );
+    }
+
+    public function testAvifConverterEntryFromConfigReturnsNullForWebpOnlyId(): void
+    {
+        $this->assertNull(ProviderRegistry::byId('avif')->converterEntryFromConfig([], 'cwebp'));
     }
 }

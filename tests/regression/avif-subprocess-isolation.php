@@ -11,6 +11,7 @@ namespace MagicConvert\RegressionTest;
 $pluginDir = dirname(__DIR__, 2);
 define('MAGIC_CONVERT_PLUGIN_DIR', $pluginDir);
 require $pluginDir . '/vendor/autoload.php';
+require_once $pluginDir . '/lib/classes/Format/FormatEncodeException.php';
 foreach (['AbstractAvifConverter', 'AbstractAvifExecConverter', 'AvifEncBinary', 'MagickBinaryAvif',
           'CavifBinary', 'GdAvif', 'ImagickAvif', 'VipsAvif', 'AvifStack', 'AvifStackException',
           'AvifSubprocessRunner'] as $c) {
