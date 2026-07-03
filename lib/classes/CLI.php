@@ -61,7 +61,10 @@ class CLI extends \WP_CLI_Command
      * : Override encoding quality with specified ("auto", "lossy" or "lossless")
      *
      * [--converter=<converter>]
-     * : Specify the converter to use (default is to use the stack). Valid options: cwebp | vips | ewww | imagemagick | imagick | gmagick | graphicsmagick | ffmpeg | gd | wpc | ewww
+     * : Specify the converter to use (default is to use the stack). Valid ids depend on the format —
+     *   webp: cwebp | vips | imagemagick | graphicsmagick | ffmpeg | wpc | ewww | imagick | gmagick | gd;
+     *   avif: imagick | vips | gd | magick-binary | avifenc | cavif.
+     *   Enabled formats the converter cannot produce are skipped for the run.
      *
      * [--format=<format>]
      * : Limit conversion to a single output format. Valid options: webp | avif. By default
@@ -135,15 +138,6 @@ class CLI extends \WP_CLI_Command
             $override['png-encoding'] = $assoc_args['encoding'];
             $override['jpeg-encoding'] = $assoc_args['encoding'];
         }
-        if (isset($assoc_args['converter'])) {
-            if (!in_array($assoc_args['converter'], ConvertersHelper::getDefaultConverterNames())) {
-                \WP_CLI::error(
-                  '"' . $assoc_args['converter'] . '" is not a valid converter id. ' .
-                  'Valid converters are: ' . implode(', ', ConvertersHelper::getDefaultConverterNames())
-                );
-            }
-        }
-
         $config = array_merge($config, $override);
 
         $enabledFormats = Config::enabledFormatIds($config);
@@ -163,6 +157,46 @@ class CLI extends \WP_CLI_Command
                 );
             }
             $activeFormats = [$requested];
+        }
+
+        $converter = null;
+        $convertOptionsByFormat = [];
+        if (isset($assoc_args['converter'])) {
+            $converter = $assoc_args['converter'];
+            $general = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
+
+            $usableFormats = [];
+            foreach ($activeFormats as $fmtId) {
+                $entry = Format\ProviderRegistry::byId($fmtId)->converterEntryFromConfig($config, $converter);
+                if (is_null($entry)) {
+                    continue;
+                }
+                $options = array_merge($general, isset($entry['options']) ? $entry['options'] : []);
+                unset($options['converters']);
+                $convertOptionsByFormat[$fmtId] = $options;
+                $usableFormats[] = $fmtId;
+            }
+
+            if (count($usableFormats) === 0) {
+                $valid = [];
+                foreach ($activeFormats as $fmtId) {
+                    $valid[] = self::formatLabel($fmtId) . ': ' .
+                        implode(', ', Format\ProviderRegistry::byId($fmtId)->converterIds());
+                }
+                \WP_CLI::error(
+                    '"' . $converter . '" is not a valid converter for any enabled format. ' .
+                    'Valid converters are — ' . implode('; ', $valid)
+                );
+            }
+            if (!$isChild) {
+                foreach (array_diff($activeFormats, $usableFormats) as $fmtId) {
+                    \WP_CLI::log(
+                        'Skipping ' . self::formatLabel($fmtId) . ': "' . $converter .
+                        '" is not a ' . self::formatLabel($fmtId) . ' converter'
+                    );
+                }
+            }
+            $activeFormats = $usableFormats;
         }
 
         if (!$isChild) {
@@ -278,30 +312,6 @@ class CLI extends \WP_CLI_Command
             }
         }
 
-        $converter = null;
-        $convertOptions = null;
-
-        if (isset($assoc_args['converter'])) {
-
-            $converter = $assoc_args['converter'];
-            $convertOptions = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
-
-            // find the converter
-            $optionsForThisConverter = null;
-            foreach ($convertOptions['converters'] as $c) {
-                if ($c['converter'] == $converter) {
-                    $optionsForThisConverter = (isset($c['options']) ? $c['options'] : []);
-                    break;
-                }
-            }
-            if (!is_array($optionsForThisConverter)) {
-                \WP_CLI::error('Failed handling options');
-            }
-
-            $convertOptions = array_merge($convertOptions, $optionsForThisConverter);
-            unset($convertOptions['converters']);
-        }
-
         $orgTotalFilesize = 0;
         $webpTotalFilesize = 0;
         $convertedCount = 0;
@@ -332,6 +342,7 @@ class CLI extends \WP_CLI_Command
                 foreach ($fileFormats as $fmtId) {
                     $formatTag = $multiFormat ? ('[' . self::formatLabel($fmtId) . '] ') : '';
 
+                    $convertOptions = isset($convertOptionsByFormat[$fmtId]) ? $convertOptionsByFormat[$fmtId] : null;
                     $result = Convert::convertFile($path, $config, $convertOptions, $converter, $skipIfFresh, $fmtId);
 
                     if ($result['success']) {
