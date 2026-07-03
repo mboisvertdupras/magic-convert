@@ -274,12 +274,8 @@ class Convert
             $checking = '"converter" argument';
             if (isset($_POST['converter'])) {
                 $converterId = sanitize_text_field($_POST['converter']);
-                if ($format === 'avif') {
-                    if (!in_array($converterId, ProviderRegistry::byId($format)->converterIds(), true)) {
-                        $converterId = null;
-                    }
-                } else {
-                    Validate::isConverterId($converterId);
+                if (!in_array($converterId, ProviderRegistry::byId($format)->converterIds(), true)) {
+                    throw new ValidateException('Not a valid converter id');
                 }
             }
 
