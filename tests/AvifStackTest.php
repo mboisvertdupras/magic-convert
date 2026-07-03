@@ -113,7 +113,7 @@ class AvifStackTest extends TestCase
             $stack->convert('/src', '/dst', []);
             $this->fail('expected AvifStackException');
         } catch (AvifStackException $e) {
-            $reasons = $e->getReasons();
+            $reasons = $e->perConverterReasons();
             $this->assertSame('imagick not loaded', $reasons['imagick']);
             $this->assertSame('no AVIF support', $reasons['gd']);
             $this->assertSame('binary crashed', $reasons['avifenc']);

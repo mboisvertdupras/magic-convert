@@ -59,26 +59,27 @@ class AvifProvider implements FormatProvider
         return 2;
     }
 
+    public function converterEntryFromConfig(array $config, string $converterId): ?array
+    {
+        return in_array($converterId, $this->converterIds(), true) ? ['converter' => $converterId] : null;
+    }
+
     public function encode(string $source, string $destination, array $options, $logger): void
     {
-        $avifOptions = $this->deriveAvifOptions($options);
-        $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
-            . ', speed=' . $avifOptions['speed']
-            . ', metadata=' . $avifOptions['metadata'] . ')');
-        $logger->logLn('');
-
         $avifConverterList = (isset($options['avif']['converters']) && is_array($options['avif']['converters']))
             ? $options['avif']['converters']
             : [];
         $stack = AvifStack::fromConverterList($avifConverterList);
-        $result = $stack->convert($source, $destination, $avifOptions);
-
-        $logger->logLn($result['log']);
-        $logger->logLn('');
-        $logger->logLn('Converted with: ' . $result['converter']);
+        $this->runStack($stack, $source, $destination, $options, $logger);
     }
 
     public function encodeWith(string $converterId, string $source, string $destination, array $options, $logger): void
+    {
+        $stack = AvifStack::fromConverterList([['converter' => $converterId]]);
+        $this->runStack($stack, $source, $destination, $options, $logger);
+    }
+
+    private function runStack(AvifStack $stack, string $source, string $destination, array $options, $logger): void
     {
         $avifOptions = $this->deriveAvifOptions($options);
         $logger->logLn('AVIF conversion (quality=' . $avifOptions['quality']
@@ -86,7 +87,6 @@ class AvifProvider implements FormatProvider
             . ', metadata=' . $avifOptions['metadata'] . ')');
         $logger->logLn('');
 
-        $stack = AvifStack::fromConverterList([['converter' => $converterId]]);
         $result = $stack->convert($source, $destination, $avifOptions);
 
         $logger->logLn($result['log']);
