@@ -116,7 +116,7 @@ class Config
                         static function ($id) {
                             return ['converter' => $id];
                         },
-                        \MagicConvert\Avif\AvifStack::defaultConverterIds()
+                        \MagicConvert\Format\ProviderRegistry::byId('avif')->converterIds()
                     ),
                 ],
         ];
@@ -602,7 +602,7 @@ class Config
         }
 
         $rows = [];
-        foreach ((new \MagicConvert\Avif\AvifStack())->selfTest() as $row) {
+        foreach (\MagicConvert\Format\ProviderRegistry::byId('avif')->selfTest() as $row) {
             $rows[$row['id']] = $row;
         }
 

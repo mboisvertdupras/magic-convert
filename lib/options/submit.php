@@ -357,6 +357,7 @@ After this, there must be no more references to $_POST
 
 
 // Sanitizing
+$avifDefaults = ProviderRegistry::byId('avif')->optionDefaults();
 $sanitized = [
     // Force htaccess rules
     'force' => isset($_POST['force']),
@@ -471,8 +472,8 @@ $sanitized = [
 
 
     'avif-enabled' => isset($_POST['avif-enabled']),
-    'avif-quality' => magicconvert_getSanitizedClampedInt('avif-quality', 30, 0, 100),
-    'avif-speed' => magicconvert_getSanitizedClampedInt('avif-speed', 6, 0, 10),
+    'avif-quality' => magicconvert_getSanitizedClampedInt('avif-quality', $avifDefaults['quality'], 0, 100),
+    'avif-speed' => magicconvert_getSanitizedClampedInt('avif-speed', $avifDefaults['speed'], 0, 10),
     'avif-converters' => magicconvert_getSanitizedAvifConverters(),
 
 
