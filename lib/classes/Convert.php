@@ -6,7 +6,6 @@ use \WebPConvert\Convert\Converters\Ewww;
 
 use \MagicConvert\ConvertHelperIndependent;
 use \MagicConvert\Config;
-use \MagicConvert\ConvertersHelper;
 use \MagicConvert\Format\ProviderRegistry;
 use \MagicConvert\ImageRoots;
 use \MagicConvert\OutputFormat;
@@ -341,6 +340,9 @@ class Convert
      *  @param  bool         $skipIfFresh
      *  @param  OutputFormat|string|null $format
      *
+     *  A non-null $converterId without config-overrides forces a single-converter run,
+     *  dispatched through the format provider's encodeWith path.
+     *
      *  @return array
      */
     public static function runConversion($source, $converterId = null, $configOverrides = null, $skipIfFresh = false, $format = null)
@@ -354,8 +356,9 @@ class Convert
                 // Merge in the config-overrides (config-overrides only have effect when using a specific converter)
                 $config = array_merge($config, $configOverrides);
 
-                $converter = ConvertersHelper::getConverterById($config, $converterId);
-                if ($converter === false) {
+                $entry = ProviderRegistry::byId(OutputFormat::coerce($format)->id())
+                    ->converterEntryFromConfig($config, $converterId);
+                if ($entry === null) {
                     return [
                         'success' => false,
                         'msg' => 'Converter could not be loaded',
@@ -368,15 +371,11 @@ class Convert
                 // We need to "regenerate" webp-convert options in order to use the ones specified in the config-overrides
                 // And we need to merge the general options (such as quality etc) into the option for the specific converter
 
-                $generalWebpConvertOptions = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
-                $converterSpecificWebpConvertOptions = isset($converter['options']) ? $converter['options'] : [];
+                $general = Config::generateWodOptionsFromConfigObj($config)['webp-convert']['convert'];
+                $options = array_merge($general, isset($entry['options']) ? $entry['options'] : []);
+                unset($options['converters']);
 
-                $webpConvertOptions = array_merge($generalWebpConvertOptions, $converterSpecificWebpConvertOptions);
-                unset($webpConvertOptions['converters']);
-
-                // what is this? - I forgot why!
-                //$config = array_merge($config, $converter['options']);
-                return self::convertFile($source, $config, $webpConvertOptions, $converterId, $skipIfFresh, $format);
+                return self::convertFile($source, $config, $options, $converterId, $skipIfFresh, $format);
             }
 
             return self::convertFile($source, $config, null, null, $skipIfFresh, $format);

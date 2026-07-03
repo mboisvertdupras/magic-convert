@@ -433,8 +433,7 @@ class SelfTestHelper
             $log[] = '- AVIF output enabled in settings?: ' . self::trueFalseNullString($avifEnabled);
         }
 
-        $stack = new \MagicConvert\Avif\AvifStack();
-        $rows = $stack->selfTest();
+        $rows = \MagicConvert\Format\ProviderRegistry::byId('avif')->selfTest();
 
         $operationalIds = [];
         $log[] = '';
@@ -456,7 +455,7 @@ class SelfTestHelper
             $log[] = '**No AVIF-capable converter found.**{: .warn} See the per-converter reasons above.';
         }
 
-        $mode = $stack->memorySafetyMode();
+        $mode = \MagicConvert\Format\ProviderRegistry::byId('avif')->memorySafetyMode();
         if ($mode === 'binary') {
             $log[] = '- Memory-safe bulk AVIF encoding?: yes — an out-of-process binary encoder is used.';
         } elseif ($mode === 'isolated') {
